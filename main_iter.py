@@ -23,14 +23,14 @@ if run_program == 1:
         rate_iter_conv = [r.detach().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
         tau_iter_conv = [e.detach().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
     # ====================================================== Conv. PGA with J = 10 ====================================
-    if run_UPGA_J10 == 1:
-        print('Running unfolded PGA with J = 10...')
-        model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-        rate_UPGA_J10, tau_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, R, snr,
+    if run_conv_PGA_J10 == 1:
+        print('Running conventional PGA with J = 10...')
+        model_conv_PGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+        rate_conv_PGA_J10, tau_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, R, snr,
                                                                                            n_iter_outer,
                                                                                            n_iter_inner_J10)
-        rate_iter_PGA_J10 = [r.detach().numpy() for r in (sum(rate_UPGA_J10) / len(H_test[0]))]
-        tau_iter_PGA_J10 = [e.detach().numpy() for e in (sum(tau_UPGA_J10) / (len(H_test[0])))]
+        rate_iter_conv_PGA_J10 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
+        tau_iter_conv_PGA_J10 = [e.detach().numpy() for e in (sum(tau_conv_PGA_J10) / (len(H_test[0])))]
     # ====================================================== Conv. PGA with J = 10 and partial coupling ====================================
     if run_UPGA_J10_PC == 1:
         print('Running unfolded PGA with J = 10 and partial coupling...')
@@ -218,6 +218,9 @@ if plot_figure == 1:
     # if run_UPGA_J1 == 1:
     #     obj_iter_UPGA_J1 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J1, tau_iter_UPGA_J1)]
     #     plt.plot(iter_number_UPGA_J1, obj_iter_UPGA_J1, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
+    if run_conv_PGA_J10 == 1:
+        obj_iter_conv_PGA_J10 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_conv_PGA_J10, tau_iter_conv_PGA_J10)]
+        plt.plot(iter_number_UPGA_J10, obj_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J10, tau_iter_UPGA_J10)]
         plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10, ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J10)

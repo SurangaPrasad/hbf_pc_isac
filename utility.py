@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 
 # ==================================== initialize F and W ===========================
-def initialize(H, R, Pt, normalization):
+def initialize(H, R, Pt, normalization, pc=False):
     if init_scheme == 'conv':
         # randomizing F
         F = torch.randn(len(H[0]), Nt, Nrf, dtype=torch.double) + 1j * torch.randn(len(H[0]), Nt, Nrf,
@@ -57,6 +57,7 @@ def initialize(H, R, Pt, normalization):
             F = torch.cat(((F[None, :, :, :],) * K), 0)
         else:
             sys.stderr.write('Error: Wrong RF chain configuration....\n')
+        F = F * generage_partial_connection_mask(Nt, Nrf) if pc else F
     elif init_scheme == 'svd':
         U, S, V_H = torch.linalg.svd(H)
         V = V_H
@@ -317,7 +318,7 @@ def get_trace(A):
 
 # ======== normalization to meet constant modulus and power constraint ===========================
 def normalize(F, W, H, Pt):
-    F = F / torch.abs(F)
+    F = F / (torch.abs(F) + 1e-12)
     sum_norm_BB = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
     normalize_factor = torch.sqrt(K * Pt / sum_norm_BB).reshape(len(H[0]), 1, 1)
     W = normalize_factor * W
@@ -335,18 +336,14 @@ def normalize_power(F, W, H, Pt):
     return F
 
 # ========================= generate PC mask =====================
-def generate_partial_connection_mask(Nt, Nrf, batch_size, num_freq=1, device=None):
-    antennas_per_rf = Nt // Nrf
+def generage_partial_connection_mask(N, M):
 
-    idx = torch.arange(Nt, device=device) // antennas_per_rf
-    idx = idx.clamp(max=Nrf - 1)
-
-    mask = torch.zeros((Nt, Nrf), dtype=torch.cfloat, device=device)
-    mask[torch.arange(Nt), idx] = 1.0 + 0j
-
-    mask = mask.unsqueeze(0).unsqueeze(0)
-    mask = mask.expand(batch_size, num_freq, Nt, Nrf)
-
+    mask = torch.zeros((N, M), dtype=torch.cfloat)
+    antennas_per_rf = N // M
+    for rf in range(M):
+        start_idx = rf * antennas_per_rf
+        end_idx = start_idx + antennas_per_rf
+        mask[start_idx:end_idx, rf] = 1.0 + 0j  # connect these antennas to this RF chain
     return mask
 
 

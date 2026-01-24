@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 from utility import *
 
+def project_unit_modulus(F, eps=1e-12):
+    """Project complex entries to unit modulus without introducing NaNs."""
+    magnitude = torch.abs(F)
+    return torch.where(magnitude > eps, F / magnitude, torch.zeros_like(F))
+
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             PGA MODEL CLASSES
 # /////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +37,7 @@ class PGA_Conv_comp_grad(nn.Module):
                 if sum(torch.abs(F[0, :, 0, 0])) > 1e1:
                     F = normalize_power(F, W, H, Pt)
                 # Projection
-                F = F / torch.abs(F)
+                F = project_unit_modulus(F)
 
                 # update W
                 W_new = W.clone().detach()
@@ -78,7 +83,7 @@ class PGA_Conv(nn.Module):
             F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
 
             # Projection
-            F = F / torch.abs(F)
+            F = project_unit_modulus(F)
 
             # update W
             W_new = W.clone().detach()
@@ -128,7 +133,7 @@ class PGA_Unfold_J10(nn.Module):
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
             # Projection
-            F = F / torch.abs(F)
+            F = project_unit_modulus(F)
 
             # update W
             W_new = W.clone().detach()
@@ -159,13 +164,14 @@ class PGA_Unfold_J10_PC(nn.Module):
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
-        rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
+        rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
-        PC_mask = generate_partial_connection_mask(Nt, Nrf, batch_size=len(H[0]), num_freq=1, device=H.device)
+
+        pc_mask = generage_partial_connection_mask(64, 4)
         for ii in range(n_iter_outer):
             # update F over
-            for jj in range(n_iter_inner):
+            for jj in range(n_iter_inner):    
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_rad = get_grad_F_rad(F, W, R)
                 if grad_F_com.isnan().any() or grad_F_rad.isnan().any(): # check gradient
@@ -173,14 +179,13 @@ class PGA_Unfold_J10_PC(nn.Module):
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                 delta_F_rad = self.step_size[jj][ii][0] * grad_F_rad
                 F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
+                F = F * pc_mask
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
             # Projection
-            F = PC_mask * F
-            F = F / torch.clamp(torch.abs(F), min=1e-12)
-
-
+            F = project_unit_modulus(F)
+            
             # update W
             W_new = W.clone().detach()
             # compute gradients
@@ -190,9 +195,9 @@ class PGA_Unfold_J10_PC(nn.Module):
                 delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
                 delta_W_rad = self.step_size[0][ii][k + 1] * grad_W_k_rad[k]
                 W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_rad * WEIGHT_W_RAD
+            
             # Projection
             F, W = normalize(F, W_new, H, Pt)
-
             # get the rate in this iteration
             rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
             # print(rate_over_iters[ii])
@@ -228,7 +233,7 @@ class PGA_Unfold_J20(nn.Module):
                 if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                     F = normalize_power(F, W, H, Pt)
             # Projection
-            F = F / torch.abs(F)
+            F = project_unit_modulus(F)
 
             # update W
             W_new = W.clone().detach()
@@ -276,13 +281,13 @@ def get_grad_F_com(H, F, W):
         B = A @ F_H
         C = B @ Htilde_mk
         denom_1 = np.log(2) * (get_trace(C) + sigma2)
-        grad_F_1 = Htilde_mk @ F @ V / denom_1[:, :, None, None]  # expand dimension
+        grad_F_1 = Htilde_mk @ F @ V / (denom_1[:, :, None, None]+1e-4)  # expand dimension
 
         A1 = F @ V_mk
         B1 = A1 @ F_H
         C1 = B1 @ Htilde_mk
         denom_2 = np.log(2) * (get_trace(C1) + sigma2)
-        grad_F_2 = Htilde_mk @ F @ V_mk / denom_2[:, :, None, None]  # expand dimension
+        grad_F_2 = Htilde_mk @ F @ V_mk / (denom_2[:, :, None, None]+1e-4)  # expand dimension
 
         grad_F_sum_M = grad_F_sum_M + (grad_F_1 - grad_F_2)
 
