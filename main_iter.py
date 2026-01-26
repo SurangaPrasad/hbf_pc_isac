@@ -32,8 +32,8 @@ if run_program == 1:
         print('Running conventional PGA...')
         model_conv_PGA = PGA_Conv(step_size_conv_PGA).to(device)
         rate_conv, tau_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
-        rate_iter_conv = torch.stack(rate_conv).mean(dim=0)
-        tau_iter_conv = torch.stack(tau_conv).mean(dim=0)
+        rate_iter_conv = [r.detach().cpu().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
+        tau_iter_conv = [e.detach().cpu().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
@@ -41,8 +41,8 @@ if run_program == 1:
         rate_conv_PGA_J10, tau_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, R, snr,
                                                                                            n_iter_outer,
                                                                                            n_iter_inner_J10)
-        rate_iter_conv_PGA_J10 = torch.stack(rate_conv_PGA_J10).mean(dim=0)
-        tau_iter_conv_PGA_J10 = torch.stack(tau_conv_PGA_J10).mean(dim=0)
+        rate_iter_conv_PGA_J10 = [r.detach().cpu().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
+        tau_iter_conv_PGA_J10 = [e.detach().cpu().numpy() for e in (sum(tau_conv_PGA_J10) / (len(H_test[0])))]
     # ====================================================== Conv. PGA with J = 10 and partial coupling ====================================
     if run_UPGA_J10_PC == 1:
         print('Running unfolded PGA with J = 10 and partial coupling...')
@@ -50,8 +50,8 @@ if run_program == 1:
         rate_UPGA_J10_PC, tau_UPGA_J10_PC, F_UPGA_J10_PC, W_UPGA_J10_PC = model_UPGA_J10_PC.execute_PGA(H_test, R, snr,
                                                                                            n_iter_outer,
                                                                                            n_iter_inner_J10)
-        rate_iter_UPGA_J10_PC = torch.stack(rate_UPGA_J10_PC).mean(dim=0)
-        tau_iter_UPGA_J10_PC = torch.stack(tau_UPGA_J10_PC).mean(dim=0)
+        rate_iter_UPGA_J10_PC = [r.detach().cpu().numpy() for r in (sum(rate_UPGA_J10_PC) / len(H_test[0]))]
+        tau_iter_UPGA_J10_PC = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J10_PC) / (len(H_test[0])))]
     # ====================================================== Unfolded PGA with J = 1====================================
     if run_UPGA_J1 == 1:
         print('Running unfolded PGA with J = 1...')
@@ -61,8 +61,8 @@ if run_program == 1:
 
         # executing unfolded PGA on the test set
         sum_rate_UPGA_J1, tau_UPGA_J1, F_UPGA_J1, W_UPGA_J1 = model_UPGA_J1.execute_PGA(H_test, R, snr, n_iter_outer)
-        rate_iter_UPGA_J1 = torch.stack(sum_rate_UPGA_J1).mean(dim=0)
-        tau_iter_UPGA_J1 = torch.stack(tau_UPGA_J1).mean(dim=0)
+        rate_iter_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J1) / len(H_test[0]))]
+        tau_iter_UPGA_J1 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J1) / (len(H_test[0])))]
 
     # ====================================================== Proposed Unfolded PGA light ====================================
     if run_UPGA_J10 == 1:
@@ -75,8 +75,8 @@ if run_program == 1:
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_UPGA_J10 = torch.stack(sum_rate_UPGA_J10).mean(dim=0)
-        tau_iter_UPGA_J10 = torch.stack(tau_UPGA_J10).mean(dim=0)
+        rate_iter_UPGA_J10 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
+        tau_iter_UPGA_J10 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J10) / (len(H_test[0])))]
 
     # ====================================================== Proposed Unfolded PGA ====================================
     if run_UPGA_J20 == 1:
@@ -87,8 +87,8 @@ if run_program == 1:
 
         sum_rate_UPGA_J20, tau_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, R, snr, n_iter_outer,
                                                                                              n_iter_inner_J20)
-        rate_iter_UPGA_J20 = torch.stack(sum_rate_UPGA_J20).mean(dim=0)
-        tau_iter_UPGA_J20 = torch.stack(tau_UPGA_J20).mean(dim=0)
+        rate_iter_UPGA_J20 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
+        tau_iter_UPGA_J20 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J20) / (len(H_test[0])))]
 
     # ============================== generate beampattern ////////////////////////////////////////////////////////////////////
     print('generating beampattern...')
@@ -286,8 +286,7 @@ if plot_figure == 1:
     # benchmark beampatter
     at_H = torch.transpose(at, 2, 3).conj()
     beam_bm = torch.diagonal(at_H @ R @ at, offset=0, dim1=-1, dim2=-2) / snr
-    beam_bm_array = beam_bm[0, 0, :].detach()
-
+    beam_bm_array = beam_bm[0,0,:].detach().cpu().numpy()
     plt.plot(angles_theta, np.real(beam_bm_array), '--', markevery=5, color='green', linewidth=1,
              label='Benchmark beampattern')  # ideal beampatter
     if run_UPGA_J1 == 1:
