@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from utility import *
+from utility import _get_real_dtype_like
 
 def clamp_complex_magnitude(delta, max_magnitude):
     """Scale complex updates so their magnitude never exceeds `max_magnitude`."""
@@ -51,8 +52,10 @@ class PGA_Conv_comp_grad(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner, weight_grad_F_rad, init_method):
         rate_init, tau_init, F, W = initialize_schemes(H, R, Pt, init_method)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save beampattern errors over iterations
+        device = H.device
+        real_dtype = _get_real_dtype_like(H)
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)  # save beampattern errors over iterations
         # update F and W over iterations
         for ii in range(n_iter_outer):
             for jj in range(n_iter_inner):
@@ -100,8 +103,10 @@ class PGA_Conv(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save beampattern errors over iterations
+        device = H.device
+        real_dtype = _get_real_dtype_like(H)
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)  # save beampattern errors over iterations
         # update F and W over iterations
         for ii in range(n_iter_outer):
             # update F
@@ -146,8 +151,10 @@ class PGA_Unfold_J10(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        device = H.device
+        real_dtype = _get_real_dtype_like(H)
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save beam errors over iterations
 
         for ii in range(n_iter_outer):
             # update F over
@@ -195,13 +202,15 @@ class PGA_Unfold_J10_PC(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        device = H.device
+        real_dtype = _get_real_dtype_like(H)
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save beam errors over iterations
 
-        pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
-        for ii in range(n_iter_outer):
+        pc_mask = generage_partial_connection_mask(Nt, Nrf, device=F.device, dtype=F.dtype)
+        for ii in range(2):
             # update F over
-            for jj in range(n_iter_inner):    
+            for jj in range(2):    
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_rad = get_grad_F_rad(F, W, R)
 
@@ -263,8 +272,10 @@ class PGA_Unfold_J20(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        device = H.device
+        real_dtype = _get_real_dtype_like(H)
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save beam errors over iterations
 
         for ii in range(n_iter_outer):
             # update F over
@@ -315,7 +326,7 @@ def get_grad_F_com(H, F, W):
     F_H = torch.transpose(F, 2, 3).conj()
     W_H = torch.transpose(W, 2, 3).conj()  # _H, _T means hermitian and transpose of a matrix
     V = W @ W_H  # K x train_size x Nrf x Nrf
-    grad_F_sum_M = torch.zeros(len(H[0]), Nt, Nrf)
+    grad_F_sum_M = torch.zeros(len(H[0]), Nt, Nrf, device=F.device, dtype=F.dtype)
     for m in range(M):
         W_m = W[:, :, :, torch.arange(W.size(3)) != m]
         V_mk = W_m @ torch.transpose(W_m, 2, 3).conj()  # need to change to remove 1 column
@@ -346,7 +357,7 @@ def get_grad_W_com(H, F, W):
     F_H = torch.transpose(F, 2, 3).conj()
     W_H = torch.transpose(W, 2, 3).conj()
     V = W @ W_H  # K x train_size x Nrf x Nrf
-    grad_W = torch.zeros(len(H), len(H[0]), Nrf, M)
+    grad_W = torch.zeros(len(H), len(H[0]), Nrf, M, device=W.device, dtype=W.dtype)
 
     for m in range(M):
         W_m = W
@@ -364,8 +375,8 @@ def get_grad_W_com(H, F, W):
 
         denom_2 = np.log(2) * (get_trace(W_m @ W_m_H @ Hbar_mk) + sigma2)
         grad_W_2 = Hbar_mk @ W_m / denom_2[:, :, None, None]  # expand dimension
-        mask_m = torch.ones(len(H), len(H[0]), Nrf, M)
-        mask_m[:, :, :, m] = torch.zeros(len(H), len(H[0]), Nrf)
+        mask_m = torch.ones(len(H), len(H[0]), Nrf, M, device=W.device, dtype=W.dtype)
+        mask_m[:, :, :, m] = torch.zeros(len(H), len(H[0]), Nrf, device=W.device, dtype=W.dtype)
         grad_W_2_masked = grad_W_2 * mask_m  # need element-wise multiplication for masking
         grad_W = grad_W + (grad_W_1 - grad_W_2_masked)
 

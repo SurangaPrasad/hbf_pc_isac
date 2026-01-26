@@ -1,6 +1,15 @@
+import os
+import torch
 from PGA_models import *
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+# ---- GPU Setup: Detect and configure device ----
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
+if torch.cuda.is_available():
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
 
 run_program = 1
 plot_figure = 1
@@ -9,74 +18,77 @@ save_result = 0
 # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
 # Load training data
 H_train, H_test0 = get_data_tensor(data_source)
-H_test = H_test0[:, :test_size, :, :]
+H_train = H_train.to(device)
+H_test = H_test0[:, :test_size, :, :].to(device)
 
 R, at0, theta, ideal_beam = get_radar_data(snr_dB, H_test)
+R = R.to(device)
+at0 = at0.to(device)
 at = at0[:, : test_size, :, :]
 
 if run_program == 1:
     # ====================================================== Conv. PGA ====================================
     if run_conv_PGA == 1:
         print('Running conventional PGA...')
-        model_conv_PGA = PGA_Conv(step_size_conv_PGA)
+        model_conv_PGA = PGA_Conv(step_size_conv_PGA).to(device)
         rate_conv, tau_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
-        rate_iter_conv = [r.detach().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
-        tau_iter_conv = [e.detach().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
+        rate_iter_conv = [r.detach().cpu().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
+        tau_iter_conv = [e.detach().cpu().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
-        model_conv_PGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+        model_conv_PGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10).to(device)
         rate_conv_PGA_J10, tau_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, R, snr,
                                                                                            n_iter_outer,
                                                                                            n_iter_inner_J10)
-        rate_iter_conv_PGA_J10 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
-        tau_iter_conv_PGA_J10 = [e.detach().numpy() for e in (sum(tau_conv_PGA_J10) / (len(H_test[0])))]
+        rate_iter_conv_PGA_J10 = [r.detach().cpu().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
+        tau_iter_conv_PGA_J10 = [e.detach().cpu().numpy() for e in (sum(tau_conv_PGA_J10) / (len(H_test[0])))]
     # ====================================================== Conv. PGA with J = 10 and partial coupling ====================================
     if run_UPGA_J10_PC == 1:
         print('Running unfolded PGA with J = 10 and partial coupling...')
-        model_UPGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10)
+        model_UPGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10).to(device)
         rate_UPGA_J10_PC, tau_UPGA_J10_PC, F_UPGA_J10_PC, W_UPGA_J10_PC = model_UPGA_J10_PC.execute_PGA(H_test, R, snr,
                                                                                            n_iter_outer,
                                                                                            n_iter_inner_J10)
-        rate_iter_UPGA_J10_PC = [r.detach().numpy() for r in (sum(rate_UPGA_J10_PC) / len(H_test[0]))]
-        tau_iter_UPGA_J10_PC = [e.detach().numpy() for e in (sum(tau_UPGA_J10_PC) / (len(H_test[0])))]
+        rate_iter_UPGA_J10_PC = [r.detach().cpu().numpy() for r in (sum(rate_UPGA_J10_PC) / len(H_test[0]))]
+        tau_iter_UPGA_J10_PC = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J10_PC) / (len(H_test[0])))]
     # ====================================================== Unfolded PGA with J = 1====================================
     if run_UPGA_J1 == 1:
         print('Running unfolded PGA with J = 1...')
         # Create new model and load states
-        model_UPGA_J1 = PGA_Conv(step_size_UPGA_J1)
-        model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1))
+        model_UPGA_J1 = PGA_Conv(step_size_UPGA_J1).to(device)
+        model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
 
         # executing unfolded PGA on the test set
         sum_rate_UPGA_J1, tau_UPGA_J1, F_UPGA_J1, W_UPGA_J1 = model_UPGA_J1.execute_PGA(H_test, R, snr, n_iter_outer)
-        rate_iter_UPGA_J1 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J1) / len(H_test[0]))]
-        tau_iter_UPGA_J1 = [e.detach().numpy() for e in (sum(tau_UPGA_J1) / (len(H_test[0])))]
+        rate_iter_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J1) / len(H_test[0]))]
+        tau_iter_UPGA_J1 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J1) / (len(H_test[0])))]
 
     # ====================================================== Proposed Unfolded PGA light ====================================
     if run_UPGA_J10 == 1:
         print('Running unfolded PGA with J = 10...')
         # Create new model and load states
-        model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
+        model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10).to(device)
+        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
 
         sum_rate_UPGA_J10, tau_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, R,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_UPGA_J10 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
-        tau_iter_UPGA_J10 = [e.detach().numpy() for e in (sum(tau_UPGA_J10) / (len(H_test[0])))]
+        rate_iter_UPGA_J10 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
+        tau_iter_UPGA_J10 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J10) / (len(H_test[0])))]
 
     # ====================================================== Proposed Unfolded PGA ====================================
     if run_UPGA_J20 == 1:
         print('Running unfolded PGA with J = 20...')
         # Create new model and load states
-        model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
-        # model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20))
+        model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20).to(device)
+        # model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
 
         sum_rate_UPGA_J20, tau_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, R, snr, n_iter_outer,
                                                                                              n_iter_inner_J20)
-        rate_iter_UPGA_J20 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
-        tau_iter_UPGA_J20 = [e.detach().numpy() for e in (sum(tau_UPGA_J20) / (len(H_test[0])))]
+        rate_iter_UPGA_J20 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
+        tau_iter_UPGA_J20 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J20) / (len(H_test[0])))]
 
     # ============================== generate beampattern ////////////////////////////////////////////////////////////////////
     print('generating beampattern...')
@@ -274,7 +286,7 @@ if plot_figure == 1:
     # benchmark beampatter
     at_H = torch.transpose(at, 2, 3).conj()
     beam_bm = torch.diagonal(at_H @ R @ at, offset=0, dim1=-1, dim2=-2) / snr
-    beam_bm_array = beam_bm[0,0,:]
+    beam_bm_array = beam_bm[0,0,:].detach().cpu().numpy()
     plt.plot(angles_theta, np.real(beam_bm_array), '--', markevery=5, color='green', linewidth=1,
              label='Benchmark beampattern')  # ideal beampatter
     if run_UPGA_J1 == 1:
