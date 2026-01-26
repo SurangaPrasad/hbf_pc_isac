@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 from utility import *
@@ -272,14 +273,15 @@ class PGA_Unfold_J20(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
+        print(f'size of F at init: {F.shape} and W: {W.shape} and H: {H.shape} and R: {R.shape}')
         device = H.device
         real_dtype = _get_real_dtype_like(H)
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=device, dtype=real_dtype)# save beam errors over iterations
 
-        for ii in range(n_iter_outer):
+        for ii in range(2):
             # update F over
-            for jj in range(n_iter_inner):
+            for jj in range(2):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_rad = get_grad_F_rad(F, W, R)
                 if grad_F_com.isnan().any() or grad_F_rad.isnan().any(): # check gradient
@@ -322,167 +324,100 @@ class PGA_Unfold_J20(nn.Module):
 
 
 # ==================================== gradient of R_mk w.r.t. F ===========================
-def get_grad_F_com(H, F, W, sigma2, K, Nt, Nrf):
-    """
-    Vectorized GPU-friendly version of get_grad_F_com
-    Removes the for-loop over m using batched matrix multiplications
-    """
+def get_grad_F_com(H, F, W, chunk_size=4):
+    """Compute communication gradient w.r.t. F with low peak memory via chunking."""
 
     device = F.device
     dtype = F.dtype
+    real_dtype = _get_real_dtype_like(F)
 
-    # Hermitian transposes
-    F_H = F.transpose(2, 3).conj()          # [K, train, Nrf, Nt]
-    W_H = W.transpose(2, 3).conj()          # [K, train, M, Nrf]
+    F_H = F.transpose(2, 3).conj()
+    W_H = W.transpose(2, 3).conj()
+    V = W @ W_H
 
-    # V = W W^H
-    V = W @ W_H                             # [K, train, Nrf, Nrf]
+    F_exp = F[:, :, None, :, :]
+    F_H_exp = F_H[:, :, None, :, :]
+    V_exp = V[:, :, None, :, :]
 
-    # --------------------------------------------------
-    # Construct Htilde_mk for ALL m
-    # --------------------------------------------------
-    # H: [K, train, M, Nt]
-    h = H.permute(0, 1, 3, 2)               # [K, train, Nt, M]
-    Htilde = h[..., :, None] @ h[..., None, :].conj()
-    # Htilde: [K, train, M, Nt, Nt]
+    log2 = torch.log(torch.tensor(2.0, device=device, dtype=real_dtype))
+    eps = torch.tensor(1e-4, device=device, dtype=real_dtype)
 
-    # --------------------------------------------------
-    # Construct V_mk = V - w_m w_m^H for ALL m
-    # --------------------------------------------------
-    w = W.permute(0, 1, 3, 2)               # [K, train, Nrf, M]
-    w_outer = w[..., :, None] @ w[..., None, :].conj()
-    # w_outer: [K, train, M, Nrf, Nrf]
+    grad_accum = torch.zeros_like(F)
+    chunk = max(1, min(M, chunk_size))
 
-    V_exp = V[:, :, None, :, :]             # [K, train, 1, Nrf, Nrf]
-    V_mk = V_exp - w_outer                  # [K, train, M, Nrf, Nrf]
+    for m_start in range(0, M, chunk):
+        m_end = min(m_start + chunk, M)
+        # Build Htilde for this chunk only
+        h_chunk = H[:, :, m_start:m_end, :].unsqueeze(-1)
+        h_chunk_H = h_chunk.conj().transpose(-2, -1)
+        Htilde = h_chunk @ h_chunk_H
 
-    # --------------------------------------------------
-    # Expand F for broadcasting
-    # --------------------------------------------------
-    F_exp = F[:, :, None, :, :]             # [K, train, 1, Nt, Nrf]
-    F_H_exp = F_H[:, :, None, :, :]         # [K, train, 1, Nrf, Nt]
+        # Build V_mk without cloning entire W each time
+        w_chunk = W[:, :, :, m_start:m_end].transpose(2, 3).unsqueeze(-1)
+        w_chunk_H = w_chunk.conj().transpose(-2, -1)
+        w_outer = w_chunk @ w_chunk_H
+        V_mk = V_exp - w_outer
 
-    log2 = torch.log(torch.tensor(2.0, device=device, dtype=dtype))
+        C = F_exp @ V_exp @ F_H_exp @ Htilde
+        trace_C = torch.diagonal(C, dim1=-2, dim2=-1).sum(-1).real
+        denom_1 = log2 * (trace_C + sigma2)
+        grad_F_1 = (Htilde @ F_exp @ V_exp) / (denom_1[..., None, None] + eps)
 
-    # --------------------------------------------------
-    # grad_F_1 (all m)
-    # --------------------------------------------------
-    C = F_exp @ V_exp @ F_H_exp @ Htilde
-    trace_C = torch.diagonal(C, dim1=-2, dim2=-1).sum(-1)
-    denom_1 = log2 * (trace_C + sigma2)
+        C1 = F_exp @ V_mk @ F_H_exp @ Htilde
+        trace_C1 = torch.diagonal(C1, dim1=-2, dim2=-1).sum(-1).real
+        denom_2 = log2 * (trace_C1 + sigma2)
+        grad_F_2 = (Htilde @ F_exp @ V_mk) / (denom_2[..., None, None] + eps)
 
-    grad_F_1 = (
-        Htilde @ F_exp @ V_exp
-    ) / (denom_1[..., None, None] + 1e-4)
+        grad_accum = grad_accum + (grad_F_1 - grad_F_2).sum(dim=2)
 
-    # --------------------------------------------------
-    # grad_F_2 (all m)
-    # --------------------------------------------------
-    C1 = F_exp @ V_mk @ F_H_exp @ Htilde
-    trace_C1 = torch.diagonal(C1, dim1=-2, dim2=-1).sum(-1)
-    denom_2 = log2 * (trace_C1 + sigma2)
-
-    grad_F_2 = (
-        Htilde @ F_exp @ V_mk
-    ) / (denom_2[..., None, None] + 1e-4)
-
-    # --------------------------------------------------
-    # Sum over m (this replaces the for-loop)
-    # --------------------------------------------------
-    grad_F_sum_M = (grad_F_1 - grad_F_2).sum(dim=2)   # [K, train, Nt, Nrf]
-
-    # --------------------------------------------------
-    # Final reduction over K (same as original)
-    # --------------------------------------------------
-    grad_F_sum_K = grad_F_sum_M.sum(dim=0) / K
-    grad_F = grad_F_sum_K.unsqueeze(0).repeat(K, 1, 1, 1)
-
+    grad_mean = grad_accum.sum(dim=0, keepdim=True) / K
+    grad_F = grad_mean.expand_as(F)
     return grad_F
 
-def get_grad_W_com(H, F, W, sigma2, K):
-    """
-    Fully vectorized GPU-friendly version of get_grad_W_com
-    Removes the for-loop over m using batched matrix multiplications
-    """
+
+def get_grad_W_com(H, F, W, chunk_size=4):
+    """Compute communication gradient w.r.t. W while limiting intermediate tensor sizes."""
 
     device = W.device
     dtype = W.dtype
+    real_dtype = _get_real_dtype_like(W)
 
-    # Dimensions
-    K_, train_size, M, Nt = H.shape
-    _, _, Nrf, _ = W.shape
+    F_H = F.transpose(2, 3).conj()
+    W_H = W.transpose(2, 3).conj()
+    V = W @ W_H
 
-    # Hermitian transposes
-    F_H = F.transpose(2, 3).conj()      # [K, train, Nrf, Nt]
-    W_H = W.transpose(2, 3).conj()      # [K, train, M, Nrf]
+    F_exp = F[:, :, None, :, :]
+    F_H_exp = F_H[:, :, None, :, :]
+    V_exp = V[:, :, None, :, :]
 
-    log2 = torch.log(torch.tensor(2.0, device=device, dtype=dtype))
+    log2 = torch.log(torch.tensor(2.0, device=device, dtype=real_dtype))
+    eps = torch.tensor(1e-4, device=device, dtype=real_dtype)
 
-    # --------------------------------------------------
-    # Construct Htilde_mk for ALL m
-    # --------------------------------------------------
-    # H: [K, train, M, Nt]
-    h = H.permute(0, 1, 3, 2)            # [K, train, Nt, M]
-    Htilde = h[..., :, None] @ h[..., None, :].conj()
-    # [K, train, M, Nt, Nt]
+    grad_accum = torch.zeros_like(W)
+    chunk = max(1, min(M, chunk_size))
 
-    # --------------------------------------------------
-    # Hbar_mk = F^H Htilde F   (for all m)
-    # --------------------------------------------------
-    F_exp = F[:, :, None, :, :]          # [K, train, 1, Nt, Nrf]
-    F_H_exp = F_H[:, :, None, :, :]      # [K, train, 1, Nrf, Nt]
+    for m_start in range(0, M, chunk):
+        m_end = min(m_start + chunk, M)
+        h_chunk = H[:, :, m_start:m_end, :].unsqueeze(-1)
+        h_chunk_H = h_chunk.conj().transpose(-2, -1)
+        Htilde = h_chunk @ h_chunk_H
+        Hbar = F_H_exp @ Htilde @ F_exp
 
-    Hbar = F_H_exp @ Htilde @ F_exp
-    # [K, train, M, Nrf, Nrf]
+        C = V_exp @ Hbar
+        trace_vals = torch.diagonal(C, dim1=-2, dim2=-1).sum(-1).real
+        denom = log2 * (trace_vals + sigma2)
+        common = (Hbar @ W[:, :, None, :, :]) / (denom[..., None, None] + eps)
 
-    # --------------------------------------------------
-    # Precompute W W^H
-    # --------------------------------------------------
-    V = W @ W_H                          # [K, train, Nrf, Nrf]
-    V_exp = V[:, :, None, :, :]          # [K, train, 1, Nrf, Nrf]
+        mask = torch.ones((m_end - m_start, M), device=device, dtype=real_dtype)
+        for local_idx, m_idx in enumerate(range(m_start, m_end)):
+            mask[local_idx, m_idx] = 0.0
+        mask = mask[None, None, :, None, :].to(dtype)
 
-    # --------------------------------------------------
-    # grad_W_1  (same for all m)
-    # --------------------------------------------------
-    C1 = V_exp @ Hbar
-    trace_1 = torch.diagonal(C1, dim1=-2, dim2=-1).sum(-1)
-    denom_1 = log2 * (trace_1 + sigma2)
+        grad_chunk = (common - common * mask).sum(dim=2)
+        grad_accum = grad_accum + grad_chunk
 
-    grad_W_1 = (
-        Hbar @ W[:, :, None, :, :]
-    ) / (denom_1[..., None, None] + 1e-4)
-    # [K, train, M, Nrf, M]
-
-    # --------------------------------------------------
-    # grad_W_2  (same computation, masked per m)
-    # --------------------------------------------------
-    C2 = (W @ W_H)[:, :, None, :, :] @ Hbar
-    trace_2 = torch.diagonal(C2, dim1=-2, dim2=-1).sum(-1)
-    denom_2 = log2 * (trace_2 + sigma2)
-
-    grad_W_2 = (
-        Hbar @ W[:, :, None, :, :]
-    ) / (denom_2[..., None, None] + 1e-4)
-
-    # --------------------------------------------------
-    # Mask diagonal (remove column m contribution)
-    # --------------------------------------------------
-    mask = torch.ones(M, M, device=device, dtype=dtype)
-    mask.fill_diagonal_(0.0)
-    mask = mask[None, None, None, :, :]      # broadcastable
-
-    grad_W_2_masked = grad_W_2 * mask
-
-    # --------------------------------------------------
-    # Sum over m (replaces the loop)
-    # --------------------------------------------------
-    grad_W = (grad_W_1 - grad_W_2_masked).sum(dim=2)
-
-    # --------------------------------------------------
-    # Final normalization
-    # --------------------------------------------------
-    grad_W = grad_W / K
-
+    grad_mean = grad_accum.sum(dim=0, keepdim=True) / K
+    grad_W = grad_mean.expand_as(W)
     return grad_W
 
 # /////////////////////////////////////////////////////////////////////////////////////////

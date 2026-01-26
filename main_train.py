@@ -1,5 +1,7 @@
+import math
 import numpy as np
 import matplotlib.pyplot as plt
+from torch.cuda.amp import autocast, GradScaler
 from utility import *
 from PGA_models import *
 
@@ -12,6 +14,14 @@ if torch.cuda.is_available():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
 
+amp_enabled = bool(enable_amp) and device.type == 'cuda'
+scaler = GradScaler(enabled=amp_enabled)
+train_micro_batch_size = max(1, min(batch_size, micro_batch_size))
+if train_micro_batch_size != batch_size:
+    print(f"Using micro-batches of {train_micro_batch_size} (logical batch {batch_size}).")
+if amp_enabled:
+    print("Mixed precision (torch.cuda.amp) is enabled.")
+
 # ---- training and test the models ----
 
 # Load training data
@@ -21,6 +31,32 @@ torch.manual_seed(3407)
 
 # Move test data to GPU (training batches are transferred on-the-fly)
 H_test = H_test.to(device)
+
+
+def _train_with_micro_batches(model, optimizer, H_batch, R_batch, transmit_power, n_iter_outer, scaler, *, n_iter_inner=None):
+    """Run a forward/backward pass using micro-batches to reduce activation memory."""
+    if H_batch.size(1) == 0:
+        return
+    micro = min(train_micro_batch_size, H_batch.size(1))
+    total_micro_steps = math.ceil(H_batch.size(1) / micro)
+
+    optimizer.zero_grad(set_to_none=True)
+    for start in range(0, H_batch.size(1), micro):
+        end = min(start + micro, H_batch.size(1))
+        H_micro = H_batch[:, start:end, :, :]
+        R_micro = R_batch[:, start:end, :, :]
+        with autocast(enabled=amp_enabled):
+            if n_iter_inner is None:
+                _, _, F_tmp, W_tmp = model.execute_PGA(H_micro, R_micro, transmit_power, n_iter_outer)
+            else:
+                _, _, F_tmp, W_tmp = model.execute_PGA(H_micro, R_micro, transmit_power, n_iter_outer, n_iter_inner)
+            loss = get_sum_loss(F_tmp, W_tmp, H_micro, R_micro, transmit_power, end - start)
+            loss = loss / total_micro_steps
+        scaler.scale(loss).backward()
+
+    scaler.step(optimizer)
+    scaler.update()
+    optimizer.zero_grad(set_to_none=True)
 
 # ====================================================== Conventional PGA ====================================
 if run_conv_PGA == 1:
@@ -60,13 +96,15 @@ if run_UPGA_J1 == 1:
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
             # Move radar data to GPU (H is already on GPU from H_train)
             Rtrain = Rtrain.to(device)
-            
-            __, __, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer)
-            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
-
-            optimizer.zero_grad()  # zero the gradient buffers
-            loss.backward()
-            optimizer.step()  # Does the update
+            _train_with_micro_batches(
+                model_UPGA_J1,
+                optimizer,
+                H,
+                Rtrain,
+                snr_train,
+                n_iter_outer,
+                scaler,
+            )
 
     # Save trained model
     torch.save(model_UPGA_J1.state_dict(), model_file_name_UPGA_J1)
@@ -105,14 +143,17 @@ if run_UPGA_J20 == 1:
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
             # Move radar data to GPU (H is already on GPU from H_train)
             Rtrain = Rtrain.to(device)
-            
-            rate, __, F, W = model_UPGA_J20.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J20)
-            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
-            # loss = -sum(sum(rate[1:]) / (K * batch_size))
-
-            optimizer.zero_grad()  # zero the gradient buffers
-            loss.backward()
-            optimizer.step()  # Does the update
+            print(f'Dimmensions of H: {H.shape}')
+            _train_with_micro_batches(
+                model_UPGA_J20,
+                optimizer,
+                H,
+                Rtrain,
+                snr_train,
+                n_iter_outer,
+                scaler,
+                n_iter_inner=n_iter_inner_J20,
+            )
 
     # Save trained model
     torch.save(model_UPGA_J20.state_dict(), model_file_name_UPGA_J20)
@@ -156,14 +197,16 @@ if run_UPGA_J10 == 1:
             # Move radar data to GPU (H is already on GPU from H_train)
             Rtrain = Rtrain.to(device)
             
-            rate, __, F, W = model_UPGA_J10.execute_PGA(H, Rtrain, snr_train, n_iter_outer,
-                                                        n_iter_inner_J10)
-            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
-            # loss = -sum(sum(rate[1:]) / (K * batch_size))
-
-            optimizer.zero_grad()  # zero the gradient buffers
-            loss.backward()
-            optimizer.step()  # Does the update
+            _train_with_micro_batches(
+                model_UPGA_J10,
+                optimizer,
+                H,
+                Rtrain,
+                snr_train,
+                n_iter_outer,
+                scaler,
+                n_iter_inner=n_iter_inner_J10,
+            )
 
     # Save trained model
     torch.save(model_UPGA_J10.state_dict(), model_file_name_UPGA_J10)
@@ -211,13 +254,16 @@ if run_UPGA_J10_PC == 1:
             Rtrain = Rtrain.to(device)
             print(f'Batch {i_batch} processing')
 
-            __ , __, F, W = model_UPGA_J10_PC.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10)
-            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
-
-
-            optimizer.zero_grad()  # zero the gradient buffers
-            loss.backward()
-            optimizer.step()  # Does the update 
+            _train_with_micro_batches(
+                model_UPGA_J10_PC,
+                optimizer,
+                H,
+                Rtrain,
+                snr_train,
+                n_iter_outer,
+                scaler,
+                n_iter_inner=n_iter_inner_J10,
+            )
 
     # Save trained model
     torch.save(model_UPGA_J10_PC.state_dict(), model_file_name_UPGA_J10_PC)
