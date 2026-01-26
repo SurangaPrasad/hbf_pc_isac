@@ -7,8 +7,8 @@ run_conv_PGA = 0           # Conventional PGA without unfolding
 run_conv_PGA_J10 = 0        # Conventional PGA with setting J = 10
 run_UPGA_J1 = 0           # Unfolded PGA without any modification (J = 1)
 run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
-run_UPGA_J20 = 1           # Unfolded PGA with setting J = 20
-run_UPGA_J10_PC = 0    # Unfolded PGA with J = 10 and partial coupling (PC) - future work
+run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
+run_UPGA_J10_PC = 1    # Unfolded PGA with J = 10 and partial coupling (PC)
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
@@ -72,6 +72,7 @@ step_size_conv_PGA = torch.full([n_iter_outer, K + 1], step_size_fixed, requires
 step_size_UPGA_J1 = torch.full([n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
 step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
 step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
+step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
 
 # ////////////////////////////////////////////// SAVING RESULTS AND DATA //////////////////////////////////////////////
 directory_data = "./dataset/" + system_config + "/"
@@ -97,7 +98,7 @@ if not os.path.exists(directory_model):
 model_file_name_UPGA_J1 = directory_model + 'UPGA_J1.pth'
 model_file_name_UPGA_J10 = directory_model + 'UPGA_J10.pth'
 model_file_name_UPGA_J20 = directory_model + 'UPGA_J20.pth'
-
+model_file_name_UPGA_J10_PC = directory_model + 'UPGA_J10_PC.pth'
 # To save result figures
 directory_result = "./sim_results/" + system_config + "/"
 if not os.path.exists(directory_result):
@@ -109,5 +110,6 @@ label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 label_UPGA_J1 = r'Unfolded PGA ' + '$(J = 1)$'
 label_UPGA_J10 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 label_UPGA_J20 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')$'
+label_UPGA_J10_PC = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_ZF = 'ZF (digital, comm. only)'
 label_SCA = 'SCA-ManOpt (converged)'

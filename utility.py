@@ -320,6 +320,7 @@ def get_trace(A):
 def normalize(F, W, H, Pt):
     F = F / (torch.abs(F) + 1e-12)
     sum_norm_BB = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
+    sum_norm_BB = torch.clamp(sum_norm_BB, min=1e-6)
     normalize_factor = torch.sqrt(K * Pt / sum_norm_BB).reshape(len(H[0]), 1, 1)
     W = normalize_factor * W
     # sum_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)/K
@@ -331,6 +332,7 @@ def normalize(F, W, H, Pt):
 # ========================= normalize F based on power constraint =====================
 def normalize_power(F, W, H, Pt):
     sum_norm_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
+    sum_norm_power = torch.clamp(sum_norm_power, min=1e-6)
     normalize_factor = torch.sqrt(Pt / sum_norm_power).reshape(len(H[0]), 1, 1)
     F = normalize_factor * F
     return F

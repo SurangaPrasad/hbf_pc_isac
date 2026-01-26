@@ -2,10 +2,40 @@ import torch
 import torch.nn as nn
 from utility import *
 
-def project_unit_modulus(F, eps=1e-12):
+def clamp_complex_magnitude(delta, max_magnitude):
+    """Scale complex updates so their magnitude never exceeds `max_magnitude`."""
+    magnitude = torch.abs(delta)
+    scale = torch.clamp(max_magnitude / (magnitude + 1e-12), max=1.0)
+    return delta * scale
+
+
+def sanitize_complex_tensor(tensor):
+    """Replace NaN/Inf entries in a complex tensor with safe finite values."""
+    real = torch.where(torch.isfinite(tensor.real), tensor.real, torch.zeros_like(tensor.real))
+    imag = torch.where(torch.isfinite(tensor.imag), tensor.imag, torch.zeros_like(tensor.imag))
+    return torch.complex(real, imag)
+
+
+def project_unit_modulus(F, eps=1e-12, active_mask=None):
     """Project complex entries to unit modulus without introducing NaNs."""
     magnitude = torch.abs(F)
-    return torch.where(magnitude > eps, F / magnitude, torch.zeros_like(F))
+    safe_magnitude = torch.where(magnitude > eps, magnitude, torch.ones_like(magnitude))
+    projected = F / safe_magnitude
+    projected = torch.where(magnitude > eps, projected, torch.zeros_like(F))
+
+    if active_mask is not None:
+        mask = active_mask
+        while mask.dim() < F.dim():
+            mask = mask.unsqueeze(0)
+        mask = mask.to(dtype=F.dtype, device=F.device)
+        mask_bool = mask.abs() > 0
+
+        # Rebuild the phase for entries that were driven below eps inside the active region.
+        phase = torch.polar(torch.ones_like(F.real), torch.angle(F))
+        projected = torch.where(mask_bool & (magnitude <= eps), phase, projected)
+        projected = torch.where(mask_bool, projected, torch.zeros_like(projected))
+
+    return projected
 
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             PGA MODEL CLASSES
@@ -168,23 +198,35 @@ class PGA_Unfold_J10_PC(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
 
-        pc_mask = generage_partial_connection_mask(64, 4)
+        pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
         for ii in range(n_iter_outer):
             # update F over
             for jj in range(n_iter_inner):    
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_rad = get_grad_F_rad(F, W, R)
+
+                grad_F_com = grad_F_com * pc_mask
+                grad_F_rad = grad_F_rad * pc_mask
+
+
+                # print(f'F matrix element: {F[0,0, :, :]}')
                 if grad_F_com.isnan().any() or grad_F_rad.isnan().any(): # check gradient
                     print('Error NaN gradients!!!!!!!!!!!!!!!')
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                 delta_F_rad = self.step_size[jj][ii][0] * grad_F_rad
+                delta_F_com = clamp_complex_magnitude(delta_F_com, 0.5)
+                delta_F_rad = clamp_complex_magnitude(delta_F_rad, 0.5)
                 F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
+                F = sanitize_complex_tensor(F)
                 F = F * pc_mask
+                F = sanitize_complex_tensor(F)
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
+                F = sanitize_complex_tensor(F)
             # Projection
-            F = project_unit_modulus(F)
+            F = project_unit_modulus(F, active_mask=pc_mask)
+            F = sanitize_complex_tensor(F)
             
             # update W
             W_new = W.clone().detach()
@@ -194,10 +236,15 @@ class PGA_Unfold_J10_PC(nn.Module):
             for k in range(K):
                 delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
                 delta_W_rad = self.step_size[0][ii][k + 1] * grad_W_k_rad[k]
+                delta_W_com = clamp_complex_magnitude(delta_W_com, 0.5)
+                delta_W_rad = clamp_complex_magnitude(delta_W_rad, 0.5)
                 W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_rad * WEIGHT_W_RAD
+                W_new[k] = sanitize_complex_tensor(W_new[k])
             
             # Projection
             F, W = normalize(F, W_new, H, Pt)
+            F = sanitize_complex_tensor(F)
+            W = sanitize_complex_tensor(W)
             # get the rate in this iteration
             rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
             # print(rate_over_iters[ii])
@@ -291,7 +338,7 @@ def get_grad_F_com(H, F, W):
 
         grad_F_sum_M = grad_F_sum_M + (grad_F_1 - grad_F_2)
 
-    grad_F_sum_K = sum(grad_F_sum_M) / K
+    grad_F_sum_K = sum(grad_F_sum_M) / K 
     grad_F = torch.cat(((grad_F_sum_K[None, :, :, :],) * K), 0)
     return grad_F
 
@@ -358,7 +405,7 @@ def get_sum_loss(F, W, H, R, Pt, batch_size):
     X = F @ W
     X_H = torch.transpose(X, 2, 3).conj()
     if normalize_tau == 1:
-        error = torch.linalg.matrix_norm(X @ X_H - R, ord='fro') ** 2 / torch.linalg.matrix_norm(R[:, 0, :, :], ord='fro') ** 2
+        error = torch.linalg.matrix_norm(X @ X_H - R, ord='fro') ** 2 / torch.linalg.matrix_norm(R[:, 0, :, :] , ord='fro') ** 2
     else:
         error = torch.linalg.matrix_norm(X @ X_H - R, ord='fro') ** 2
     # sum_error = sum(sum(error))
