@@ -322,66 +322,169 @@ class PGA_Unfold_J20(nn.Module):
 
 
 # ==================================== gradient of R_mk w.r.t. F ===========================
-def get_grad_F_com(H, F, W):
-    F_H = torch.transpose(F, 2, 3).conj()
-    W_H = torch.transpose(W, 2, 3).conj()  # _H, _T means hermitian and transpose of a matrix
-    V = W @ W_H  # K x train_size x Nrf x Nrf
-    grad_F_sum_M = torch.zeros(len(H[0]), Nt, Nrf, device=F.device, dtype=F.dtype)
-    for m in range(M):
-        W_m = W[:, :, :, torch.arange(W.size(3)) != m]
-        V_mk = W_m @ torch.transpose(W_m, 2, 3).conj()  # need to change to remove 1 column
-        h_mk0 = torch.unsqueeze(H[:, :, m, :], dim=2)
-        h_mk = torch.transpose(h_mk0, 2, 3)
-        h_mk_H = torch.transpose(h_mk, 2, 3).conj()
-        Htilde_mk = h_mk @ h_mk_H
+def get_grad_F_com(H, F, W, sigma2, K, Nt, Nrf):
+    """
+    Vectorized GPU-friendly version of get_grad_F_com
+    Removes the for-loop over m using batched matrix multiplications
+    """
 
-        A = F @ V
-        B = A @ F_H
-        C = B @ Htilde_mk
-        denom_1 = np.log(2) * (get_trace(C) + sigma2)
-        grad_F_1 = Htilde_mk @ F @ V / (denom_1[:, :, None, None]+1e-4)  # expand dimension
+    device = F.device
+    dtype = F.dtype
 
-        A1 = F @ V_mk
-        B1 = A1 @ F_H
-        C1 = B1 @ Htilde_mk
-        denom_2 = np.log(2) * (get_trace(C1) + sigma2)
-        grad_F_2 = Htilde_mk @ F @ V_mk / (denom_2[:, :, None, None]+1e-4)  # expand dimension
+    # Hermitian transposes
+    F_H = F.transpose(2, 3).conj()          # [K, train, Nrf, Nt]
+    W_H = W.transpose(2, 3).conj()          # [K, train, M, Nrf]
 
-        grad_F_sum_M = grad_F_sum_M + (grad_F_1 - grad_F_2)
+    # V = W W^H
+    V = W @ W_H                             # [K, train, Nrf, Nrf]
 
-    grad_F_sum_K = sum(grad_F_sum_M) / K 
-    grad_F = torch.cat(((grad_F_sum_K[None, :, :, :],) * K), 0)
+    # --------------------------------------------------
+    # Construct Htilde_mk for ALL m
+    # --------------------------------------------------
+    # H: [K, train, M, Nt]
+    h = H.permute(0, 1, 3, 2)               # [K, train, Nt, M]
+    Htilde = h[..., :, None] @ h[..., None, :].conj()
+    # Htilde: [K, train, M, Nt, Nt]
+
+    # --------------------------------------------------
+    # Construct V_mk = V - w_m w_m^H for ALL m
+    # --------------------------------------------------
+    w = W.permute(0, 1, 3, 2)               # [K, train, Nrf, M]
+    w_outer = w[..., :, None] @ w[..., None, :].conj()
+    # w_outer: [K, train, M, Nrf, Nrf]
+
+    V_exp = V[:, :, None, :, :]             # [K, train, 1, Nrf, Nrf]
+    V_mk = V_exp - w_outer                  # [K, train, M, Nrf, Nrf]
+
+    # --------------------------------------------------
+    # Expand F for broadcasting
+    # --------------------------------------------------
+    F_exp = F[:, :, None, :, :]             # [K, train, 1, Nt, Nrf]
+    F_H_exp = F_H[:, :, None, :, :]         # [K, train, 1, Nrf, Nt]
+
+    log2 = torch.log(torch.tensor(2.0, device=device, dtype=dtype))
+
+    # --------------------------------------------------
+    # grad_F_1 (all m)
+    # --------------------------------------------------
+    C = F_exp @ V_exp @ F_H_exp @ Htilde
+    trace_C = torch.diagonal(C, dim1=-2, dim2=-1).sum(-1)
+    denom_1 = log2 * (trace_C + sigma2)
+
+    grad_F_1 = (
+        Htilde @ F_exp @ V_exp
+    ) / (denom_1[..., None, None] + 1e-4)
+
+    # --------------------------------------------------
+    # grad_F_2 (all m)
+    # --------------------------------------------------
+    C1 = F_exp @ V_mk @ F_H_exp @ Htilde
+    trace_C1 = torch.diagonal(C1, dim1=-2, dim2=-1).sum(-1)
+    denom_2 = log2 * (trace_C1 + sigma2)
+
+    grad_F_2 = (
+        Htilde @ F_exp @ V_mk
+    ) / (denom_2[..., None, None] + 1e-4)
+
+    # --------------------------------------------------
+    # Sum over m (this replaces the for-loop)
+    # --------------------------------------------------
+    grad_F_sum_M = (grad_F_1 - grad_F_2).sum(dim=2)   # [K, train, Nt, Nrf]
+
+    # --------------------------------------------------
+    # Final reduction over K (same as original)
+    # --------------------------------------------------
+    grad_F_sum_K = grad_F_sum_M.sum(dim=0) / K
+    grad_F = grad_F_sum_K.unsqueeze(0).repeat(K, 1, 1, 1)
+
     return grad_F
 
-def get_grad_W_com(H, F, W):
-    F_H = torch.transpose(F, 2, 3).conj()
-    W_H = torch.transpose(W, 2, 3).conj()
-    V = W @ W_H  # K x train_size x Nrf x Nrf
-    grad_W = torch.zeros(len(H), len(H[0]), Nrf, M, device=W.device, dtype=W.dtype)
+def get_grad_W_com(H, F, W, sigma2, K):
+    """
+    Fully vectorized GPU-friendly version of get_grad_W_com
+    Removes the for-loop over m using batched matrix multiplications
+    """
 
-    for m in range(M):
-        W_m = W
-        # print(W)
-        W_m_H = torch.transpose(W_m, 2, 3).conj()
+    device = W.device
+    dtype = W.dtype
 
-        h_mk0 = torch.unsqueeze(H[:, :, m, :], dim=2)
-        h_mk = torch.transpose(h_mk0, 2, 3)
-        h_mk_H = torch.transpose(h_mk, 2, 3).conj()
-        Htilde_mk = h_mk @ h_mk_H
-        Hbar_mk = F_H @ Htilde_mk @ F
+    # Dimensions
+    K_, train_size, M, Nt = H.shape
+    _, _, Nrf, _ = W.shape
 
-        denom_1 = np.log(2) * (get_trace(W @ W_H @ Hbar_mk) + sigma2)
-        grad_W_1 = Hbar_mk @ W / denom_1[:, :, None, None]  # expand dimension
+    # Hermitian transposes
+    F_H = F.transpose(2, 3).conj()      # [K, train, Nrf, Nt]
+    W_H = W.transpose(2, 3).conj()      # [K, train, M, Nrf]
 
-        denom_2 = np.log(2) * (get_trace(W_m @ W_m_H @ Hbar_mk) + sigma2)
-        grad_W_2 = Hbar_mk @ W_m / denom_2[:, :, None, None]  # expand dimension
-        mask_m = torch.ones(len(H), len(H[0]), Nrf, M, device=W.device, dtype=W.dtype)
-        mask_m[:, :, :, m] = torch.zeros(len(H), len(H[0]), Nrf, device=W.device, dtype=W.dtype)
-        grad_W_2_masked = grad_W_2 * mask_m  # need element-wise multiplication for masking
-        grad_W = grad_W + (grad_W_1 - grad_W_2_masked)
+    log2 = torch.log(torch.tensor(2.0, device=device, dtype=dtype))
 
+    # --------------------------------------------------
+    # Construct Htilde_mk for ALL m
+    # --------------------------------------------------
+    # H: [K, train, M, Nt]
+    h = H.permute(0, 1, 3, 2)            # [K, train, Nt, M]
+    Htilde = h[..., :, None] @ h[..., None, :].conj()
+    # [K, train, M, Nt, Nt]
+
+    # --------------------------------------------------
+    # Hbar_mk = F^H Htilde F   (for all m)
+    # --------------------------------------------------
+    F_exp = F[:, :, None, :, :]          # [K, train, 1, Nt, Nrf]
+    F_H_exp = F_H[:, :, None, :, :]      # [K, train, 1, Nrf, Nt]
+
+    Hbar = F_H_exp @ Htilde @ F_exp
+    # [K, train, M, Nrf, Nrf]
+
+    # --------------------------------------------------
+    # Precompute W W^H
+    # --------------------------------------------------
+    V = W @ W_H                          # [K, train, Nrf, Nrf]
+    V_exp = V[:, :, None, :, :]          # [K, train, 1, Nrf, Nrf]
+
+    # --------------------------------------------------
+    # grad_W_1  (same for all m)
+    # --------------------------------------------------
+    C1 = V_exp @ Hbar
+    trace_1 = torch.diagonal(C1, dim1=-2, dim2=-1).sum(-1)
+    denom_1 = log2 * (trace_1 + sigma2)
+
+    grad_W_1 = (
+        Hbar @ W[:, :, None, :, :]
+    ) / (denom_1[..., None, None] + 1e-4)
+    # [K, train, M, Nrf, M]
+
+    # --------------------------------------------------
+    # grad_W_2  (same computation, masked per m)
+    # --------------------------------------------------
+    C2 = (W @ W_H)[:, :, None, :, :] @ Hbar
+    trace_2 = torch.diagonal(C2, dim1=-2, dim2=-1).sum(-1)
+    denom_2 = log2 * (trace_2 + sigma2)
+
+    grad_W_2 = (
+        Hbar @ W[:, :, None, :, :]
+    ) / (denom_2[..., None, None] + 1e-4)
+
+    # --------------------------------------------------
+    # Mask diagonal (remove column m contribution)
+    # --------------------------------------------------
+    mask = torch.ones(M, M, device=device, dtype=dtype)
+    mask.fill_diagonal_(0.0)
+    mask = mask[None, None, None, :, :]      # broadcastable
+
+    grad_W_2_masked = grad_W_2 * mask
+
+    # --------------------------------------------------
+    # Sum over m (replaces the loop)
+    # --------------------------------------------------
+    grad_W = (grad_W_1 - grad_W_2_masked).sum(dim=2)
+
+    # --------------------------------------------------
+    # Final normalization
+    # --------------------------------------------------
     grad_W = grad_W / K
+
     return grad_W
+
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             RADAR GRADIENTS
 # /////////////////////////////////////////////////////////////////////////////////////////
