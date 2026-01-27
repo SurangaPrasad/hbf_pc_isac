@@ -66,6 +66,7 @@ if run_UPGA_J1 == 1:
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J20 == 1:
 
+    print(f'Running Unfolded PGA with J=20 ...')
     # Object defining
     model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
 
@@ -106,6 +107,7 @@ if run_UPGA_J20 == 1:
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J10 == 1:
 
+    print(f'Running Unfolded PGA with J=10 ...')
     # Object defining
     model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
 
@@ -145,3 +147,56 @@ if run_UPGA_J10 == 1:
     rate_UPGA_J10 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J10) / len(H_test[0]))]
     beam_error_UPGA_J10 = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J10) / (len(H_test[0])))]
     iter_number_UPGA_J10 = np.array(list(range(n_iter_outer + 1)))
+
+
+# ============================================================= RKD Distillation for UPGA J=10 =================================
+if run_RKD_Distillation == 1:
+
+    print(f'Running RKD Distillation for UPGA J=10 ...')
+    # 1. Load Pre-trained Teacher (J=20)
+    model_teacher = PGA_Unfold_J20(step_size_UPGA_J20)
+    model_teacher.load_state_dict(torch.load(model_file_name_UPGA_J20))
+    model_teacher.eval() # Teacher stays in evaluation mode
+
+    # 2. Define Student (J=10)
+    model_student = PGA_Unfold_J10(step_size_UPGA_J10)
+    optimizer = torch.optim.Adam(model_student.parameters(), lr=learning_rate)
+    
+    # Weighting factors for RKD losses
+    lambda_dist = 1.0
+    lambda_angle = 2.0
+
+    for i_epoch in range(n_epoch):
+        print(i_epoch)
+        H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train))]
+        
+        for i_batch in range(0, len(H_train), batch_size):
+            H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
+            snr_dB_train = np.random.choice(snr_dB_list)
+            snr_train = 10 ** (snr_dB_train / 10)
+            Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
+
+            # --- Teacher Forward Pass (No Gradients) ---
+            with torch.no_grad():
+                _, _, F_t, W_t = model_teacher.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J20)
+                # Representation: Flatten F_t (Analog Precoder) to act as 'embedding'
+                teacher_repr = F_t.view(batch_size, -1) 
+
+            # --- Student Forward Pass ---
+            rate, _, F_s, W_s = model_student.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10)
+            student_repr = F_s.view(batch_size, -1)
+
+            # --- Loss Calculation ---
+            # 1. Original Task Loss (Source [9, 13])
+            loss_task = get_sum_loss(F_s, W_s, H, Rtrain, snr_train, batch_size)
+            
+            # 2. RKD Losses (Source [6, 7, 9])
+            loss_dist = rkd_distance_loss(teacher_repr, student_repr)
+            loss_angle = rkd_angle_loss(teacher_repr, student_repr)
+            
+            # Total Loss = Task Loss + (lambda * RKD Loss) [9]
+            total_loss = loss_task + (lambda_dist * loss_dist) + (lambda_angle * loss_angle)
+
+            optimizer.zero_grad()
+            total_loss.backward()
+            optimizer.step()

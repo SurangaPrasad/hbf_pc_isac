@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import sys
 import h5py
 import scipy.io
@@ -505,3 +506,65 @@ def get_beampattern(F, W, at, Pt):
 # print(channel_test[0][0])
 # print(data_test_array[0][0])
 # print('------------------------------')
+
+
+# ====================================================== Compute Pairwise Euclidean Distances ====================================
+
+def _flatten_real_embedding(emb: torch.Tensor) -> torch.Tensor:
+    """Return a 2-D real tensor representation of `emb` suitable for distance metrics."""
+    emb = emb.contiguous()
+    if torch.is_complex(emb):
+        emb = torch.view_as_real(emb)
+    return emb.view(emb.shape[0], -1)
+
+
+def pdist(e, squared=False, eps=1e-12):
+    """Computes pairwise Euclidean distance matrix for (possibly complex) embeddings."""
+    e = _flatten_real_embedding(e)
+    e_square = (e * e).sum(dim=1)
+    prod = e @ e.t()
+    eps_tensor = torch.as_tensor(eps, dtype=e.dtype, device=e.device)
+    res = (e_square.unsqueeze(1) + e_square.unsqueeze(0) - 2 * prod).clamp_min(eps_tensor)
+    if not squared:
+        res = res.sqrt()
+    return res
+
+# ====================================================== Compute Distance-wise distilation loss ====================================
+
+def rkd_distance_loss(teacher_emb, student_emb):
+    """Distance-wise distillation loss (Source [5, 6])."""
+    teacher_emb = _flatten_real_embedding(teacher_emb)
+    student_emb = _flatten_real_embedding(student_emb)
+    with torch.no_grad():
+        t_dist = pdist(teacher_emb)
+        # Normalise distance to focus on relative structures (Source [5])
+        t_mu = t_dist.mean()
+        t_dist = t_dist / t_mu
+
+    s_dist = pdist(student_emb)
+    s_mu = s_dist.mean()
+    s_dist = s_dist / s_mu
+    
+    # Penalise distance differences using Huber loss (Source [6, 7])
+    return F.smooth_l1_loss(s_dist, t_dist)
+
+
+# ====================================================== Compute Angle-wise distilation loss ====================================
+
+def rkd_angle_loss(teacher_emb, student_emb):
+    """Angle-wise distillation loss (Source [7])."""
+    teacher_emb = _flatten_real_embedding(teacher_emb)
+    student_emb = _flatten_real_embedding(student_emb)
+    with torch.no_grad():
+        # Compute angles between triplets in teacher space
+        td = teacher_emb.unsqueeze(0) - teacher_emb.unsqueeze(1)
+        norm_td = F.normalize(td, p=2, dim=2)
+        t_angle = torch.bmm(norm_td, norm_td.transpose(1, 2))
+
+    sd = student_emb.unsqueeze(0) - student_emb.unsqueeze(1)
+    norm_sd = F.normalize(sd, p=2, dim=2)
+    s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2))
+
+    return F.smooth_l1_loss(s_angle, t_angle)
+
+

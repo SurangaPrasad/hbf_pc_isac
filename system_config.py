@@ -7,8 +7,10 @@ run_conv_PGA = 0           # Conventional PGA without unfolding
 run_conv_PGA_J10 = 0        # Conventional PGA with setting J = 10
 run_UPGA_J1 = 0           # Unfolded PGA without any modification (J = 1)
 run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
-run_UPGA_J20 = 1           # Unfolded PGA with setting J = 20
+run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0    # Unfolded PGA with J = 10 and partial coupling (PC) - future work
+run_RKD_Distillation = 1  # Knowledge distillation for UPGA with J = 10 - future work
+
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
