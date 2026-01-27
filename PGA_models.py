@@ -219,9 +219,9 @@ class PGA_Unfold_J20(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
 
-        for ii in range(1):
+        for ii in range(n_iter_outer):
             # update F over
-            for jj in range(1):
+            for jj in range(n_iter_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_rad = get_grad_F_rad(F, W, R)
                 if grad_F_com.isnan().any() or grad_F_rad.isnan().any(): # check gradient
