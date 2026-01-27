@@ -200,3 +200,6 @@ if run_RKD_Distillation == 1:
             optimizer.zero_grad()
             total_loss.backward()
             optimizer.step()
+
+    # Save trained student model
+    torch.save(model_student.state_dict(), model_file_name_UPGA_J10 + '_RKD.pth')
