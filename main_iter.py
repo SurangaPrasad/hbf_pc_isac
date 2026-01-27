@@ -71,13 +71,25 @@ if run_program == 1:
         print('Running unfolded PGA with J = 20...')
         # Create new model and load states
         model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
-        # model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20))
+        model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20))
 
         sum_rate_UPGA_J20, tau_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, R, snr, n_iter_outer,
                                                                                              n_iter_inner_J20)
         rate_iter_UPGA_J20 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
         tau_iter_UPGA_J20 = [e.detach().numpy() for e in (sum(tau_UPGA_J20) / (len(H_test[0])))]
 
+
+    # ====================================================== Proposed Unfolded PGA - RKD ====================================
+    if run_RKD_Distillation == 1:
+        print('Running unfolded PGA with RKD distillation...')
+        # Create new model and load states
+        model_RKD = PGA_Unfold_J10(step_size_UPGA_J10)
+        model_RKD.load_state_dict(torch.load(model_file_name_UPGA_J10_RKD))
+
+        sum_rate_RKD, tau_RKD, F_RKD, W_RKD = model_RKD.execute_PGA(H_test, R, snr, n_iter_outer,
+                                                                                             n_iter_inner_J20)
+        rate_iter_RKD = [r.detach().numpy() for r in (sum(sum_rate_RKD) / len(H_test[0]))]
+        tau_iter_RKD = [e.detach().numpy() for e in (sum(tau_RKD) / (len(H_test[0])))]
     # ============================== generate beampattern ////////////////////////////////////////////////////////////////////
     print('generating beampattern...')
     if run_conv_PGA == 1:
@@ -218,21 +230,24 @@ if plot_figure == 1:
     # if run_UPGA_J1 == 1:
     #     obj_iter_UPGA_J1 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J1, tau_iter_UPGA_J1)]
     #     plt.plot(iter_number_UPGA_J1, obj_iter_UPGA_J1, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
-    if run_conv_PGA_J10 == 1:
-        obj_iter_conv_PGA_J10 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_conv_PGA_J10, tau_iter_conv_PGA_J10)]
-        plt.plot(iter_number_UPGA_J10, obj_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    # if run_conv_PGA_J10 == 1:
+    #     obj_iter_conv_PGA_J10 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_conv_PGA_J10, tau_iter_conv_PGA_J10)]
+    #     plt.plot(iter_number_UPGA_J10, obj_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J10, tau_iter_UPGA_J10)]
         plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10, ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J10)
-    # if run_UPGA_J20 == 1:
-    #     obj_iter_UPGA_J20 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J20, tau_iter_UPGA_J20)]
-    #     plt.plot(iter_number_UPGA_J20, obj_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+    if run_UPGA_J20 == 1:
+        obj_iter_UPGA_J20 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J20, tau_iter_UPGA_J20)]
+        plt.plot(iter_number_UPGA_J20, obj_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+    if run_RKD_Distillation == 1:
+        obj_iter_RKD = [rate - OMEGA * tau for rate, tau in zip(rate_iter_RKD, tau_iter_RKD)]
+        plt.plot(iter_number_UPGA_J10, obj_iter_RKD, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, RKD)')
     # if run_conv_PGA == 1:
     #     obj_iter_conv = [rate - OMEGA * tau for rate, tau in zip(rate_iter_conv, tau_iter_conv)]
     #     plt.plot(iter_number_conv_PGA, obj_iter_conv, ':', markevery=5, color='black', linewidth=3, markersize=7, label=label_conv)
-    if run_UPGA_J10_PC == 1:
-        obj_iter_UPGA_J10_PC = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J10_PC, tau_iter_UPGA_J10_PC)]
-        plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PC)')
+    # if run_UPGA_J10_PC == 1:
+    #     obj_iter_UPGA_J10_PC = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J10_PC, tau_iter_UPGA_J10_PC)]
+    #     plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PC)')
     # plt.title(system_params)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel(r'$R - \omega \bar{\tau}$', fontsize="14")
