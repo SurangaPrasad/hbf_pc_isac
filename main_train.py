@@ -164,7 +164,7 @@ if run_RKD_Distillation == 1:
     
     # Weighting factors for RKD losses
     lambda_dist = 1.0
-    lambda_angle = 2.0
+    lambda_angle = 0.0
 
     for i_epoch in range(n_epoch):
         print(i_epoch)
