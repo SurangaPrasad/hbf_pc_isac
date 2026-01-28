@@ -253,6 +253,72 @@ class PGA_Unfold_J10_PC(nn.Module):
             taus = torch.cat([tau_init, tau_over_iters], dim=0)
 
         return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+
+
+class PGA_Unfold_J10_PC_AP(nn.Module):
+    def __init__(self, step_size):
+        super().__init__()
+        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+
+    # =========== Projection Gradient Ascent execution ===================
+    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
+        rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
+        print(f'The size of F: {F.shape}')
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+
+        pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
+        for ii in range(1):
+            # update F over
+            for jj in range(1):    
+                grad_F_com_AP = get_grad_F_com_AP(H, F, W)
+                grad_F_rad = get_grad_F_rad(F, W, R)
+
+                # print(f'F matrix element: {F[0,0, :, :]}')
+                if grad_F_com_AP.isnan().any() or grad_F_rad.isnan().any(): # check gradient
+                    print('Error NaN gradients!!!!!!!!!!!!!!!')
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com_AP
+                delta_F_rad = self.step_size[jj][ii][0] * grad_F_rad
+                delta_F_com = clamp_complex_magnitude(delta_F_com, 0.5)
+                delta_F_rad = clamp_complex_magnitude(delta_F_rad, 0.5)
+                F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
+                F = sanitize_complex_tensor(F)
+                F = F * pc_mask
+                F = sanitize_complex_tensor(F)
+                # normalize by power to ensure non-NaN gradients if F becomes too large
+                #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
+                F = normalize_power(F, W, H, Pt)
+                F = sanitize_complex_tensor(F)
+            # Projection
+            F = project_unit_modulus(F, active_mask=pc_mask)
+            F = sanitize_complex_tensor(F)
+            
+            # update W
+            W_new = W.clone().detach()
+            # compute gradients
+            grad_W_k_com = get_grad_W_com(H, F, W)
+            grad_W_k_rad = get_grad_W_rad(F, W, R)
+            for k in range(K):
+                delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
+                delta_W_rad = self.step_size[0][ii][k + 1] * grad_W_k_rad[k]
+                delta_W_com = clamp_complex_magnitude(delta_W_com, 0.5)
+                delta_W_rad = clamp_complex_magnitude(delta_W_rad, 0.5)
+                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_rad * WEIGHT_W_RAD
+                W_new[k] = sanitize_complex_tensor(W_new[k])
+            
+            # Projection
+            F, W = normalize(F, W_new, H, Pt)
+            F = sanitize_complex_tensor(F)
+            W = sanitize_complex_tensor(W)
+            # get the rate in this iteration
+            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+            # print(rate_over_iters[ii])
+            rates = torch.cat([rate_init, rate_over_iters], dim=0)
+            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
+            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+
+        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W    
+
 # ============================================== Proposed PGA model=============================
 class PGA_Unfold_J20(nn.Module):
 
@@ -371,6 +437,13 @@ def get_grad_W_com(H, F, W):
 
     grad_W = grad_W / K
     return grad_W
+
+def get_grad_F_com_AP(H, F, W):
+    a = extract_active_elements(F)  # (B, N, 1)
+    print(f'F matrix element: {F[0,0, :, :]}')
+    print(f'Active elements: {a[0, :, :]}')
+    return a
+
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             RADAR GRADIENTS
 # /////////////////////////////////////////////////////////////////////////////////////////

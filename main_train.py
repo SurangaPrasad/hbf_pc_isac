@@ -203,3 +203,32 @@ if run_UPGA_J10_PC == 1:
     plt.ylabel('Average achievable rate (bps/Hz)')
     plt.title('Average achievable rate vs Number of iterations for UPGA J=10 PC')
     plt.grid()
+
+if run_UPGA_J10_PC_AP == 1:
+
+    # Object defining
+    model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC)
+
+    # training procedure
+    optimizer = torch.optim.Adam(model_UPGA_J10_PC_AP.parameters(), lr=learning_rate)
+
+    train_losses, valid_losses = [], []
+
+    for i_epoch in range(n_epoch):
+        print(i_epoch)
+        H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+        for i_batch in range(0, len(H_train), batch_size):
+            H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
+            snr_dB_train = np.random.choice(snr_dB_list)
+            snr_train = 10 ** (snr_dB_train / 10)
+            Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
+            __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10)
+            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
+
+
+            optimizer.zero_grad()  # zero the gradient buffers
+            loss.backward()
+            optimizer.step()  # Does the update
+
+    # Save trained model
+    torch.save(model_UPGA_J10_PC_AP.state_dict(), model_file_name_UPGA_J10_PC)

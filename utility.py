@@ -507,3 +507,19 @@ def get_beampattern(F, W, at, Pt):
 # print(channel_test[0][0])
 # print(data_test_array[0][0])
 # print('------------------------------')
+
+def extract_active_elements(F):
+    # Batch, Nrf, Nt = F.shape[1], F.shape[3], F.shape[2]
+    Batch, Nrf, Nt = 1, 4, 64
+
+    F_active = torch.zeros((Batch, Nt, 1), dtype=torch.cfloat, device=F.device)
+    antennas_per_rf = Nt // Nrf
+    for index in range(Nrf):
+        start_idx = index * antennas_per_rf
+        end_idx = (index + 1) * antennas_per_rf
+
+        # Copy the active block from column i
+        F_active[:, start_idx:end_idx, 0] = F[:, start_idx:end_idx, index]
+
+    return F_active
+    
