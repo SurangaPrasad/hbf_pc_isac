@@ -204,6 +204,8 @@ if run_UPGA_J10_PC == 1:
     plt.title('Average achievable rate vs Number of iterations for UPGA J=10 PC')
     plt.grid()
 
+# ============================================= Proposed unfolded PGA J=10 PC AP ============================================
+
 if run_UPGA_J10_PC_AP == 1:
 
     # Object defining
