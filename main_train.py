@@ -8,8 +8,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 # ---- training and test the models ----
 
 # Load training data
-H_train, H_test0 = get_data_tensor(data_source)
-H_test = H_test0[:, :test_size, :, :]
+H_train = get_data_tensor(data_source)
+# H_test = H_test0[:, :test_size, :, :]
 torch.manual_seed(3407)
 
 # ====================================================== Conventional PGA ====================================
@@ -75,7 +75,7 @@ if run_UPGA_J20 == 1:
 
     train_losses, valid_losses = [], []
 
-    for i_epoch in range(n_epoch):
+    for i_epoch in range(2):
         print(i_epoch)
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
         for i_batch in range(0, len(H_train), batch_size):
@@ -83,6 +83,7 @@ if run_UPGA_J20 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
+            print(f'Rtrain shape: {Rtrain.shape}')
             rate, __, F, W = model_UPGA_J20.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J20)
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
             # loss = -sum(sum(rate[1:]) / (K * batch_size))
@@ -164,7 +165,7 @@ if run_RKD_Distillation == 1:
     
     # Weighting factors for RKD losses
     lambda_dist = 1.0
-    lambda_angle = 0.0
+    lambda_angle = 2.0
 
     for i_epoch in range(n_epoch):
         print(i_epoch)

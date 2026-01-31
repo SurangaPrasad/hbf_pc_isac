@@ -408,9 +408,9 @@ def save_data(data_train, data_test):
 def load_data_matlab():
     data_train = scipy.io.loadmat(data_path_train)
     data_train_array = data_train['H_train']
-    data_test = scipy.io.loadmat(data_path_test)
-    data_test_array = data_test['H_test']
-    return data_train_array, data_test_array
+    # data_test = scipy.io.loadmat(data_path_train)
+    # data_test_array = data_test['H_train']
+    return data_train_array
 
 
 # =================================== load data generated in python ==================================================
@@ -431,11 +431,11 @@ def get_data_tensor(data_source):
     if data_source == 'python':
         data_train_array, data_test_array = load_data()
     else:  # use matlab data
-        data_train_array, data_test_array = load_data_matlab()
+        data_train_array = load_data_matlab()
     # then convert numpy to tensor
     H_train_tensor = torch.from_numpy(data_train_array)
-    H_test_tensor = torch.from_numpy(data_test_array)
-    return H_train_tensor, H_test_tensor
+    # H_test_tensor = torch.from_numpy(data_test_array)
+    return H_train_tensor
 
 
 # =================================== load radar data generated in Matlab ==================================================
@@ -511,20 +511,23 @@ def get_beampattern(F, W, at, Pt):
 # ====================================================== Compute Pairwise Euclidean Distances ====================================
 
 def _flatten_real_embedding(emb: torch.Tensor) -> torch.Tensor:
-    """Return a 2-D real tensor representation of `emb` suitable for distance metrics."""
+    """
+    Transforms the complex analog precoder (Nt x M) into a real-valued vector.
+    Correctly handles complex values by viewing them as real/imag pairs [7].
+    """
     emb = emb.contiguous()
     if torch.is_complex(emb):
+        # Converts [Batch, Nt, M] complex to [Batch, Nt, M, 2] real [7]
         emb = torch.view_as_real(emb)
-    return emb.view(emb.shape[0], -1)
+    # Flattens to [Batch, Nt * M * 2] for relational calculations [7]
+    return emb.view(emb.shape, -1)
 
 
 def pdist(e, squared=False, eps=1e-12):
-    """Computes pairwise Euclidean distance matrix for (possibly complex) embeddings."""
-    e = _flatten_real_embedding(e)
-    e_square = (e * e).sum(dim=1)
+    """Computes the pairwise Euclidean distance matrix for a batch of embeddings [5]."""
+    e_square = e.pow(2).sum(dim=1)
     prod = e @ e.t()
-    eps_tensor = torch.as_tensor(eps, dtype=e.dtype, device=e.device)
-    res = (e_square.unsqueeze(1) + e_square.unsqueeze(0) - 2 * prod).clamp_min(eps_tensor)
+    res = (e_square.unsqueeze(1) + e_square.unsqueeze(0) - 2 * prod).clamp(min=eps)
     if not squared:
         res = res.sqrt()
     return res
@@ -532,39 +535,48 @@ def pdist(e, squared=False, eps=1e-12):
 # ====================================================== Compute Distance-wise distilation loss ====================================
 
 def rkd_distance_loss(teacher_emb, student_emb):
-    """Distance-wise distillation loss (Source [5, 6])."""
-    teacher_emb = _flatten_real_embedding(teacher_emb)
-    student_emb = _flatten_real_embedding(student_emb)
+    """
+    Distance-wise distillation loss using normalized pairwise distances [3, 5].
+    """
+    t_emb = _flatten_real_embedding(teacher_emb)
+    s_emb = _flatten_real_embedding(student_emb)
+
     with torch.no_grad():
-        t_dist = pdist(teacher_emb)
-        # Normalise distance to focus on relative structures (Source [5])
+        t_dist = pdist(t_emb)
+        # Normalization factor mu: average distance in the batch [3]
         t_mu = t_dist.mean()
         t_dist = t_dist / t_mu
 
-    s_dist = pdist(student_emb)
+    s_dist = pdist(s_emb)
     s_mu = s_dist.mean()
     s_dist = s_dist / s_mu
-    
-    # Penalise distance differences using Huber loss (Source [6, 7])
+
+    # Use Huber loss (Smooth L1) to penalize structural differences [5, 8]
     return F.smooth_l1_loss(s_dist, t_dist)
 
 
 # ====================================================== Compute Angle-wise distilation loss ====================================
 
 def rkd_angle_loss(teacher_emb, student_emb):
-    """Angle-wise distillation loss (Source [7])."""
-    teacher_emb = _flatten_real_embedding(teacher_emb)
-    student_emb = _flatten_real_embedding(student_emb)
+    """
+    Angle-wise distillation loss penalizing angular differences between triplets [4, 6].
+    """
+    t_emb = _flatten_real_embedding(teacher_emb)
+    s_emb = _flatten_real_embedding(student_emb)
+
     with torch.no_grad():
-        # Compute angles between triplets in teacher space
-        td = teacher_emb.unsqueeze(0) - teacher_emb.unsqueeze(1)
+        # Vectors between every pair in the batch
+        td = t_emb.unsqueeze(0) - t_emb.unsqueeze(1)
+        # Normalize vectors for cosine similarity calculation [4]
         norm_td = F.normalize(td, p=2, dim=2)
+        # Batch Matrix Multiply to get cosine of angles between all triplets
         t_angle = torch.bmm(norm_td, norm_td.transpose(1, 2))
 
-    sd = student_emb.unsqueeze(0) - student_emb.unsqueeze(1)
+    sd = s_emb.unsqueeze(0) - s_emb.unsqueeze(1)
     norm_sd = F.normalize(sd, p=2, dim=2)
     s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2))
 
+    # Penalize angular differences [4, 6]
     return F.smooth_l1_loss(s_angle, t_angle)
 
 
