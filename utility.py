@@ -520,13 +520,13 @@ def _flatten_real_embedding(emb: torch.Tensor) -> torch.Tensor:
         # Converts [Batch, Nt, M] complex to [Batch, Nt, M, 2] real [7]
         emb = torch.view_as_real(emb)
     # Flattens to [Batch, Nt * M * 2] for relational calculations [7]
-    return emb.view(emb.shape, -1)
+    return emb.view(emb.shape[0], -1)
 
 
 def pdist(e, squared=False, eps=1e-12):
     """Computes the pairwise Euclidean distance matrix for a batch of embeddings [5]."""
     e_square = e.pow(2).sum(dim=1)
-    prod = e @ e.t()
+    prod = e @ e.T
     res = (e_square.unsqueeze(1) + e_square.unsqueeze(0) - 2 * prod).clamp(min=eps)
     if not squared:
         res = res.sqrt()
