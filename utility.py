@@ -408,9 +408,9 @@ def save_data(data_train, data_test):
 def load_data_matlab():
     data_train = scipy.io.loadmat(data_path_train)
     data_train_array = data_train['H_train']
-    # data_test = scipy.io.loadmat(data_path_train)
-    # data_test_array = data_test['H_train']
-    return data_train_array
+    data_test = scipy.io.loadmat(data_path_test)
+    data_test_array = data_test['H_train']
+    return data_train_array, data_test_array
 
 
 # =================================== load data generated in python ==================================================
@@ -431,11 +431,11 @@ def get_data_tensor(data_source):
     if data_source == 'python':
         data_train_array, data_test_array = load_data()
     else:  # use matlab data
-        data_train_array = load_data_matlab()
+        data_train_array, data_test_array = load_data_matlab()
     # then convert numpy to tensor
     H_train_tensor = torch.from_numpy(data_train_array)
-    # H_test_tensor = torch.from_numpy(data_test_array)
-    return H_train_tensor
+    H_test_tensor = torch.from_numpy(data_test_array)
+    return H_train_tensor, H_test_tensor
 
 
 # =================================== load radar data generated in Matlab ==================================================

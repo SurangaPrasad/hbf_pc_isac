@@ -75,7 +75,7 @@ if run_UPGA_J20 == 1:
 
     train_losses, valid_losses = [], []
 
-    for i_epoch in range(2):
+    for i_epoch in range(n_epoch):
         print(i_epoch)
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
         for i_batch in range(0, len(H_train), batch_size):
