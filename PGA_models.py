@@ -68,10 +68,11 @@ class PGA_Conv(nn.Module):
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
 
     # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, R, Pt, n_iter_outer):
+    def execute_PGA(self, H, R, Pt, n_iter_outer, track_metrics=True):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save beampattern errors over iterations
+        if track_metrics:
+            rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))
+            tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))
         # update F and W over iterations
         for ii in range(n_iter_outer):
             # update F
@@ -98,13 +99,14 @@ class PGA_Conv(nn.Module):
             # projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+            if track_metrics:
+                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+                tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
+        if track_metrics:
             rates = torch.cat([rate_init, rate_over_iters], dim=0)
-            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
             taus = torch.cat([tau_init, tau_over_iters], dim=0)
-            # print(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
-        return torch.transpose(rates,  0, 1), torch.transpose(taus,  0, 1), F, W
+            return torch.transpose(rates,  0, 1), torch.transpose(taus,  0, 1), F, W
+        return None, None, F, W
 
 # ============================================== Proposed PGA model light=============================
 class PGA_Unfold_J10(nn.Module):
@@ -114,10 +116,11 @@ class PGA_Unfold_J10(nn.Module):
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
 
     # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
+    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        if track_metrics:
+            rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))
+            tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))
 
         for ii in range(n_iter_outer):
             # update F over
@@ -147,14 +150,15 @@ class PGA_Unfold_J10(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
-            # print(rate_over_iters[ii])
-            rates = torch.cat([rate_init, rate_over_iters], dim=0)
-            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
-            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            if track_metrics:
+                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+                tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
 
-        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        if track_metrics:
+            rates = torch.cat([rate_init, rate_over_iters], dim=0)
+            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        return None, None, F, W
 # ============================================== Proposed PGA model light for PC======================
 class PGA_Unfold_J10_PC(nn.Module):
 
@@ -163,12 +167,13 @@ class PGA_Unfold_J10_PC(nn.Module):
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
 
     # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
+    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        if track_metrics:
+            rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))
+            tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))
 
-        pc_mask = generage_partial_connection_mask(64, 4)
+        pc_mask = generage_partial_connection_mask(64, 4, dtype=F.dtype, device=F.device)
         for ii in range(n_iter_outer):
             # update F over
             for jj in range(n_iter_inner):    
@@ -198,14 +203,15 @@ class PGA_Unfold_J10_PC(nn.Module):
             
             # Projection
             F, W = normalize(F, W_new, H, Pt)
-            # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
-            # print(rate_over_iters[ii])
-            rates = torch.cat([rate_init, rate_over_iters], dim=0)
-            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
-            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            if track_metrics:
+                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+                tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
 
-        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        if track_metrics:
+            rates = torch.cat([rate_init, rate_over_iters], dim=0)
+            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        return None, None, F, W
 # ============================================== Proposed PGA model=============================
 class PGA_Unfold_J20(nn.Module):
 
@@ -214,10 +220,11 @@ class PGA_Unfold_J20(nn.Module):
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
 
     # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
+    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        if track_metrics:
+            rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))
+            tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))
 
         for ii in range(n_iter_outer):
             # update F over
@@ -248,14 +255,15 @@ class PGA_Unfold_J20(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
-            # print(rate_over_iters[ii])
-            rates = torch.cat([rate_init, rate_over_iters], dim=0)
-            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
-            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            if track_metrics:
+                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+                tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
 
-        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        if track_metrics:
+            rates = torch.cat([rate_init, rate_over_iters], dim=0)
+            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        return None, None, F, W
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////

@@ -42,7 +42,7 @@ if run_UPGA_J1 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            __, __, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer)
+            _, _, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer, track_metrics=False)
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
 
             optimizer.zero_grad()  # zero the gradient buffers
@@ -83,8 +83,14 @@ if run_UPGA_J20 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            print(f'Rtrain shape: {Rtrain.shape}')
-            rate, __, F, W = model_UPGA_J20.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J20)
+            _, _, F, W = model_UPGA_J20.execute_PGA(
+                H,
+                Rtrain,
+                snr_train,
+                n_iter_outer,
+                n_iter_inner_J20,
+                track_metrics=False,
+            )
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
             # loss = -sum(sum(rate[1:]) / (K * batch_size))
 
@@ -125,8 +131,14 @@ if run_UPGA_J10 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            rate, __, F, W = model_UPGA_J10.execute_PGA(H, Rtrain, snr_train, n_iter_outer,
-                                                        n_iter_inner_J10)
+            _, _, F, W = model_UPGA_J10.execute_PGA(
+                H,
+                Rtrain,
+                snr_train,
+                n_iter_outer,
+                n_iter_inner_J10,
+                track_metrics=False,
+            )
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
             # loss = -sum(sum(rate[1:]) / (K * batch_size))
 
@@ -179,12 +191,26 @@ if run_RKD_Distillation == 1:
 
             # --- Teacher Forward Pass (No Gradients) ---
             with torch.no_grad():
-                _, _, F_t, W_t = model_teacher.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J20)
+                _, _, F_t, W_t = model_teacher.execute_PGA(
+                    H,
+                    Rtrain,
+                    snr_train,
+                    n_iter_outer,
+                    n_iter_inner_J20,
+                    track_metrics=False,
+                )
                 # Representation: Flatten F_t (Analog Precoder) to act as 'embedding'
                 teacher_repr = F_t.view(batch_size, -1) 
 
             # --- Student Forward Pass ---
-            rate, _, F_s, W_s = model_student.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10)
+            _, _, F_s, W_s = model_student.execute_PGA(
+                H,
+                Rtrain,
+                snr_train,
+                n_iter_outer,
+                n_iter_inner_J10,
+                track_metrics=False,
+            )
             student_repr = F_s.view(batch_size, -1)
 
             # --- Loss Calculation ---
