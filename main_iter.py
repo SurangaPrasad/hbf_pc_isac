@@ -98,6 +98,12 @@ if run_program == 1:
         beam_UPGA_J10 = get_beampattern(F_UPGA_J10, W_UPGA_J10, at, snr)
     if run_UPGA_J20 == 1:
         beam_UPGA_J20 = get_beampattern(F_UPGA_J20, W_UPGA_J20, at, snr)
+    if run_conv_PGA_J10 == 1:
+        beam_conv_PGA_J10 = get_beampattern(F_conv_PGA_J10, W_conv_PGA_J10, at, snr)
+    if run_UPGA_J10_PC == 1:
+        beam_UPGA_J10_PC = get_beampattern(F_UPGA_J10_PC, W_UPGA_J10_PC, at, snr)
+    if run_conv_PGA_J10_PC == 1:
+        beam_PGA_J10_PC = get_beampattern(F_PGA_J10_PC, W_PGA_J10_PC, at, snr)
 
     # ////////////////////////////////////////////////////////////////////////////////////////////
     #                                SAVE RESULTS
@@ -214,15 +220,20 @@ if plot_figure == 1:
         plt.plot(iter_number_UPGA_J20, tau_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     if run_conv_PGA == 1:
         plt.plot(iter_number_conv_PGA, tau_iter_conv, ':', markevery=5, color='black', linewidth=3, markersize=7, label=label_conv)
-    if benchmark == 1:
-        plt.plot(iter_number_conv_PGA, tau_SCA, '-x', markevery=5, color='black', linewidth=3, markersize=7, label=label_SCA)
-        plt.plot(iter_number_conv_PGA, tau_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
-
+    # if benchmark == 1:
+    #     plt.plot(iter_number_conv_PGA, tau_SCA, '-x', markevery=5, color='black', linewidth=3, markersize=7, label=label_SCA)
+    #     plt.plot(iter_number_conv_PGA, tau_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
+    if run_conv_PGA_J10 == 1:
+        plt.plot(iter_number_UPGA_J10, tau_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    if run_UPGA_J10_PC == 1:
+        plt.plot(iter_number_UPGA_J10, tau_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, PC)')
+    if run_conv_PGA_J10_PC == 1:
+        plt.plot(iter_number_UPGA_J10, tau_iter_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10, PC)')
     # plt.title(system_params)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel( r'$\bar{\tau}$', fontsize="14")
     plt.grid()
-    # plt.legend(loc='best')
+    plt.legend(loc='best')
     # save figure
     plt.savefig(directory_result + 'beampattern_error_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'beampattern_error_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
@@ -275,7 +286,12 @@ if plot_figure == 1:
     if benchmark == 1:
         plt.plot(tau_SCA, rate_SCA, '-x', markevery=5, color='black', linewidth=3, markersize=7, label=label_SCA)
         plt.plot(tau_ZF, rate_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
-
+    if run_conv_PGA_J10 == 1:
+        plt.plot(tau_iter_conv_PGA_J10, rate_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    if run_UPGA_J10_PC == 1:
+        plt.plot(tau_iter_UPGA_J10_PC, rate_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, PC)')
+    if run_conv_PGA_J10_PC == 1:
+        plt.plot(tau_iter_PGA_J10_PC, rate_iter_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10, PC)')
     # plt.title(system_params)
     plt.xlabel( r'$\bar{\tau}$', fontsize="14")
     plt.ylabel(r'$R$ [bits/s/Hz]', fontsize="14")
@@ -288,25 +304,30 @@ if plot_figure == 1:
     # /////////////////////////////////////// BEAMPATTERN /////////////////////////////
     fig_beam = plt.figure(4)
     angles_theta = theta[0, :] * 180 / np.pi
-    # benchmark beampatter
+    # benchmark beampattern
     at_H = torch.transpose(at, 2, 3).conj()
     beam_bm = torch.diagonal(at_H @ R @ at, offset=0, dim1=-1, dim2=-2) / snr
     beam_bm_array = beam_bm[0,0,:]
     plt.plot(angles_theta, np.real(beam_bm_array), '--', markevery=5, color='green', linewidth=1,
-             label='Benchmark beampattern')  # ideal beampatter
-    if run_UPGA_J1 == 1:
-        plt.plot(angles_theta, beam_UPGA_J1, '--', markevery=5, color='blue', linewidth=2, markersize=7)
-    if run_UPGA_J10 == 1:
-        plt.plot(angles_theta, beam_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7)
-    if run_UPGA_J20 == 1:
-        plt.plot(angles_theta, beam_UPGA_J20, '-', markevery=5, color='red', linewidth=2, markersize=7)
-    if run_conv_PGA == 1:
-        plt.plot(angles_theta, beam_conv_PGA, ':', markevery=5, color='black', linewidth=2, markersize=7)
-    if benchmark == 1:
-        benchmark_results = scipy.io.loadmat(directory_benchmark + 'result_benchmark')
-        plt.plot(angles_theta, beam_SCA, '-x', markevery=5, color='black', linewidth=1, markersize=7)
-        plt.plot(angles_theta, beam_ZF, '-o', markevery=5, color='purple', linewidth=1, markersize=7)
-
+             label='Benchmark beampattern')  # ideal beampattern
+    # if run_UPGA_J1 == 1:
+    #     plt.plot(angles_theta, beam_UPGA_J1, '--', markevery=5, color='blue', linewidth=2, markersize=7)
+    # if run_UPGA_J10 == 1:
+    #     plt.plot(angles_theta, beam_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7)
+    # if run_UPGA_J20 == 1:
+    #     plt.plot(angles_theta, beam_UPGA_J20, '-', markevery=5, color='red', linewidth=2, markersize=7)
+    # if run_conv_PGA == 1:
+    #     plt.plot(angles_theta, beam_conv_PGA, ':', markevery=5, color='black', linewidth=2, markersize=7)
+    # if benchmark == 1:
+    #     benchmark_results = scipy.io.loadmat(directory_benchmark + 'result_benchmark')
+    #     plt.plot(angles_theta, beam_SCA, '-x', markevery=5, color='black', linewidth=1, markersize=7)
+    #     plt.plot(angles_theta, beam_ZF, '-o', markevery=5, color='purple', linewidth=1, markersize=7)
+    if run_conv_PGA_J10 == 1:
+        plt.plot(angles_theta, beam_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=2, markersize=7)
+    if run_UPGA_J10_PC == 1:
+        plt.plot(angles_theta, beam_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=2, markersize=7)
+    if run_conv_PGA_J10_PC == 1:
+        plt.plot(angles_theta, beam_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=2, markersize=7)
 
     # plt.title(system_params)
     plt.xlabel(r'Angle $(\theta_t)$', fontsize="14")
@@ -317,7 +338,7 @@ if plot_figure == 1:
     #     plt.ylim([0, 12])
     plt.xticks(np.arange(-90, 91, step=30))
     plt.grid()
-    plt.legend(loc='upper right', fontsize="14")
+    plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)
     # save figure
     plt.savefig(directory_result + 'beampattern_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'beampattern_' + str(Nt) + '_' + str(OMEGA) + '.eps')

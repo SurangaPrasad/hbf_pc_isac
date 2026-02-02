@@ -45,7 +45,7 @@ if normalize_tau == 0:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
     else:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_LoS"
-    OMEGA = 0.001
+    OMEGA = 0.3
     n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
 else:
     system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_normalize"
