@@ -54,7 +54,7 @@ print(system_info)
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 500    # size of training set
 test_size = 1      # size of testing set
-batch_size = 4     # batch size when training
+batch_size = 8     # batch size when training
 n_epoch = 30         # number of training epochs
 learning_rate = 0.001 # learning rate
 
