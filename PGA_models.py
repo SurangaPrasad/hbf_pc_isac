@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 from utility import *
@@ -191,6 +192,37 @@ class PGA_Unfold_J10_PC(nn.Module):
     def __init__(self, step_size):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+        # Learnable connectivity logits; initialize to the deterministic PC topology.
+        pc_mask = generage_partial_connection_mask(Nt, Nrf).abs().to(torch.float32)
+        active_prob = 0.9
+        inactive_prob = 0.1
+        active_logit = math.log(active_prob / (1.0 - active_prob))
+        inactive_logit = math.log(inactive_prob / (1.0 - inactive_prob))
+        init_logits = torch.where(
+            pc_mask > 0.5,
+            torch.full_like(pc_mask, active_logit),
+            torch.full_like(pc_mask, inactive_logit),
+        )
+        self.activation_logits = nn.Parameter(init_logits)
+        self.register_buffer("pc_template", pc_mask)
+        self.activation_temperature = 5.0
+        self.activation_threshold = 0.55
+
+    def _activation_map(self, reference_tensor):
+        probs = torch.sigmoid(self.activation_temperature * self.activation_logits)
+        hard_mask = (probs >= self.activation_threshold).to(probs.dtype)
+        if hard_mask.sum().item() == 0:
+            # Fall back to the canonical PC wiring so the structure remains sparse.
+            hard_mask = self.pc_template.to(probs)
+            activation = hard_mask
+        else:
+            activation = hard_mask + (probs - probs.detach())  # straight-through binarization
+        activation = activation.to(dtype=reference_tensor.dtype, device=reference_tensor.device)
+        return activation.view(1, 1, Nt, Nrf)
+
+    def _apply_activation(self, F, activation_map):
+        phased = project_unit_modulus(F)
+        return activation_map * phased
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
@@ -198,15 +230,16 @@ class PGA_Unfold_J10_PC(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
 
-        pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
         for ii in range(n_iter_outer):
+            activation_map = self._activation_map(F)
             # update F over
             for jj in range(n_iter_inner):    
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_rad = get_grad_F_rad(F, W, R)
 
-                grad_F_com = grad_F_com * pc_mask
-                grad_F_rad = grad_F_rad * pc_mask
+                grad_F_com = grad_F_com * activation_map
+                grad_F_rad = grad_F_rad * activation_map
+            
 
 
                 # print(f'F matrix element: {F[0,0, :, :]}')
@@ -218,14 +251,12 @@ class PGA_Unfold_J10_PC(nn.Module):
                 delta_F_rad = clamp_complex_magnitude(delta_F_rad, 0.5)
                 F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
                 F = sanitize_complex_tensor(F)
-                F = F * pc_mask
+                F = self._apply_activation(F, activation_map)
                 F = sanitize_complex_tensor(F)
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
-                F = sanitize_complex_tensor(F)
-            # Projection
-            F = project_unit_modulus(F, active_mask=pc_mask)
+                # print(f'F after power norm: {F[0,0, :, :]}')
             F = sanitize_complex_tensor(F)
             
             # update W

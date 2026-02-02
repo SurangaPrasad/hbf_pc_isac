@@ -188,7 +188,12 @@ if plot_figure == 1:
     if benchmark == 1:
         plt.plot(iter_number_conv_PGA, rate_SCA, '-x', markevery=5, color='black', linewidth=3, markersize=7, label=label_SCA)
         plt.plot(iter_number_conv_PGA, rate_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
-
+    if run_conv_PGA_J10 == 1:
+        plt.plot(iter_number_UPGA_J10, rate_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    if run_UPGA_J10_PC == 1:
+        plt.plot(iter_number_UPGA_J10, rate_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, PC)')
+    if run_conv_PGA_J10_PC == 1:
+        plt.plot(iter_number_UPGA_J10, rate_iter_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10, PC)')
     # plt.title(system_params)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel('$R$ [bits/s/Hz]', fontsize="14")
