@@ -263,18 +263,18 @@ class PGA_Unfold_J10_PC_AP(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
-        print(f'The size of F: {F.shape}')
+        # print(f'The size of F: {F.shape}')
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
 
-        pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
+        # pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
         for ii in range(n_iter_outer):
             # update F over
             for jj in range(n_iter_inner):
 
                 # ---- active vector a
                 F_active = extract_active_elements_pc(F[0], Nt, Nrf)  # (B, Nt, 1) - work with first frequency    
-                print(f'F_active matrix element: {F_active[0, :, :]}')
+                # print(f'F_active matrix element: {F_active[0, :, :]}')
                 grad_F_com_AP = get_grad_F_com_AP(F_active, H, F, W)
 
                 # --- generate pi metrix
@@ -294,9 +294,9 @@ class PGA_Unfold_J10_PC_AP(nn.Module):
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
                 F = sanitize_complex_tensor(F)
-                print(f'F after power norm: {F[0,0, :, :]}')
+                # print(f'F after power norm: {F[0,0, :, :]}')
             # Projection
-            F = project_unit_modulus(F, active_mask=pc_mask)
+            F = project_unit_modulus(F)
             F = sanitize_complex_tensor(F)
             
             # update W

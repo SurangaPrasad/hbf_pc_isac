@@ -7,12 +7,18 @@ from system_config import *
 import matplotlib.pyplot as plt
 
 
+def randn_complex(shape, device=None):
+    """Sample a complex tensor with IID unit-variance entries."""
+    real = torch.randn(shape, dtype=REAL_DTYPE, device=device)
+    imag = torch.randn(shape, dtype=REAL_DTYPE, device=device)
+    return torch.complex(real, imag)
+
+
 # ==================================== initialize F and W ===========================
 def initialize(H, R, Pt, normalization, pc=False):
     if init_scheme == 'conv':
         # randomizing F
-        F = torch.randn(len(H[0]), Nt, Nrf, dtype=torch.double) + 1j * torch.randn(len(H[0]), Nt, Nrf,
-                                                                                   dtype=torch.double)
+        F = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
         F = F / torch.abs(F)
         F = torch.cat(((F[None, :, :, :],) * K), 0)
         W = torch.linalg.pinv(H @ F)
@@ -28,8 +34,7 @@ def initialize(H, R, Pt, normalization, pc=False):
         if Nrf == M:
             F = H[K // 2, :, :, :] / torch.abs(H[K // 2, :, :, :])
             F = torch.transpose(F, 1, 2)
-            W = torch.randn(K, len(H[0]), Nrf, M, dtype=torch.double) + 1j * torch.randn(K, len(H[0]), Nrf, M,
-                                                                                         dtype=torch.double)
+            W = randn_complex((K, len(H[0]), Nrf, M), device=H.device)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -44,8 +49,7 @@ def initialize(H, R, Pt, normalization, pc=False):
             F = G / torch.abs(G)
 
             F = torch.transpose(F, 1, 2)
-            W = torch.randn(K, len(H[0]), Nrf, M, dtype=torch.double) + 1j * torch.randn(K, len(H[0]), Nrf, M,
-                                                                                         dtype=torch.double)
+            W = randn_complex((K, len(H[0]), Nrf, M), device=H.device)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -105,8 +109,7 @@ def initialize(H, R, Pt, normalization, pc=False):
 def initialize_schemes(H, R, Pt, init_method):
     if init_method == 'conv':
         # randomizing F
-        F = torch.randn(len(H[0]), Nt, Nrf, dtype=torch.double) + 1j * torch.randn(len(H[0]), Nt, Nrf,
-                                                                                   dtype=torch.double)
+        F = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
         F = F / torch.abs(F)
         F = torch.cat(((F[None, :, :, :],) * K), 0)
         W = torch.linalg.pinv(H @ F)
@@ -114,8 +117,7 @@ def initialize_schemes(H, R, Pt, init_method):
         if Nrf == M:
             F = H[K // 2, :, :, :] / torch.abs(H[K // 2, :, :, :])
             F = torch.transpose(F, 1, 2)
-            W = torch.randn(K, test_size, Nrf, M, dtype=torch.double) + 1j * torch.randn(K, test_size, Nrf, M,
-                                                                                         dtype=torch.double)
+            W = randn_complex((K, test_size, Nrf, M), device=H.device)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -130,8 +132,7 @@ def initialize_schemes(H, R, Pt, init_method):
             F = G / torch.abs(G)
 
             F = torch.transpose(F, 1, 2)
-            W = torch.randn(K, test_size, Nrf, M, dtype=torch.double) + 1j * torch.randn(K, test_size, Nrf, M,
-                                                                                         dtype=torch.double)
+            W = randn_complex((K, test_size, Nrf, M), device=H.device)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -147,8 +148,7 @@ def initialize_schemes(H, R, Pt, init_method):
             # V = torch.transpose(V_H, 2, 3).conj()
             F = V[:, :, :, :Nrf]
             F = F / torch.abs(F)
-            W = torch.randn(K, test_size, Nrf, M, dtype=torch.double) + 1j * torch.randn(K, test_size, Nrf, M,
-                                                                                         dtype=torch.double)
+            W = randn_complex((K, test_size, Nrf, M), device=H.device)
             for k in range(K):
                 Hk = H[k, :, :, :]
                 Hp = Hk.conj()
@@ -162,8 +162,7 @@ def initialize_schemes(H, R, Pt, init_method):
             F = G / torch.abs(G)
 
             F = torch.transpose(F, 1, 2)
-            W = torch.randn(K, test_size, Nrf, M, dtype=torch.double) + 1j * torch.randn(K, test_size, Nrf, M,
-                                                                                         dtype=torch.double)
+            W = randn_complex((K, test_size, Nrf, M), device=H.device)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -204,7 +203,7 @@ def initialize_schemes(H, R, Pt, init_method):
 
 # ================== get matrix G for initalization when Nrf > K
 def get_mat_G(H,fre_indx,snr_dB):
-    G = torch.randn(len(H[0]), Nt, Nrf, dtype=torch.double) + 1j*torch.randn(len(H[0]), Nt, Nrf, dtype=torch.double)
+    G = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
     Htmp = torch.transpose(H[fre_indx, :, :, :], 1, 2)
     G[:, :, :M] = Htmp
 
@@ -221,7 +220,7 @@ def get_mat_G(H,fre_indx,snr_dB):
     return G
 
 def get_mat_G_SVD(H,fre_indx,snr_dB):
-    G = torch.randn(len(H[0]), Nt, Nrf, dtype=torch.double) + 1j*torch.randn(len(H[0]), Nt, Nrf, dtype=torch.double)
+    G = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
     U, S, V_H = torch.linalg.svd(H)
     V = V_H
     G[:, :, :M] = V[:, :, :, :M]
@@ -339,8 +338,7 @@ def normalize_power(F, W, H, Pt):
 
 # ========================= generate PC mask =====================
 def generage_partial_connection_mask(N, M):
-
-    mask = torch.zeros((N, M), dtype=torch.cfloat)
+    mask = torch.zeros((N, M), dtype=COMPLEX_DTYPE)
     antennas_per_rf = N // M
     for rf in range(M):
         start_idx = rf * antennas_per_rf
@@ -434,8 +432,14 @@ def get_data_tensor(data_source):
     else:  # use matlab data
         data_train_array, data_test_array = load_data_matlab()
     # then convert numpy to tensor
-    H_train_tensor = torch.from_numpy(data_train_array)
-    H_test_tensor = torch.from_numpy(data_test_array)
+    max_train = min(train_size, data_train_array.shape[1])
+    max_test = min(test_size, data_test_array.shape[1])
+
+    train_slice = np.ascontiguousarray(data_train_array[:, :max_train, :, :])
+    test_slice = np.ascontiguousarray(data_test_array[:, :max_test, :, :])
+
+    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous()
+    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous()
     return H_train_tensor, H_test_tensor
 
 
@@ -469,8 +473,8 @@ def get_radar_data(snr_dB, H):
         at_array1 = np.tile(at0, (train_size, 1, 1, 1))
         at_array = np.transpose(at_array1, (1, 0, 2, 3))
 
-    R = torch.from_numpy(R_array)
-    at = torch.from_numpy(at_array)
+    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous()
+    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous()
     theta = radar_data['theta']
     ideal_beam = radar_data['Pd_theta']
 

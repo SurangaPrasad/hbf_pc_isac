@@ -2,6 +2,12 @@ import numpy as np
 import os
 import torch
 
+# ////////////////////////////////////////////// GLOBAL DTYPES //////////////////////////////////////////////
+# Use single-precision complex tensors to keep memory usage manageable unless a
+# specific routine requires doubles.
+REAL_DTYPE = torch.float32
+COMPLEX_DTYPE = torch.complex64
+
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
 run_conv_PGA_J10 = 0        # Conventional PGA with setting J = 10
