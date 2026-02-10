@@ -230,10 +230,10 @@ class PGA_Unfold_J10_PC(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
 
-        for ii in range(n_iter_outer):
+        for ii in range(1):
             activation_map = self._activation_map(F)
             # update F over
-            for jj in range(n_iter_inner):    
+            for jj in range(1):    
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_rad = get_grad_F_rad(F, W, R)
 

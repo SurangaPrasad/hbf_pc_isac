@@ -13,26 +13,40 @@ def execute_conv_PGA(conv_PGA, H_test, R, Pt):
     rate, tau, F, W = conv_PGA.execute_PGA(H_test, R, Pt, n_iter_outer)
     rate_avr = [r.detach().numpy() for r in (sum(rate) / len(H_test[0]))][-1]
     tau_avr = [r.detach().numpy() for r in (sum(tau) / len(H_test[0]))][-1]
-    MSE_avr = get_MSE(F, W, at, R, Pt)
+    MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
     return rate_avr, tau_avr, MSE_avr
 
 def execute_UPGA_J1(model_UPJA_J1, H_test, R, Pt):
     rate, tau, F, W = model_UPJA_J1.execute_PGA(H_test, R, Pt, n_iter_outer)
     rate_avr = [r.detach().numpy() for r in (sum(rate) / len(H_test[0]))][-1]
     tau_avr = [r.detach().numpy() for r in (sum(tau) / len(H_test[0]))][-1]
-    MSE_avr = get_MSE(F, W, at, R, Pt)
+    MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
     return rate_avr, tau_avr, MSE_avr
 
 def execute_UPGA_J20(model_UPJA_J20, H_test, R, Pt):
     rate, tau, F, W = model_UPJA_J20.execute_PGA(H_test, R, Pt, n_iter_outer, n_iter_inner_J20)
     rate_avr = [r.detach().numpy() for r in (sum(rate) / len(H_test[0]))][-1]
     tau_avr = [r.detach().numpy() for r in (sum(tau) / len(H_test[0]))][-1]
-    MSE_avr = get_MSE(F, W, at, R, Pt)
+    MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
     return rate_avr, tau_avr, MSE_avr
 
 def execute_UPGA_J10(model_UPJA_J10, H_test, R, Pt):
     rate, tau, F, W = model_UPJA_J10.execute_PGA(H_test, R, Pt, n_iter_outer, n_iter_inner_J10)
     rate_avr = [r.detach().numpy() for r in (sum(rate) / len(H_test[0]))][-1]
     tau_avr = [r.detach().numpy() for r in (sum(tau) / len(H_test[0]))][-1]
-    MSE_avr = get_MSE(F, W, at, R, Pt)
+    MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
+    return rate_avr, tau_avr, MSE_avr
+
+def execute_UPGA_J10_PC(model_UPJA_J10_PC, H_test, R, Pt):
+    rate, tau, F, W = model_UPJA_J10_PC.execute_PGA(H_test, R, Pt, n_iter_outer, n_iter_inner_J10)
+    rate_avr = [r.detach().numpy() for r in (sum(rate) / len(H_test[0]))][-1]
+    tau_avr = [r.detach().numpy() for r in (sum(tau) / len(H_test[0]))][-1]
+    MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
+    return rate_avr, tau_avr, MSE_avr
+def execute_conv_PGA_J10_PC(conv_PGA_J10_PC, H_test, R, Pt):
+    # executing classical PGA on the test set
+    rate, tau, F, W = conv_PGA_J10_PC.execute_PGA(H_test, R, Pt, n_iter_outer, n_iter_inner_J10)
+    rate_avr = [r.detach().numpy() for r in (sum(rate) / len(H_test[0]))][-1]
+    tau_avr = [r.detach().numpy() for r in (sum(tau) / len(H_test[0]))][-1]
+    MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
     return rate_avr, tau_avr, MSE_avr
