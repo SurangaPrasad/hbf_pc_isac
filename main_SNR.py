@@ -20,7 +20,8 @@ if run_UPGA_J20 == 1:
     model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20))
 if run_UPGA_J10 == 1:
     model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-    model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
+    model_UPGA_J10_EA = PGA_Unfold_J10_EA(step_size_UPGA_J10)
+    # model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
 if run_UPGA_J10_PC == 1:
     model_UPGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10_PC)
     model_UPGA_J10_PC.load_state_dict(torch.load(model_file_name_UPGA_J10_PC))
@@ -37,6 +38,7 @@ rate_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J1 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
+rate_UPGA_J10_EA = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_conv_PGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 
@@ -44,8 +46,12 @@ MSE_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_UPGA_J1 = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
+MSE_UPGA_J10_EA = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_UPGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_conv_PGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
+
+power_UPGA_J10 = np.zeros(len(snr_dB_list))
+power_UPGA_J10_EA = np.zeros(len(snr_dB_list))
 
 for ss in range(len(snr_dB_list)):
     snr_dB = snr_dB_list[ss]
@@ -61,13 +67,25 @@ for ss in range(len(snr_dB_list)):
     if run_UPGA_J1 == 1:
         rate_UPGA_J1[ss], _, MSE_UPGA_J1[ss] = execute_UPGA_J1(model_UPGA_J1, H_test, R, snr_ss)
     if run_UPGA_J10 == 1:
-        rate_UPGA_J10[ss], _, MSE_UPGA_J10[ss] = execute_UPGA_J10(model_UPGA_J10, H_test, R, snr_ss)
+        rate_UPGA_J10[ss], _, power_UPGA_J10[ss], MSE_UPGA_J10[ss] = execute_UPGA_J10(model_UPGA_J10, H_test, R, snr_ss)
+        rate_UPGA_J10_EA[ss], _, power_UPGA_J10_EA[ss], MSE_UPGA_J10_EA[ss] = execute_UPGA_J10_EA(model_UPGA_J10_EA, H_test, R, snr_ss)
+        
     if run_UPGA_J20 == 1:
         rate_UPGA_J20[ss], _, MSE_UPGA_J20[ss] = execute_UPGA_J20(model_UPGA_J20, H_test, R, snr_ss)
     if run_UPGA_J10_PC == 1:
         rate_UPGA_J10_PC[ss], _, MSE_UPGA_J10_PC[ss] = execute_UPGA_J10_PC(model_UPGA_J10_PC, H_test, R, snr_ss)
     if run_conv_PGA_J10_PC == 1:
         rate_conv_PGA_J10_PC[ss], _, MSE_conv_PGA_J10_PC[ss] = execute_conv_PGA_J10_PC(conv_PGA_J10_PC, H_test, R, snr_ss)
+
+# plot rate vs energy ====================================
+fig_energy = plt.figure()
+plt.plot(power_UPGA_J10, rate_UPGA_J10, ':*', color='red', label='UPGA (J=10)')
+plt.plot(power_UPGA_J10_EA, rate_UPGA_J10_EA, ':*', color='cyan', label='UPGA (J=10, EA)')
+plt.xlabel('Average Transmit Power')
+plt.ylabel(r'$R$ [bits/s/Hz]')
+plt.grid()
+plt.legend()
+plt.savefig(directory_result + 'rate_vs_energy.png')        
 
 # plot rate vs MSE ======================================================
 fig_tradeoff = plt.figure(3)
@@ -76,6 +94,7 @@ if run_UPGA_J1 == 1:
     plt.plot(MSE_UPGA_J1, rate_UPGA_J1, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
 if run_UPGA_J10 == 1:
     plt.plot(MSE_UPGA_J10, rate_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    plt.plot(MSE_UPGA_J10_EA, rate_UPGA_J10_EA, ':*', color='cyan', linewidth=3, markersize=7, label='UPGA (J=10, EA)')
 if run_UPGA_J20 == 1:
     plt.plot(MSE_UPGA_J20, rate_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
 if run_conv_PGA == 1:
@@ -107,6 +126,7 @@ if run_UPGA_J1 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J1, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
 if run_UPGA_J10 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    plt.plot(snr_dB_list, rate_UPGA_J10_EA, ':*', color='cyan', linewidth=3, markersize=7, label='UPGA (J=10, EA)')
 if run_UPGA_J20 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
 if run_conv_PGA == 1:
@@ -135,6 +155,7 @@ if run_UPGA_J1 == 1:
     plt.plot(snr_dB_list, MSE_UPGA_J1, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
 if run_UPGA_J10 == 1:
     plt.plot(snr_dB_list, MSE_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    plt.plot(snr_dB_list, MSE_UPGA_J10_EA, ':*', color='cyan', linewidth=3, markersize=7, label='UPGA (J=10, EA)')
 if run_UPGA_J20 == 1:
     plt.plot(snr_dB_list, MSE_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
 if run_conv_PGA == 1:

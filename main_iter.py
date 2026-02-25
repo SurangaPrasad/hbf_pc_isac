@@ -78,14 +78,26 @@ if run_program == 1:
         print('Running unfolded PGA with J = 10...')
         # Create new model and load states
         model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
+        # model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
 
-        sum_rate_UPGA_J10, tau_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, R,
+        sum_rate_UPGA_J10, tau_UPGA_J10, F_UPGA_J10, W_UPGA_J10, power_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, R,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
         rate_iter_UPGA_J10 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
         tau_iter_UPGA_J10 = [e.detach().numpy() for e in (sum(tau_UPGA_J10) / (len(H_test[0])))]
+        power_iter_UPGA_J10 = [p.detach().numpy() for p in (sum(power_UPGA_J10) / len(H_test[0]))]
+                               
+        print('Running unfolded PGA for energy aware method with J = 10...')
+        model_UPGA_J10_EA = PGA_Unfold_J10_EA(step_size_UPGA_J10)
+        sum_rate_UPGA_J10_EA, tau_UPGA_J10_EA, F_UPGA_J10_EA, W_UPGA_J10_EA, power_UPGA_J10_EA = model_UPGA_J10_EA.execute_PGA(H_test, R,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J10)
+        rate_iter_UPGA_J10_EA = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10_EA) / len(H_test[0]))]
+        tau_iter_UPGA_J10_EA = [e.detach().numpy() for e in (sum(tau_UPGA_J10_EA) / (len(H_test[0])))]
+        power_iter_UPGA_J10_EA = [p.detach().numpy() for p in (sum(power_UPGA_J10_EA) / len(H_test[0]))]
+
 
     # ====================================================== Proposed Unfolded PGA ====================================
     if run_UPGA_J20 == 1:
@@ -259,10 +271,15 @@ if plot_figure == 1:
         obj_iter_conv_PGA_J10 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_conv_PGA_J10, tau_iter_conv_PGA_J10)]
         plt.plot(iter_number_UPGA_J10, obj_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_UPGA_J10 == 1:
-        obj_iter_UPGA_J10 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J10, tau_iter_UPGA_J10)]
+        obj_iter_UPGA_J10 = [rate - OMEGA * tau for rate, tau, power in zip(rate_iter_UPGA_J10, tau_iter_UPGA_J10, power_iter_UPGA_J10)]
+        obj_iter_UPGA_J10_EA = [rate - OMEGA * tau for rate, tau, power in zip(rate_iter_UPGA_J10_EA, tau_iter_UPGA_J10_EA, power_iter_UPGA_J10_EA)]
+        # obj_iter_UPGA_J10 = [rate for rate, tau, power in zip(rate_iter_UPGA_J10, tau_iter_UPGA_J10, power_iter_UPGA_J10)]
         plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10, ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J10)
+        plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10_EA, ':*', markevery=5, color='cyan', linewidth=3, markersize=7, label='UPGA (J=10, EA)')
+
+
     if run_UPGA_J20 == 1:
-        obj_iter_UPGA_J20 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J20, tau_iter_UPGA_J20)]
+        obj_iter_UPGA_J20 = [rate for rate, tau in zip(rate_iter_UPGA_J20, tau_iter_UPGA_J20)]
         plt.plot(iter_number_UPGA_J20, obj_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     # if run_conv_PGA == 1:
     #     obj_iter_conv = [rate - OMEGA * tau for rate, tau in zip(rate_iter_conv, tau_iter_conv)]

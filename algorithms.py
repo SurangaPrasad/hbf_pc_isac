@@ -31,11 +31,40 @@ def execute_UPGA_J20(model_UPJA_J20, H_test, R, Pt):
     return rate_avr, tau_avr, MSE_avr
 
 def execute_UPGA_J10(model_UPJA_J10, H_test, R, Pt):
-    rate, tau, F, W = model_UPJA_J10.execute_PGA(H_test, R, Pt, n_iter_outer, n_iter_inner_J10)
-    rate_avr = [r.detach().numpy() for r in (sum(rate) / len(H_test[0]))][-1]
-    tau_avr = [r.detach().numpy() for r in (sum(tau) / len(H_test[0]))][-1]
+
+    rate, tau, F, W, power = model_UPJA_J10.execute_PGA(
+        H_test, R, Pt, n_iter_outer, n_iter_inner_J10
+    )
+
+    # Final iteration (last column)
+    rate_final  = (sum(rate)  / len(H_test[0]))[-1]
+    tau_final   = (sum(tau)   / len(H_test[0]))[-1]
+    power_final = (sum(power) / len(H_test[0]))[-1]
+
+    rate_avr  = rate_final.detach().cpu().numpy()
+    tau_avr   = tau_final.detach().cpu().numpy()
+    power_avr = power_final.detach().cpu().numpy()
+
     MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
-    return rate_avr, tau_avr, MSE_avr
+
+    return rate_avr, tau_avr, power_avr, MSE_avr
+def execute_UPGA_J10_EA(model_UPJA_J10_EA, H_test, R, Pt):
+
+    rate, tau, F, W, power = model_UPJA_J10_EA.execute_PGA(
+        H_test, R, Pt, n_iter_outer, n_iter_inner_J10
+    )
+
+    rate_final  = (sum(rate)  / len(H_test[0]))[-1]
+    tau_final   = (sum(tau)   / len(H_test[0]))[-1]
+    power_final = (sum(power) / len(H_test[0]))[-1]
+
+    rate_avr  = rate_final.detach().cpu().numpy()
+    tau_avr   = tau_final.detach().cpu().numpy()
+    power_avr = power_final.detach().cpu().numpy()
+
+    MSE_avr = get_MSE(F, W, at, R, Pt).detach().item()
+
+    return rate_avr, tau_avr, power_avr, MSE_avr
 
 def execute_UPGA_J10_PC(model_UPJA_J10_PC, H_test, R, Pt):
     rate, tau, F, W = model_UPJA_J10_PC.execute_PGA(H_test, R, Pt, n_iter_outer, n_iter_inner_J10)

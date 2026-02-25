@@ -137,8 +137,8 @@ class PGA_Conv(nn.Module):
             # print(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
         return torch.transpose(rates,  0, 1), torch.transpose(taus,  0, 1), F, W
 
-# ============================================== Proposed PGA model light=============================
-class PGA_Unfold_J10(nn.Module):
+# ============================================== Proposed PGA model light for=============================
+class PGA_Unfold_J10(nn.Module): 
 
     def __init__(self, step_size):
         super().__init__()
@@ -147,6 +147,9 @@ class PGA_Unfold_J10(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
+        power_init = torch.linalg.matrix_norm(F @ W, ord='fro') ** 2
+        power_init = power_init.reshape(1, -1)  # shape: (1, batch_size)
+        power_over_iters = torch.zeros(n_iter_outer, len(H[0]))
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
 
@@ -184,8 +187,68 @@ class PGA_Unfold_J10(nn.Module):
             rates = torch.cat([rate_init, rate_over_iters], dim=0)
             tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
             taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            power_over_iters[ii] = torch.linalg.matrix_norm(F @ W, ord='fro') ** 2
+            powers = torch.cat([power_init, power_over_iters], dim=0)
 
-        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W, torch.transpose(powers, 0, 1)
+# ============================================== Proposed PGA model light for enrgy aware method=============================
+class PGA_Unfold_J10_EA(nn.Module): 
+
+    def __init__(self, step_size):
+        super().__init__()
+        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+
+    # =========== Projection Gradient Ascent execution ===================
+    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
+        rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
+        power_init = torch.linalg.matrix_norm(F @ W, ord='fro') ** 2
+        power_init = power_init.reshape(1, -1)  # shape: (1, batch_size)
+        power_over_iters = torch.zeros(n_iter_outer, len(H[0]))
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+
+        for ii in range(n_iter_outer):
+            # update F over
+            for jj in range(n_iter_inner):
+                grad_F_com = get_grad_F_com(H, F, W)
+                grad_F_rad = get_grad_F_rad(F, W, R)
+                grad_F_power = get_grad_F_power(F, W)
+                if grad_F_com.isnan().any() or grad_F_rad.isnan().any(): # check gradient
+                    print('Error NaN gradients!!!!!!!!!!!!!!!')
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                delta_F_rad = self.step_size[jj][ii][0] * grad_F_rad
+                delta_F_power = self.step_size[jj][ii][0] * grad_F_power
+                F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD - delta_F_power * 0.5
+                # normalize by power to ensure non-NaN gradients if F becomes too large
+                #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
+                # F = normalize_power(F, W, H, Pt)
+            # Projection
+            F = project_unit_modulus(F)
+
+            # update W
+            W_new = W.clone().detach()
+            # compute gradients
+            grad_W_k_com = get_grad_W_com(H, F, W)
+            grad_W_k_rad = get_grad_W_rad(F, W, R)
+            grad_W_k_power = get_grad_W_power(F, W)
+            for k in range(K):
+                delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
+                delta_W_rad = self.step_size[0][ii][k + 1] * grad_W_k_rad[k]
+                delta_W_power = self.step_size[0][ii][k + 1] * grad_W_k_power[k]
+                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_rad * WEIGHT_W_RAD - delta_W_power * 0.5
+            # Projection
+            # F, W = normalize(F, W_new, H, Pt)
+
+            # get the rate in this iteration
+            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+            # print(rate_over_iters[ii])
+            rates = torch.cat([rate_init, rate_over_iters], dim=0)
+            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
+            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            power_over_iters[ii] = torch.linalg.matrix_norm(F @ W, ord='fro') ** 2
+            powers = torch.cat([power_init, power_over_iters], dim=0)
+
+        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W, torch.transpose(powers, 0, 1)
 # ============================================== Proposed PGA model light for PC======================
 class PGA_Unfold_J10_PC(nn.Module):
 
@@ -475,6 +538,12 @@ def get_grad_W_com(H, F, W):
     grad_W = grad_W / K
     return grad_W
 
+def get_grad_F_power(F, W):
+    W_H = torch.transpose(W, 2, 3).conj()
+    return 2 * F @ W @ W_H
+def get_grad_W_power(F, W):
+    F_H = torch.transpose(F, 2, 3).conj()
+    return 2 * F_H @ F @ W
 
 def generate_pi_matrix(B_matrix, H_tilde, Nt, Nrf):
     """
