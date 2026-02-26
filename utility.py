@@ -15,7 +15,7 @@ def randn_complex(shape, device=None):
 
 
 # ==================================== initialize F and W ===========================
-def initialize(H, R, Pt, normalization, pc=False):
+def initialize(H, Pt, normalization, pc=False):
     if init_scheme == 'conv':
         # randomizing F
         F = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
@@ -98,11 +98,11 @@ def initialize(H, R, Pt, normalization, pc=False):
         W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
     # rate_0 = get_sum_rate(H, F, W)
     rate_init = torch.zeros(1, len(H[0]))
-    beam_error_init = torch.zeros(1, len(H[0]))
+    # beam_error_init = torch.zeros(1, len(H[0]))
     rate_init[0, :] = get_sum_rate(H, F, W, Pt)
-    beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
+    # beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
 
-    return rate_init, beam_error_init, F, W
+    return rate_init, F, W
 
 
 # ==================================== initialize F and W with different methods for comparison ===========================
@@ -292,6 +292,29 @@ def get_beam_error(H, F, W, R, Pt):
     sum_error = torch.mean(error)
     return sum_error
 
+# ==================================== compute CRB function ===========================
+def get_crb(H, F, W, xi_0, A_dot, R_N_inv, Pt):
+    F, W = normalize(F, W, H, Pt)
+    
+    A_dot = A_dot.to(F.dtype)
+    R_N_inv = R_N_inv.to(F.dtype)
+
+    A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
+    R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
+
+    A_dot_H = A_dot.conj().transpose(-2, -1)
+    W_H = W.conj().transpose(-2, -1)
+    F_H = F.conj().transpose(-2, -1)
+    
+    M = A_dot_H @ R_N_inv @ A_dot
+    inner_mat = W_H @ F_H @ M @ F @ W
+    batch_trace = (torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1))
+
+    denominator = 2 * (torch.abs(torch.tensor(xi_0))**2) * batch_trace.view(1, -1, 1, 1)
+
+    crb = 1 / denominator
+    
+    return crb
 
 # ==================================== compute MSE ===========================
 def get_MSE(F, W, at, R, Pt):

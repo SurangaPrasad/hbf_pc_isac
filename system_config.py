@@ -10,12 +10,12 @@ COMPLEX_DTYPE = torch.complex64
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
-run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
-run_conv_PGA_J10_PC = 1    # Conventional PGA with J = 10 and partial coupling (PC) 
+run_conv_PGA_J10 = 0       # Conventional PGA with setting J = 10
+run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
-run_UPGA_J20 = 1           # Unfolded PGA with setting J = 20
-run_UPGA_J10_PC = 1        # Unfolded PGA with J = 10 and partial coupling (PC)
+run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
+run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
@@ -24,7 +24,7 @@ M = 4                   # Num of Users
 Nrf = 4                 # Num of RF chains (must be >= M)
 K = 1                   # Num of frequency bands
 n_target = 3            # Num of sensing targets
-theta_desire = np.array([-60.0, 0.0, 60.0], dtype='float64') # Angles of sensing targets
+theta_desire = 45 # Angles of sensing targets
 
 snr_dB = 12                 # SNR for training and showing the convergences
 snr = 10 ** (snr_dB / 10)   # transmit power
@@ -45,7 +45,7 @@ if normalize_tau == 0:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
     else:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_LoS"
-    OMEGA = 0.3
+    OMEGA = 0.000000001
     n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
 else:
     system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_normalize"
@@ -71,8 +71,31 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
-WEIGHT_F_COM = 1  # fixed
-WEIGHT_W_COM = 1
+WEIGHT_F_COM = OMEGA
+WEIGHT_W_COM = OMEGA / Nt * K
+WEIGHT_F_CRB = 1
+WEIGHT_W_CRB = 1
+
+# ========================= CRB PARAMETERS =========================
+# xi_0 = 10 ** (-40 / 10) ## path loss at reference distance (1 m) in linear scale
+xi_0 = 1
+lambda_wave = 1 # wavelength normalized
+delta = lambda_wave / 2 # antenna spacing
+desired_angle_rad = np.radians(theta_desire) # desired angles in radians
+n_indices = torch.arange(Nt, dtype=torch.float32)
+desired_angle_rad_torch = torch.tensor(desired_angle_rad, dtype=torch.float32)
+phase = 1j* 2 * torch.pi * delta * torch.sin(desired_angle_rad_torch) * n_indices
+a_phi_0 = torch.exp(phase)  # shape: (Nt, 1)
+a_dot_phi_0 = ((1j * 2 * torch.pi * delta * torch.cos(desired_angle_rad_torch) * n_indices) * a_phi_0)
+
+a_phi_0 = a_phi_0.unsqueeze(1)  # shape: (Nt, 1)
+a_dot_phi_0 = a_dot_phi_0.unsqueeze(1)  # shape: (Nt, 1)
+
+A_dot = a_dot_phi_0 @ a_phi_0.transpose(0, 1) + a_phi_0 @ a_dot_phi_0.transpose(0, 1)
+
+R_N = torch.eye(Nt)  # noise covariance matrix
+R_N_inv = torch.linalg.inv(R_N)  # inverse of noise covariance matrix
+
 
 # ========================== initiate step sizes as tensor for training ================
 step_size_fixed = 1e-2  # step size of conventional PGA

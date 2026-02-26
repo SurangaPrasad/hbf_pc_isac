@@ -145,21 +145,22 @@ class PGA_Unfold_J10(nn.Module):
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
 
     # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
-        rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
+    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
+        rate_init, F, W = initialize(H, Pt, initial_normalization)
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
 
         for ii in range(n_iter_outer):
             # update F over
             for jj in range(n_iter_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
-                grad_F_rad = get_grad_F_rad(F, W, R)
-                if grad_F_com.isnan().any() or grad_F_rad.isnan().any(): # check gradient
+                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any(): # check gradient
                     print('Error NaN gradients!!!!!!!!!!!!!!!')
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                delta_F_rad = self.step_size[jj][ii][0] * grad_F_rad
-                F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
+                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                F = F + delta_F_com * WEIGHT_F_COM - delta_F_crb * WEIGHT_F_CRB
+                F = sanitize_complex_tensor(F)
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
@@ -170,22 +171,22 @@ class PGA_Unfold_J10(nn.Module):
             W_new = W.clone().detach()
             # compute gradients
             grad_W_k_com = get_grad_W_com(H, F, W)
-            grad_W_k_rad = get_grad_W_rad(F, W, R)
+            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
             for k in range(K):
                 delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
-                delta_W_rad = self.step_size[0][ii][k + 1] * grad_W_k_rad[k]
-                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_rad * WEIGHT_W_RAD
+                delta_W_crb = self.step_size[0][ii][k + 1] * grad_W_k_crb[k]
+                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_crb * WEIGHT_W_CRB
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
             # get the rate in this iteration
             rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
             # print(rate_over_iters[ii])
-            rates = torch.cat([rate_init, rate_over_iters], dim=0)
-            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
-            taus = torch.cat([tau_init, tau_over_iters], dim=0)
+            rates = torch.cat([rate_over_iters], dim=0)
+            crb_over_iters[ii] = get_crb(H, F, W, xi_0, A_dot, R_N_inv, Pt)
+            crbs = torch.cat([crb_over_iters], dim=0)
 
-        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
+        return torch.transpose(rates, 0, 1), torch.transpose(crbs, 0, 1), F, W
 # ============================================== Proposed PGA model light for PC======================
 class PGA_Unfold_J10_PC(nn.Module):
 
@@ -841,4 +842,50 @@ def get_sum_loss(F, W, H, R, Pt, batch_size):
     return loss
 
 
+# ================== compute CRLB gradients =========================
+def get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv):
 
+    # match the data type of A_dot and R_N_inv with F
+    A_dot = A_dot.to(F.dtype)
+    R_N_inv = R_N_inv.to(F.dtype)
+
+    # reshape A_dot and R_N_inv for batch processing
+    A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
+    R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
+    
+    M = A_dot.conj().transpose(-2, -1) @ R_N_inv @ A_dot
+
+    W_H = W.conj().transpose(-2, -1)
+    F_H = F.conj().transpose(-2, -1)
+
+    inner_mat = W_H @ F_H @ M @ F @ W
+    batch_trace = torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1)
+    
+    numerator = M @ F @ W @ W_H
+    denominator = (2 * (torch.abs(torch.tensor(xi_0))**2) * batch_trace).view(1, -1, 1, 1)
+    
+    grad_F_crb = -1 * numerator / denominator
+    
+    return grad_F_crb
+
+def get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv):
+
+    A_dot = A_dot.to(F.dtype)
+    R_N_inv = R_N_inv.to(F.dtype)
+
+    A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
+    R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
+
+    A_dot_H = A_dot.conj().transpose(-2, -1)
+    W_H = W.conj().transpose(-2, -1)
+    F_H = F.conj().transpose(-2, -1)
+
+
+    M = A_dot_H @ R_N_inv @ A_dot
+    intter_mat = W_H @ F_H @ M @ F @ W
+    batch_trace = torch.diagonal(intter_mat, dim1=-2, dim2=-1).sum(-1)
+    
+    numerator = F_H @ M @ F @ W
+    denominator = 2 * (torch.abs(torch.tensor(xi_0))**2) * batch_trace.view(1, -1, 1, 1)
+    grad_W_crb = -1 * numerator / denominator
+    return grad_W_crb
