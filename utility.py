@@ -292,8 +292,8 @@ def get_beam_error(H, F, W, R, Pt):
     sum_error = torch.mean(error)
     return sum_error
 
-# ==================================== compute CRB function ===========================
-def get_crb(H, F, W, xi_0, A_dot, R_N_inv, Pt):
+# ==================================== compute CRB  fishery equation function ===========================
+def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt):
     F, W = normalize(F, W, H, Pt)
     
     A_dot = A_dot.to(F.dtype)
@@ -308,12 +308,12 @@ def get_crb(H, F, W, xi_0, A_dot, R_N_inv, Pt):
     
     M = A_dot_H @ R_N_inv @ A_dot
     inner_mat = W_H @ F_H @ M @ F @ W
-    batch_trace = (torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1))
+    batch_trace = (torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1))  # [K, batch_size]
 
-    denominator = 2 * (torch.abs(torch.tensor(xi_0))**2) * batch_trace.view(1, -1, 1, 1)
+    fim = batch_trace.sum(0).real  # sum over K users -> [batch_size]
 
-    crb = 1 / denominator
-    
+    crb = torch.log(fim)  # [batch_size]
+
     return crb
 
 # ==================================== compute MSE ===========================

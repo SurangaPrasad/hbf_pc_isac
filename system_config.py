@@ -10,7 +10,7 @@ COMPLEX_DTYPE = torch.complex64
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
-run_conv_PGA_J10 = 0       # Conventional PGA with setting J = 10
+run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
@@ -45,7 +45,7 @@ if normalize_tau == 0:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
     else:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_LoS"
-    OMEGA = 0.000000001
+    OMEGA = 1
     n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
 else:
     system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_normalize"
@@ -72,7 +72,7 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
 WEIGHT_F_COM = OMEGA
-WEIGHT_W_COM = OMEGA / Nt * K
+WEIGHT_W_COM = OMEGA
 WEIGHT_F_CRB = 1
 WEIGHT_W_CRB = 1
 

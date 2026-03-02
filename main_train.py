@@ -121,10 +121,9 @@ if run_UPGA_J10 == 1:
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
-            Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            rate, __, F, W = model_UPGA_J10.execute_PGA(H, Rtrain, snr_train, n_iter_outer,
+            rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer,
                                                         n_iter_inner_J10)
-            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
+            loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             # loss = -sum(sum(rate[1:]) / (K * batch_size))
 
             optimizer.zero_grad()  # zero the gradient buffers
@@ -138,12 +137,11 @@ if run_UPGA_J10 == 1:
     model_test = PGA_Unfold_J10(step_size_UPGA_J10)
     model_test.load_state_dict(torch.load(model_file_name_UPGA_J10))
     Rtest, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
-    rate_iter_UPGA_J10, beam_error_iter_UPGA_J10, F_prop_UPGA_J10, W_prop_UPGA_J10 = model_test.execute_PGA(H_test, Rtest,
-                                                                                                            snr,
+    rate_iter_UPGA_J10, beam_crb_iter_UPGA_J10, F_prop_UPGA_J10, W_prop_UPGA_J10 = model_test.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
                                                                                                             n_iter_outer,
                                                                                                             n_iter_inner_J10)
     rate_UPGA_J10 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J10) / len(H_test[0]))]
-    beam_error_UPGA_J10 = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J10) / (len(H_test[0])))]
+    beam_error_UPGA_J10 = [r.detach().numpy() for r in (sum(beam_crb_iter_UPGA_J10) / (len(H_test[0])))]
     iter_number_UPGA_J10 = np.array(list(range(n_iter_outer + 1)))
 
 # ============================================= Proposed unfolded PGA J=10 PC ============================================

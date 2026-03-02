@@ -159,8 +159,7 @@ class PGA_Unfold_J10(nn.Module):
                     print('Error NaN gradients!!!!!!!!!!!!!!!')
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                 delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-                F = F + delta_F_com * WEIGHT_F_COM - delta_F_crb * WEIGHT_F_CRB
-                F = sanitize_complex_tensor(F)
+                F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
@@ -175,7 +174,7 @@ class PGA_Unfold_J10(nn.Module):
             for k in range(K):
                 delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
                 delta_W_crb = self.step_size[0][ii][k + 1] * grad_W_k_crb[k]
-                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_crb * WEIGHT_W_CRB
+                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM + delta_W_crb * WEIGHT_W_CRB
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
@@ -183,10 +182,10 @@ class PGA_Unfold_J10(nn.Module):
             rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
             # print(rate_over_iters[ii])
             rates = torch.cat([rate_over_iters], dim=0)
-            crb_over_iters[ii] = get_crb(H, F, W, xi_0, A_dot, R_N_inv, Pt)
-            crbs = torch.cat([crb_over_iters], dim=0)
+            crb_over_iters[ii] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
+            crb_fes = torch.cat([crb_over_iters], dim=0)
 
-        return torch.transpose(rates, 0, 1), torch.transpose(crbs, 0, 1), F, W
+        return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
 # ============================================== Proposed PGA model light for PC======================
 class PGA_Unfold_J10_PC(nn.Module):
 
@@ -827,18 +826,14 @@ def get_grad_W_rad(F, W, R):
     return grad_W
 
 # ==================compute los based on (15)
-def get_sum_loss(F, W, H, R, Pt, batch_size):
+def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt):
     sum_rate = get_sum_rate(H, F, W, Pt)
-    # sum_rate = sum(rate)
-    X = F @ W
-    X_H = torch.transpose(X, 2, 3).conj()
-    if normalize_tau == 1:
-        error = torch.linalg.matrix_norm(X @ X_H - R, ord='fro') ** 2 / torch.linalg.matrix_norm(R[:, 0, :, :] , ord='fro') ** 2
-    else:
-        error = torch.linalg.matrix_norm(X @ X_H - R, ord='fro') ** 2
-    # sum_error = sum(sum(error))
-    sum_error = torch.mean(error)
-    loss = -(sum_rate - OMEGA * sum_error)# / (K * batch_size)
+    # loss = -(sum_rate - OMEGA * sum_error)# / (K * batch_size)
+
+    # For CRB-based loss, we can directly use the CRB value as the loss, since we want to minimize it.
+    crb = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
+    mean_crb = torch.mean(crb)
+    loss = -(sum_rate - OMEGA * mean_crb)
     return loss
 
 
@@ -852,19 +847,20 @@ def get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv):
     # reshape A_dot and R_N_inv for batch processing
     A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
     R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
-    
-    M = A_dot.conj().transpose(-2, -1) @ R_N_inv @ A_dot
 
+    A_dot_H = A_dot.conj().transpose(-2, -1)
     W_H = W.conj().transpose(-2, -1)
     F_H = F.conj().transpose(-2, -1)
+    
+    M = A_dot_H @ R_N_inv @ A_dot
 
     inner_mat = W_H @ F_H @ M @ F @ W
-    batch_trace = torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1)
+    batch_trace = (torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1))
     
     numerator = M @ F @ W @ W_H
-    denominator = (2 * (torch.abs(torch.tensor(xi_0))**2) * batch_trace).view(1, -1, 1, 1)
+    denominator = batch_trace.view(1, -1, 1, 1)
     
-    grad_F_crb = -1 * numerator / denominator
+    grad_F_crb = numerator / denominator
     
     return grad_F_crb
 
@@ -882,10 +878,10 @@ def get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv):
 
 
     M = A_dot_H @ R_N_inv @ A_dot
-    intter_mat = W_H @ F_H @ M @ F @ W
-    batch_trace = torch.diagonal(intter_mat, dim1=-2, dim2=-1).sum(-1)
+    inner_mat = W_H @ F_H @ M @ F @ W
+    batch_trace = (torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1))
     
     numerator = F_H @ M @ F @ W
-    denominator = 2 * (torch.abs(torch.tensor(xi_0))**2) * batch_trace.view(1, -1, 1, 1)
-    grad_W_crb = -1 * numerator / denominator
+    denominator = batch_trace.view(1, -1, 1, 1)
+    grad_W_crb = numerator / denominator
     return grad_W_crb
