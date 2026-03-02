@@ -95,10 +95,11 @@ if run_program == 1:
         model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
         # model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20))
 
-        sum_rate_UPGA_J20, tau_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, R, snr, n_iter_outer,
+        sum_rate_UPGA_J20, crb_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
+                                                                                             n_iter_outer,
                                                                                              n_iter_inner_J20)
         rate_iter_UPGA_J20 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
-        tau_iter_UPGA_J20 = [e.detach().numpy() for e in (sum(tau_UPGA_J20) / (len(H_test[0])))]
+        tau_iter_UPGA_J20 = [e.detach().numpy() for e in (sum(crb_UPGA_J20) / (len(H_test[0])))]
 
     # ============================== generate beampattern ////////////////////////////////////////////////////////////////////
     print('generating beampattern...')
