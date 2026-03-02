@@ -31,6 +31,14 @@ if run_conv_PGA_J10_PC == 1:
         requires_grad=False,
     )
     conv_PGA_J10_PC = PGA_Unfold_J10_PC(baseline_step)
+if run_conv_PGA_J10 == 1:
+    conv_PGA_J10 = PGA_Unfold_J10(
+        torch.full_like(
+            step_size_UPGA_J10,
+            step_size_fixed,
+            requires_grad=False,
+        )
+    )
 
 
 rate_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
@@ -39,13 +47,16 @@ rate_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_conv_PGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
+rate_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 
 MSE_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_UPGA_J1 = np.zeros([len(snr_dB_list), ], dtype=float)
-MSE_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
-MSE_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_UPGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 MSE_conv_PGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
+# CRB-based sensing metrics for new models (PGA_Unfold_J10, PGA_Unfold_J20)
+CRB_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
+CRB_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
+CRB_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 
 for ss in range(len(snr_dB_list)):
     snr_dB = snr_dB_list[ss]
@@ -61,13 +72,15 @@ for ss in range(len(snr_dB_list)):
     if run_UPGA_J1 == 1:
         rate_UPGA_J1[ss], _, MSE_UPGA_J1[ss] = execute_UPGA_J1(model_UPGA_J1, H_test, R, snr_ss)
     if run_UPGA_J10 == 1:
-        rate_UPGA_J10[ss], _, MSE_UPGA_J10[ss] = execute_UPGA_J10(model_UPGA_J10, H_test, R, snr_ss)
+        rate_UPGA_J10[ss], CRB_UPGA_J10[ss] = execute_UPGA_J10(model_UPGA_J10, H_test, snr_ss)
     if run_UPGA_J20 == 1:
-        rate_UPGA_J20[ss], _, MSE_UPGA_J20[ss] = execute_UPGA_J20(model_UPGA_J20, H_test, R, snr_ss)
+        rate_UPGA_J20[ss], CRB_UPGA_J20[ss] = execute_UPGA_J20(model_UPGA_J20, H_test, snr_ss)
     if run_UPGA_J10_PC == 1:
         rate_UPGA_J10_PC[ss], _, MSE_UPGA_J10_PC[ss] = execute_UPGA_J10_PC(model_UPGA_J10_PC, H_test, R, snr_ss)
     if run_conv_PGA_J10_PC == 1:
         rate_conv_PGA_J10_PC[ss], _, MSE_conv_PGA_J10_PC[ss] = execute_conv_PGA_J10_PC(conv_PGA_J10_PC, H_test, R, snr_ss)
+    if run_conv_PGA_J10 == 1:
+        rate_conv_PGA_J10[ss], CRB_conv_PGA_J10[ss] = execute_conv_PGA_J10(conv_PGA_J10, H_test, snr_ss)
 
 # plot rate vs MSE ======================================================
 fig_tradeoff = plt.figure(3)
@@ -75,15 +88,17 @@ plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_UPGA_J1 == 1:
     plt.plot(MSE_UPGA_J1, rate_UPGA_J1, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
 if run_UPGA_J10 == 1:
-    plt.plot(MSE_UPGA_J10, rate_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    plt.plot(CRB_UPGA_J10, rate_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
-    plt.plot(MSE_UPGA_J20, rate_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+    plt.plot(CRB_UPGA_J20, rate_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
 if run_conv_PGA == 1:
     plt.plot(MSE_conv_PGA, rate_conv_PGA, ':', color='black', linewidth=3, markersize=7, label=label_conv)
 if run_UPGA_J10_PC == 1:
     plt.plot(MSE_UPGA_J10_PC, rate_UPGA_J10_PC, ':', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_PC)
 if run_conv_PGA_J10_PC == 1:
     plt.plot(MSE_conv_PGA_J10_PC, rate_conv_PGA_J10_PC, ':', color='orange', linewidth=3, markersize=7, label=label_conv_PGA_J10_PC)
+if run_conv_PGA_J10 == 1:
+    plt.plot(CRB_conv_PGA_J10, rate_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
 if benchmark == 1:
     benchmark_results = scipy.io.loadmat(directory_benchmark + 'result_benchmark')
     rate_ZF = np.squeeze(benchmark_results['rate_ZF_mean'])
@@ -93,7 +108,7 @@ if benchmark == 1:
     plt.plot(MSE_SCA, rate_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
     plt.plot(MSE_ZF, rate_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
 # plt.title(system_params)
-plt.xlabel('Average MSE [dB]')
+plt.xlabel('Sensing Metric (CRB / MSE)')
 plt.ylabel(r'$R$ [bits/s/Hz]')
 plt.grid()
 plt.legend(loc='lower left', labelspacing  = 0.15)
@@ -115,6 +130,8 @@ if run_UPGA_J10_PC == 1:
     plt.plot(snr_dB_list, rate_UPGA_J10_PC, ':', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_PC)
 if run_conv_PGA_J10_PC == 1:
     plt.plot(snr_dB_list, rate_conv_PGA_J10_PC, ':', color='orange', linewidth=3, markersize=7, label=label_conv_PGA_J10_PC)
+if run_conv_PGA_J10 == 1:
+    plt.plot(snr_dB_list, rate_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
 if benchmark == 1:
     plt.plot(snr_dB_list, rate_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
     plt.plot(snr_dB_list, rate_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
@@ -134,15 +151,17 @@ plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_UPGA_J1 == 1:
     plt.plot(snr_dB_list, MSE_UPGA_J1, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
 if run_UPGA_J10 == 1:
-    plt.plot(snr_dB_list, MSE_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    plt.plot(snr_dB_list, CRB_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
-    plt.plot(snr_dB_list, MSE_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+    plt.plot(snr_dB_list, CRB_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
 if run_conv_PGA == 1:
     plt.plot(snr_dB_list, MSE_conv_PGA, ':', color='black', linewidth=3, markersize=7, label=label_conv)
 if run_UPGA_J10_PC == 1:
     plt.plot(snr_dB_list, MSE_UPGA_J10_PC, ':', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_PC)
 if run_conv_PGA_J10_PC == 1:
     plt.plot(snr_dB_list, MSE_conv_PGA_J10_PC, ':', color='orange', linewidth=3, markersize=7, label=label_conv_PGA_J10_PC)
+if run_conv_PGA_J10 == 1:
+    plt.plot(snr_dB_list, CRB_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
 
 if benchmark == 1:
     plt.plot(snr_dB_list, MSE_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
@@ -150,7 +169,7 @@ if benchmark == 1:
 
 # plt.title(system_params)
 plt.xlabel('SNR [dB]')
-plt.ylabel('Average radar beampattern MSE [dB]')
+plt.ylabel('Sensing Metric (CRB / MSE [dB])')
 plt.grid()
 plt.legend(loc='best', labelspacing  = 0.15)
 plt.savefig(directory_result + 'MSE_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
