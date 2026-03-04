@@ -9,6 +9,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # Load training data
 H_train, H_test0 = get_data_tensor(data_source)
+print(H_train.shape)
 H_test = H_test0[:, :test_size, :, :]
 torch.manual_seed(3407)
 

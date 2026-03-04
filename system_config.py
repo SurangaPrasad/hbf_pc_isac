@@ -14,7 +14,7 @@ run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
-run_UPGA_J20 = 1           # Unfolded PGA with setting J = 20
+run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 
@@ -105,6 +105,11 @@ step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_si
 step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
 step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
 
+# ========================== Initialize step sizes seperately for lambda and mu ============
+step_size_lambda = torch.diag([Nt, M], step_size_fixed, requires_grad=True)
+step_size_mu = torch.diag([Nrf, M], step_size_fixed, requires_grad=True)
+step_size_UPGA_J10_lambda = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_lambda, requires_grad=True)
+step_size_UPGA_J10_mu = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_mu, requires_grad=True)
 # ////////////////////////////////////////////// SAVING RESULTS AND DATA //////////////////////////////////////////////
 directory_data = "./dataset/" + system_config + "/"
 if not os.path.exists(directory_data):
