@@ -107,7 +107,7 @@ if run_UPGA_J20 == 1:
 if run_UPGA_J10 == 1:
 
     # Object defining
-    model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+    model_UPGA_J10 = PGA_Unfold_J10(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
 
     # training procedure
     optimizer = torch.optim.Adam(model_UPGA_J10.parameters(), lr=learning_rate)

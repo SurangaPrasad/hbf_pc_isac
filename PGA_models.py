@@ -140,9 +140,16 @@ class PGA_Conv(nn.Module):
 # ============================================== Proposed PGA model light=============================
 class PGA_Unfold_J10(nn.Module):
 
-    def __init__(self, step_size):
+    def __init__(self, n_iter_inner, n_iter_outer, dim_F, dim_W):
         super().__init__()
-        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+
+        # ===== Diagonal preconditioner for F =====
+        # Shape: [n_iter_inner, n_iter_outer, 64]
+        self.mu = nn.Parameter( 1e-2 * torch.ones(n_iter_inner, n_iter_outer, dim_F))
+
+        # ===== Diagonal preconditioner for W =====
+        # Shape: [n_iter_outer, 4]
+        self.lambda_ = nn.Parameter( 1e-2 * torch.ones(n_iter_outer, dim_W))
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
@@ -157,8 +164,22 @@ class PGA_Unfold_J10(nn.Module):
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                 if grad_F_com.isnan().any() or grad_F_crb.isnan().any(): # check gradient
                     print('Error NaN gradients!!!!!!!!!!!!!!!')
-                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                # reshape gradient from [ K, Batch , Nt , M] to [64, -1]
+                grad_vec_com = grad_F_com.reshape(64, -1)
+                grad_vec_crb = grad_F_crb.reshape(64, -1)
+
+                # get diagonal scaling vector for this iteration
+                mu_vec = self.mu[jj, ii]   # shape: [64]
+
+                # apply column-wise scaling
+                delta_vec_com = mu_vec.unsqueeze(1) * grad_vec_com  # shape [64 , 1] * [64, -1] -> [64, -1]
+                delta_vec_crb = mu_vec.unsqueeze(1) * grad_vec_crb
+
+                # reshape back
+                delta_F_com = delta_vec_com.reshape_as(grad_F_com)
+                delta_F_crb = delta_vec_crb.reshape_as(grad_F_crb)
+
+                # update
                 F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
@@ -171,10 +192,20 @@ class PGA_Unfold_J10(nn.Module):
             # compute gradients
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+            lambda_vec = self.lambda_[ii]   # shape: [4]
+
             for k in range(K):
-                delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
-                delta_W_crb = self.step_size[0][ii][k + 1] * grad_W_k_crb[k]
-                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM + delta_W_crb * WEIGHT_W_CRB
+
+                grad_vec_com = grad_W_k_com[k].reshape(4, -1)
+                grad_vec_crb = grad_W_k_crb[k].reshape(4, -1)
+
+                delta_vec_com = lambda_vec.unsqueeze(1) * grad_vec_com
+                delta_vec_crb = lambda_vec.unsqueeze(1) * grad_vec_crb
+
+                delta_W_com = delta_vec_com.reshape_as(grad_W_k_com[k])
+                delta_W_crb = delta_vec_crb.reshape_as(grad_W_k_crb[k])
+
+                W_new[k] = ( W[k]+ delta_W_com * WEIGHT_W_COM + delta_W_crb * WEIGHT_W_CRB)
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
