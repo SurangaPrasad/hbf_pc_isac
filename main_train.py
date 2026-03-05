@@ -105,7 +105,7 @@ if run_UPGA_J20 == 1:
 
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J10 == 1:
-    model_UPGA_J10 = PGA_Unfold_J10(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
+    model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
     optimizer = torch.optim.Adam(model_UPGA_J10.parameters(), lr=learning_rate)
 
     epoch_losses = [] # To store average loss per epoch

@@ -62,9 +62,9 @@ print(system_info)
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 256    # size of training set
 test_size = 1      # size of testing set
-batch_size = 16     # batch size when training
+batch_size = 8     # batch size when training
 n_epoch = 30         # number of training epochs
-learning_rate = 0.001 # learning rate
+learning_rate = 0.0001 # learning rate
 
 n_iter_outer = 120      # Number of outer iterations (I)
 n_iter_inner_J5 = 5     # Number of inner iterations (J = 5)

@@ -25,7 +25,7 @@ if run_program == 1:
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
-        model_conv_PGA_J10 = PGA_Unfold_J10(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
+        model_conv_PGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
         rate_conv_PGA_J10, crb_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
@@ -49,7 +49,7 @@ if run_program == 1:
     if run_UPGA_J10 == 1:
         print('Running unfolded PGA with J = 10...')
         # Create new model and load states
-        model_UPGA_J10 = PGA_Unfold_J10(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
+        model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
         model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
 
         sum_rate_UPGA_J10, crb_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,

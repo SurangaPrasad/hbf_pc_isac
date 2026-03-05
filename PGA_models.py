@@ -141,6 +141,59 @@ class PGA_Conv(nn.Module):
 # ============================================== Proposed PGA model light=============================
 class PGA_Unfold_J10(nn.Module):
 
+    def __init__(self, step_size):
+        super().__init__()
+        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+
+    # =========== Projection Gradient Ascent execution ===================
+    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
+        rate_init, F, W = initialize(H, Pt, initial_normalization)
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
+        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
+        
+        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+            for jj in range(n_inner):
+                grad_F_com = get_grad_F_com(H, F, W)
+                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any(): # check gradient
+                    print('Error NaN gradients!!!!!!!!!!!!!!!')
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                # normalize by power to ensure non-NaN gradients if F becomes too large
+                F = normalize_power(F, W, H, Pt)
+            return F
+
+        for ii in range(n_iter_outer):
+            # update F over
+            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
+            F = project_unit_modulus(F)
+
+            # update W
+            W_new = W.clone().detach()
+            # compute gradients
+            grad_W_k_com = get_grad_W_com(H, F, W)
+            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+            for k in range(K):
+                delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
+                delta_W_crb = self.step_size[0][ii][k + 1] * grad_W_k_crb[k]
+                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM + delta_W_crb * WEIGHT_W_CRB
+
+            # Projection
+            F, W = normalize(F, W_new, H, Pt)
+
+            # get the rate in this iteration
+            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
+            # print(rate_over_iters[ii])
+            rates = torch.cat([rate_over_iters], dim=0).detach()
+            crb_over_iters[ii] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            crb_fes = torch.cat([crb_over_iters], dim=0).detach()
+
+        return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
+
+# ============================================== Proposed PGA model light with preconditioner=============================
+class PGA_Unfold_J10_PRCDN(nn.Module):
+
     def __init__(self, n_iter_inner, n_iter_outer, dim_F, dim_W):
         super().__init__()
 
@@ -190,7 +243,7 @@ class PGA_Unfold_J10(nn.Module):
         
         for ii in range(n_iter_outer):
             # update F over
-            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, self.mu[:, ii], n_iter_inner, Pt)
+            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, self.mu[:, ii], n_iter_inner, Pt, use_reentrant=False)
             # Projection
             F = project_unit_modulus(F)
 
@@ -264,7 +317,7 @@ class PGA_Unfold_J10_RMSProp(nn.Module):
         
         for ii in range(n_iter_outer):
             # update F over
-            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, s_F)
+            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, s_F, use_reentrant=False)
             # Projection
             F = project_unit_modulus(F)
 
@@ -781,7 +834,7 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt):
     # For CRB-based loss, we can directly use the CRB value as the loss, since we want to minimize it.
     crb = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
     mean_crb = torch.mean(crb)
-    loss = -(sum_rate - OMEGA * mean_crb)
+    loss = -(OMEGA * sum_rate + mean_crb)
     return loss
 
 
