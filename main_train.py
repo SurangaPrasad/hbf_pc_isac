@@ -105,44 +105,62 @@ if run_UPGA_J20 == 1:
 
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J10 == 1:
-
-    # Object defining
     model_UPGA_J10 = PGA_Unfold_J10(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
-
-    # training procedure
     optimizer = torch.optim.Adam(model_UPGA_J10.parameters(), lr=learning_rate)
 
-    train_losses, valid_losses = [], []
+    epoch_losses = [] # To store average loss per epoch
 
     for i_epoch in range(n_epoch):
-        print(i_epoch)
-        H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
-            H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
+        batch_losses = [] # To store loss of each batch in current epoch
+        
+        H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+        
+        for i_batch in range(0, len(H_train[0]), batch_size):
+            H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
-            rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer,
-                                                        n_iter_inner_J10)
+            
+            rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10)
+            
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
-            # loss = -sum(sum(rate[1:]) / (K * batch_size))
-
-            optimizer.zero_grad()  # zero the gradient buffers
+            
+            optimizer.zero_grad()
             loss.backward()
-            optimizer.step()  # Does the update
+            optimizer.step()
+            
+            # .item() is critical to keep memory usage low!
+            batch_losses.append(loss.item())
 
-    # Save trained model
+        avg_loss = sum(batch_losses) / len(batch_losses)
+        epoch_losses.append(avg_loss)
+        print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
+
     torch.save(model_UPGA_J10.state_dict(), model_file_name_UPGA_J10)
+    
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, n_epoch + 1), epoch_losses, marker='o', linestyle='-', color='b')
+    plt.title('Training Loss per Epoch')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average Loss')
+    plt.grid(True)
 
-    # test proposed model
-    model_test = PGA_Unfold_J10(step_size_UPGA_J10)
-    model_test.load_state_dict(torch.load(model_file_name_UPGA_J10))
-    Rtest, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
-    rate_iter_UPGA_J10, beam_crb_iter_UPGA_J10, F_prop_UPGA_J10, W_prop_UPGA_J10 = model_test.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
-                                                                                                            n_iter_outer,
-                                                                                                            n_iter_inner_J10)
-    rate_UPGA_J10 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J10) / len(H_test[0]))]
-    beam_error_UPGA_J10 = [r.detach().numpy() for r in (sum(beam_crb_iter_UPGA_J10) / (len(H_test[0])))]
-    iter_number_UPGA_J10 = np.array(list(range(n_iter_outer + 1)))
+
+    # Save the plot of training loss
+    plt.savefig(directory_data + "training_loss_UPGA_J10.png")
+
+    
+
+    # # test proposed model
+    # model_test = PGA_Unfold_J10(step_size_UPGA_J10)
+    # model_test.load_state_dict(torch.load(model_file_name_UPGA_J10))
+    # Rtest, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
+    # rate_iter_UPGA_J10, beam_crb_iter_UPGA_J10, F_prop_UPGA_J10, W_prop_UPGA_J10 = model_test.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
+    #                                                                                                         n_iter_outer,
+    #                                                                                                         n_iter_inner_J10)
+    # rate_UPGA_J10 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J10) / len(H_test[0]))]
+    # beam_error_UPGA_J10 = [r.detach().numpy() for r in (sum(beam_crb_iter_UPGA_J10) / (len(H_test[0])))]
+    # iter_number_UPGA_J10 = np.array(list(range(n_iter_outer + 1)))
 
 # ============================================= Proposed unfolded PGA J=10 PC ============================================
 

@@ -21,16 +21,6 @@ if run_UPGA_J20 == 1:
 if run_UPGA_J10 == 1:
     model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
     model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
-if run_UPGA_J10_PC == 1:
-    model_UPGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10_PC)
-    model_UPGA_J10_PC.load_state_dict(torch.load(model_file_name_UPGA_J10_PC))
-if run_conv_PGA_J10_PC == 1:
-    baseline_step = torch.full_like(
-        step_size_UPGA_J10_PC,
-        step_size_fixed,
-        requires_grad=False,
-    )
-    conv_PGA_J10_PC = PGA_Unfold_J10_PC(baseline_step)
 if run_conv_PGA_J10 == 1:
     conv_PGA_J10 = PGA_Unfold_J10(
         torch.full_like(

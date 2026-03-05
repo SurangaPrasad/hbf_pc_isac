@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 from utility import *
+from torch.utils.checkpoint import checkpoint
 
 def clamp_complex_magnitude(delta, max_magnitude):
     """Scale complex updates so their magnitude never exceeds `max_magnitude`."""
@@ -151,15 +152,16 @@ class PGA_Unfold_J10(nn.Module):
         # Shape: [n_iter_outer, 4]
         self.lambda_ = nn.Parameter( 1e-2 * torch.ones(n_iter_outer, dim_W))
 
+
+
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
 
-        for ii in range(n_iter_outer):
-            # update F over
-            for jj in range(n_iter_inner):
+        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, mu_ii, n_inner, Pt):
+            for jj in range(n_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                 if grad_F_com.isnan().any() or grad_F_crb.isnan().any(): # check gradient
@@ -169,7 +171,7 @@ class PGA_Unfold_J10(nn.Module):
                 grad_vec_crb = grad_F_crb.reshape(64, -1)
 
                 # get diagonal scaling vector for this iteration
-                mu_vec = self.mu[jj, ii]   # shape: [64]
+                mu_vec = mu_ii[jj]   # shape: [64]
 
                 # apply column-wise scaling
                 delta_vec_com = mu_vec.unsqueeze(1) * grad_vec_com  # shape [64 , 1] * [64, -1] -> [64, -1]
@@ -184,6 +186,11 @@ class PGA_Unfold_J10(nn.Module):
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
+            return F
+        
+        for ii in range(n_iter_outer):
+            # update F over
+            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, self.mu[:, ii], n_iter_inner, Pt)
             # Projection
             F = project_unit_modulus(F)
 
@@ -210,182 +217,93 @@ class PGA_Unfold_J10(nn.Module):
             F, W = normalize(F, W_new, H, Pt)
 
             # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
             # print(rate_over_iters[ii])
-            rates = torch.cat([rate_over_iters], dim=0)
-            crb_over_iters[ii] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
-            crb_fes = torch.cat([crb_over_iters], dim=0)
+            rates = torch.cat([rate_over_iters], dim=0).detach()
+            crb_over_iters[ii] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            crb_fes = torch.cat([crb_over_iters], dim=0).detach()
 
         return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
-# ============================================== Proposed PGA model light for PC======================
-class PGA_Unfold_J10_PC(nn.Module):
 
-    def __init__(self, step_size):
+# ============================================== Proposed PGA model light for RMSProp=============================
+
+class PGA_Unfold_J10_RMSProp(nn.Module):
+
+    def __init__(self):
         super().__init__()
-        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
-        # Learnable connectivity logits; initialize to the deterministic PC topology.
-        pc_mask = generage_partial_connection_mask(Nt, Nrf).abs().to(torch.float32)
-        active_prob = 0.9
-        inactive_prob = 0.1
-        active_logit = math.log(active_prob / (1.0 - active_prob))
-        inactive_logit = math.log(inactive_prob / (1.0 - inactive_prob))
-        init_logits = torch.where(
-            pc_mask > 0.5,
-            torch.full_like(pc_mask, active_logit),
-            torch.full_like(pc_mask, inactive_logit),
-        )
-        self.activation_logits = nn.Parameter(init_logits)
-        self.register_buffer("pc_template", pc_mask)
-        self.activation_temperature = 5.0
-        self.activation_threshold = 0.55
 
-    def _activation_map(self, reference_tensor):
-        probs = torch.sigmoid(self.activation_temperature * self.activation_logits)
-        hard_mask = (probs >= self.activation_threshold).to(probs.dtype)
-        if hard_mask.sum().item() == 0:
-            # Fall back to the canonical PC wiring so the structure remains sparse.
-            hard_mask = self.pc_template.to(probs)
-            activation = hard_mask
-        else:
-            activation = hard_mask + (probs - probs.detach())  # straight-through binarization
-        activation = activation.to(dtype=reference_tensor.dtype, device=reference_tensor.device)
-        return activation.view(1, 1, Nt, Nrf)
+        self.beta = 0.9
+        self.eps = 1e-8
+        self.eta_F = 1e-2   # base learning rate for F
+        self.eta_W = 1e-2   # base learning rate for W
 
-    def _apply_activation(self, F, activation_map):
-        phased = project_unit_modulus(F)
-        return activation_map * phased
+
 
     # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
-        rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
+    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
+        rate_init, F, W = initialize(H, Pt, initial_normalization)
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
 
-        for ii in range(1):
-            activation_map = self._activation_map(F)
-            # update F over
-            for jj in range(1):    
+        s_F = torch.zeros_like(F)
+        s_W = torch.zeros_like(W)
+
+        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, s_F):
+            for jj in range(n_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
-                grad_F_rad = get_grad_F_rad(F, W, R)
+                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                grad_F = grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB
 
-                grad_F_com = grad_F_com * activation_map
-                grad_F_rad = grad_F_rad * activation_map
-            
+                # RMSProp update
+                s_F = self.beta * s_F + (1 - self.beta) * grad_F
 
+                F = F + self.eta_F * grad_F / (torch.sqrt(s_F) + self.eps)
 
-                # print(f'F matrix element: {F[0,0, :, :]}')
-                if grad_F_com.isnan().any() or grad_F_rad.isnan().any(): # check gradient
-                    print('Error NaN gradients!!!!!!!!!!!!!!!')
-                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                delta_F_rad = self.step_size[jj][ii][0] * grad_F_rad
-                delta_F_com = clamp_complex_magnitude(delta_F_com, 0.5)
-                delta_F_rad = clamp_complex_magnitude(delta_F_rad, 0.5)
-                F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
-                F = sanitize_complex_tensor(F)
-                F = self._apply_activation(F, activation_map)
-                F = sanitize_complex_tensor(F)
-                # normalize by power to ensure non-NaN gradients if F becomes too large
-                #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
-                # print(f'F after power norm: {F[0,0, :, :]}')
-            F = sanitize_complex_tensor(F)
-            
-            # update W
-            W_new = W.clone().detach()
-            # compute gradients
-            grad_W_k_com = get_grad_W_com(H, F, W)
-            grad_W_k_rad = get_grad_W_rad(F, W, R)
-            for k in range(K):
-                delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
-                delta_W_rad = self.step_size[0][ii][k + 1] * grad_W_k_rad[k]
-                delta_W_com = clamp_complex_magnitude(delta_W_com, 0.5)
-                delta_W_rad = clamp_complex_magnitude(delta_W_rad, 0.5)
-                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_rad * WEIGHT_W_RAD
-                W_new[k] = sanitize_complex_tensor(W_new[k])
-            
-            # Projection
-            F, W = normalize(F, W_new, H, Pt)
-            F = sanitize_complex_tensor(F)
-            W = sanitize_complex_tensor(W)
-            # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
-            # print(rate_over_iters[ii])
-            rates = torch.cat([rate_init, rate_over_iters], dim=0)
-            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
-            taus = torch.cat([tau_init, tau_over_iters], dim=0)
-
-        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W
-
-
-class PGA_Unfold_J10_PC_AP(nn.Module):
-    def __init__(self, step_size):
-        super().__init__()
-        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
-
-    # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
-        rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
-        # print(f'The size of F: {F.shape}')
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
-
-        # pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
+            return F
+        
         for ii in range(n_iter_outer):
             # update F over
-            for jj in range(n_iter_inner):
-
-                # ---- active vector a
-                F_active = extract_active_elements_pc(F[0], Nt, Nrf)  # (B, Nt, 1) - work with first frequency    
-                # print(f'F_active matrix element: {F_active[0, :, :]}')
-                grad_F_com_AP = get_grad_F_com_AP(F_active, H, F, W)
-
-                # --- generate pi metrix
-
-                grad_F_rad_AP = get_grad_F_rad_AP(F, W, R, Pt, Nt, Nrf)
-
-                # print(f'F matrix element: {F[0,0, :, :]}')
-                if grad_F_com_AP.isnan().any() or grad_F_rad_AP.isnan().any(): # check gradient
-                    print('Error NaN gradients!!!!!!!!!!!!!!!')
-                delta_F_com = self.step_size[jj][ii][0] * grad_F_com_AP
-                delta_F_rad = self.step_size[jj][ii][0] * grad_F_rad_AP
-                delta_F_com = clamp_complex_magnitude(delta_F_com, 0.5)
-                delta_F_rad = clamp_complex_magnitude(delta_F_rad, 0.5)
-                F = F + delta_F_com * WEIGHT_F_COM - delta_F_rad * WEIGHT_F_RAD
-                F = sanitize_complex_tensor(F)
-                # normalize by power to ensure non-NaN gradients if F becomes too large
-                #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
-                F = normalize_power(F, W, H, Pt)
-                F = sanitize_complex_tensor(F)
-                # print(f'F after power norm: {F[0,0, :, :]}')
+            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, s_F)
             # Projection
             F = project_unit_modulus(F)
-            F = sanitize_complex_tensor(F)
-            
-            # update W
-            W_new = W.clone().detach()
-            # compute gradients
+
+            # ===== update W with RMSProp =====
+
             grad_W_k_com = get_grad_W_com(H, F, W)
-            grad_W_k_rad = get_grad_W_rad(F, W, R)
+            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+
+            if ii == 0:
+                s_W = torch.zeros_like(W)   # initialize once
+
+            W_new = W.clone()
+
             for k in range(K):
-                delta_W_com = self.step_size[0][ii][k + 1] * grad_W_k_com[k]
-                delta_W_rad = self.step_size[0][ii][k + 1] * grad_W_k_rad[k]
-                delta_W_com = clamp_complex_magnitude(delta_W_com, 0.5)
-                delta_W_rad = clamp_complex_magnitude(delta_W_rad, 0.5)
-                W_new[k] = W[k].clone().detach() + delta_W_com * WEIGHT_W_COM - delta_W_rad * WEIGHT_W_RAD
-                W_new[k] = sanitize_complex_tensor(W_new[k])
-            
+
+                # combine gradients
+                grad_W_k = (
+                    grad_W_k_com[k] * WEIGHT_W_COM +
+                    grad_W_k_crb[k] * WEIGHT_W_CRB
+                )
+
+                # RMSProp accumulator per user
+                s_W[k] = self.beta * s_W[k] + (1 - self.beta) * grad_W_k
+
+                # update
+                W_new[k] = W[k] + self.eta_W * grad_W_k / (
+                    torch.sqrt(s_W[k]) + self.eps
+                )
             # Projection
             F, W = normalize(F, W_new, H, Pt)
-            F = sanitize_complex_tensor(F)
-            W = sanitize_complex_tensor(W)
-            # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
-            # print(rate_over_iters[ii])
-            rates = torch.cat([rate_init, rate_over_iters], dim=0)
-            tau_over_iters[ii] = get_beam_error(H, F, W, R, Pt)
-            taus = torch.cat([tau_init, tau_over_iters], dim=0)
 
-        return torch.transpose(rates, 0, 1), torch.transpose(taus, 0, 1), F, W    
+            # get the rate in this iteration
+            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
+            # print(rate_over_iters[ii])
+            rates = torch.cat([rate_over_iters], dim=0).detach()
+            crb_over_iters[ii] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            crb_fes = torch.cat([crb_over_iters], dim=0).detach()
+
+        return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
 
 # ============================================== Proposed PGA model=============================
 class PGA_Unfold_J20(nn.Module):

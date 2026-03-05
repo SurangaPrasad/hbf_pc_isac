@@ -25,43 +25,14 @@ if run_program == 1:
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
-        model_conv_PGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+        model_conv_PGA_J10 = PGA_Unfold_J10(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
         rate_conv_PGA_J10, crb_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
         rate_iter_conv_PGA_J10 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
         crb_iter_conv_PGA_J10 = [e.detach().numpy() for e in (sum(crb_conv_PGA_J10) / (len(H_test[0])))]
-
-    if run_conv_PGA_J10_PC == 1:
-        print('Running conventional PGA with J = 10 and partial coupling...')
-        model_PGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10)
-        rate_PGA_J10_PC, tau_PGA_J10_PC, F_PGA_J10_PC, W_PGA_J10_PC = model_PGA_J10_PC.execute_PGA(H_test, R, snr,
-                                                                                           n_iter_outer,
-                                                                                           n_iter_inner_J10)
-        rate_iter_PGA_J10_PC = [r.detach().numpy() for r in (sum(rate_PGA_J10_PC) / len(H_test[0]))]
-        tau_iter_PGA_J10_PC = [e.detach().numpy() for e in (sum(tau_PGA_J10_PC) / (len(H_test[0])))]       
-    # ====================================================== Conv. PGA with J = 10 and partial coupling ====================================
-    if run_UPGA_J10_PC == 1:
-        print('Running unfolded PGA with J = 10 and partial coupling...')
-        model_UPGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10)
-        model_UPGA_J10_PC.load_state_dict(torch.load(model_file_name_UPGA_J10_PC))
-        rate_UPGA_J10_PC, tau_UPGA_J10_PC, F_UPGA_J10_PC, W_UPGA_J10_PC = model_UPGA_J10_PC.execute_PGA(H_test, R, snr,
-                                                                                           n_iter_outer,
-                                                                                           n_iter_inner_J10)
-        rate_iter_UPGA_J10_PC = [r.detach().numpy() for r in (sum(rate_UPGA_J10_PC) / len(H_test[0]))]
-        tau_iter_UPGA_J10_PC = [e.detach().numpy() for e in (sum(tau_UPGA_J10_PC) / (len(H_test[0])))]
-
-        # loading the trained model for omega = 0.3
-        print('Loading the trained model for omega = 0.3...')
-        model_UPGA_J10_PC_omega03 = PGA_Unfold_J10_PC(step_size_UPGA_J10)
-        model_UPGA_J10_PC_omega03.load_state_dict(torch.load(model_file_name_UPGA_J10_PC_omega03))
-        rate_UPGA_J10_PC_omega03, tau_UPGA_J10_PC_omega03, F_UPGA_J10_PC_omega03, W_UPGA_J10_PC_omega03 = model_UPGA_J10_PC_omega03.execute_PGA(H_test, R, snr,
-                                                                                           n_iter_outer,
-                                                                                           n_iter_inner_J10)   
-        rate_iter_UPGA_J10_PC_omega03 = [r.detach().numpy() for r in (sum(rate_UPGA_J10_PC_omega03) / len(H_test[0]))]
-        tau_iter_UPGA_J10_PC_omega03 = [e.detach().numpy() for e in (sum(tau_UPGA_J10_PC_omega03) / (len(H_test[0])))]
-
+ 
     # ====================================================== Unfolded PGA with J = 1====================================
     if run_UPGA_J1 == 1:
         print('Running unfolded PGA with J = 1...')
@@ -79,7 +50,7 @@ if run_program == 1:
         print('Running unfolded PGA with J = 10...')
         # Create new model and load states
         model_UPGA_J10 = PGA_Unfold_J10(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
-        # model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
+        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
 
         sum_rate_UPGA_J10, crb_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
@@ -101,6 +72,20 @@ if run_program == 1:
         rate_iter_UPGA_J20 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
         crb_iter_UPGA_J20 = [e.detach().numpy() for e in (sum(crb_UPGA_J20) / (len(H_test[0])))]
 
+    # ====================================================== Propsed Unofolded PGA with RMSProp-like adaptive step sizes ====================================
+    if run_UPGA_J10_RMSProp == 1:
+        print('Running unfolded PGA with J = 10 and RMSProp-like adaptive step sizes...')
+        # Create new model and load states
+        model_UPGA_J10_RMSProp = PGA_Unfold_J10_RMSProp()
+        # model_UPGA_J10_RMSProp.load_state_dict(torch.load(model_file_name_UPGA_J10_RMSProp))
+
+        sum_rate_UPGA_J10_RMSProp, crb_UPGA_J10_RMSProp, F_UPGA_J10_RMSProp, W_UPGA_J10_RMSProp = model_UPGA_J10_RMSProp.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J10)
+        rate_iter_UPGA_J10_RMSProp = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10_RMSProp) / len(H_test[0]))]
+        crb_iter_UPGA_J10_RMSProp = [e.detach().numpy() for e in (sum(crb_UPGA_J10_RMSProp) / (len(H_test[0])))]
+
     # ============================== generate beampattern ////////////////////////////////////////////////////////////////////
     print('generating beampattern...')
     if run_conv_PGA == 1:
@@ -113,10 +98,6 @@ if run_program == 1:
         beam_UPGA_J20 = get_beampattern(F_UPGA_J20, W_UPGA_J20, at, snr)
     if run_conv_PGA_J10 == 1:
         beam_conv_PGA_J10 = get_beampattern(F_conv_PGA_J10, W_conv_PGA_J10, at, snr)
-    if run_UPGA_J10_PC == 1:
-        beam_UPGA_J10_PC = get_beampattern(F_UPGA_J10_PC, W_UPGA_J10_PC, at, snr)
-    if run_conv_PGA_J10_PC == 1:
-        beam_PGA_J10_PC = get_beampattern(F_PGA_J10_PC, W_PGA_J10_PC, at, snr)
 
     # ////////////////////////////////////////////////////////////////////////////////////////////
     #                                SAVE RESULTS
@@ -209,10 +190,6 @@ if plot_figure == 1:
         plt.plot(iter_number_conv_PGA, rate_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
     if run_conv_PGA_J10 == 1:
         plt.plot(iter_number_UPGA_J10, crb_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
-    if run_UPGA_J10_PC == 1:
-        plt.plot(iter_number_UPGA_J10, rate_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, PC)')
-    if run_conv_PGA_J10_PC == 1:
-        plt.plot(iter_number_UPGA_J10, rate_iter_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10, PC)')
     # plt.title(system_params)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel('$R$ [bits/s/Hz]', fontsize="14")
@@ -222,35 +199,6 @@ if plot_figure == 1:
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
-    # # plot beam errors ////////////////////////////////////////////////////////////////////
-    # fig_tau = plt.figure(2)
-    # if run_UPGA_J1 == 1:
-    #     plt.plot(iter_number_UPGA_J1, tau_iter_UPGA_J1, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
-    # if run_UPGA_J10 == 1:
-    #     plt.plot(iter_number_UPGA_J10, tau_iter_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7,
-    #              label=label_UPGA_J10)
-    # if run_UPGA_J20 == 1:
-    #     plt.plot(iter_number_UPGA_J20, tau_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
-    # if run_conv_PGA == 1:
-    #     plt.plot(iter_number_conv_PGA, tau_iter_conv, ':', markevery=5, color='black', linewidth=3, markersize=7, label=label_conv)
-    # # if benchmark == 1:
-    # #     plt.plot(iter_number_conv_PGA, tau_SCA, '-x', markevery=5, color='black', linewidth=3, markersize=7, label=label_SCA)
-    # #     plt.plot(iter_number_conv_PGA, tau_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
-    # if run_conv_PGA_J10 == 1:
-    #     plt.plot(iter_number_UPGA_J10, tau_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
-    # if run_UPGA_J10_PC == 1:
-    #     plt.plot(iter_number_UPGA_J10, tau_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, PC)')
-    # if run_conv_PGA_J10_PC == 1:
-    #     plt.plot(iter_number_UPGA_J10, tau_iter_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10, PC)')
-    # # plt.title(system_params)
-    # plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
-    # plt.ylabel( r'$\bar{\tau}$', fontsize="14")
-    # plt.grid()
-    # plt.legend(loc='best')
-    # # save figure
-    # plt.savefig(directory_result + 'beampattern_error_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    # plt.savefig(directory_result + 'beampattern_error_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
-
 
     # plot rate - omega * beam error over iterations ////////////////////////////////////////////////////////////////////
     fig_obj = plt.figure(5)
@@ -258,7 +206,7 @@ if plot_figure == 1:
         obj_iter_UPGA_J1 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J1, tau_iter_UPGA_J1)]
         plt.plot(iter_number_UPGA_J1, obj_iter_UPGA_J1, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_conv_PGA_J10 == 1:
-        obj_iter_conv_PGA_J10 = [crb for rate, crb in zip(rate_iter_conv_PGA_J10, crb_iter_conv_PGA_J10)]
+        obj_iter_conv_PGA_J10 = [OMEGA * rate + crb for rate, crb in zip(rate_iter_conv_PGA_J10, crb_iter_conv_PGA_J10)]
         plt.plot(iter_number_UPGA_J10, obj_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = [OMEGA * rate + crb for rate, crb in zip(rate_iter_UPGA_J10, crb_iter_UPGA_J10)]
@@ -266,19 +214,13 @@ if plot_figure == 1:
     if run_UPGA_J20 == 1:
         obj_iter_UPGA_J20 = [OMEGA * rate + crb for rate, crb in zip(rate_iter_UPGA_J20, crb_iter_UPGA_J20)]
         plt.plot(iter_number_UPGA_J20, obj_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
-    # if run_conv_PGA == 1:
-    #     obj_iter_conv = [rate - OMEGA * tau for rate, tau in zip(rate_iter_conv, tau_iter_conv)]
-    #     plt.plot(iter_number_conv_PGA, obj_iter_conv, ':', markevery=5, color='black', linewidth=3, markersize=7, label=label_conv)
-    if run_UPGA_J10_PC == 1:
-        obj_iter_UPGA_J10_PC = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J10_PC, tau_iter_UPGA_J10_PC)]
-        obj_iter_PGA_J10_PC = [rate - OMEGA * tau for rate, tau in zip(rate_iter_PGA_J10_PC, tau_iter_PGA_J10_PC)]
-        obj_ite_UPGA_J10_PC_omega03 = [rate - model_file_name_UPGA_J10_PC_omega03 * tau for rate, tau in zip(rate_iter_UPGA_J10_PC_omega03, tau_iter_UPGA_J10_PC_omega03)]
-        plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, PC)')
-        plt.plot(iter_number_UPGA_J10, obj_iter_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10, PC)')
-        plt.plot(iter_number_UPGA_J10, obj_ite_UPGA_J10_PC_omega03, '-.', markevery=5, color='purple', linewidth=3, markersize=7, label='UPGA (J=10, PC, ω=0.3)')
-    # plt.title(system_params)
+    if run_UPGA_J10_RMSProp == 1:
+        obj_iter_UPGA_J10_RMSProp = [OMEGA * rate + crb for rate, crb in zip(rate_iter_UPGA_J10_RMSProp, crb_iter_UPGA_J10_RMSProp)]
+        plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10_RMSProp, ':', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, RMSProp)')
+    
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
-    plt.ylabel(r'1/crb $', fontsize="14")
+    plt.ylabel(r'$\omega R + 1/\text{crb}$', fontsize="14")
+    plt.title("Objective function vs Iterations (Preconditioning)", fontsize="14")
     # plt.ylim(-70, 20)
     plt.grid()
     plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)
@@ -287,75 +229,5 @@ if plot_figure == 1:
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
     
-    # # plot rate - beam errors tradeoff ////////////////////////////////////////////////////////////////////
-    # fig_tradeoff = plt.figure(3)
-    # if run_UPGA_J1 == 1:
-    #     plt.plot(tau_iter_UPGA_J1, rate_iter_UPGA_J1, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
-    # if run_UPGA_J10 == 1:
-    #     plt.plot(tau_iter_UPGA_J10, rate_iter_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7,
-    #              label=label_UPGA_J10)
-    # if run_UPGA_J20 == 1:
-    #     plt.plot(tau_iter_UPGA_J20, rate_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
-    # if run_conv_PGA == 1:
-    #     plt.plot(tau_iter_conv, rate_iter_conv, ':', markevery=5, color='black', linewidth=3, markersize=7, label=label_conv)
-    # if benchmark == 1:
-    #     plt.plot(tau_SCA, rate_SCA, '-x', markevery=5, color='black', linewidth=3, markersize=7, label=label_SCA)
-    #     plt.plot(tau_ZF, rate_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
-    # if run_conv_PGA_J10 == 1:
-    #     plt.plot(tau_iter_conv_PGA_J10, rate_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
-    # if run_UPGA_J10_PC == 1:
-    #     plt.plot(tau_iter_UPGA_J10_PC, rate_iter_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=3, markersize=7, label='UPGA (J=10, PC)')
-    # if run_conv_PGA_J10_PC == 1:
-    #     plt.plot(tau_iter_PGA_J10_PC, rate_iter_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10, PC)')
-    # # plt.title(system_params)
-    # plt.xlabel( r'$\bar{\tau}$', fontsize="14")
-    # plt.ylabel(r'$R$ [bits/s/Hz]', fontsize="14")
-    # plt.grid()
-    # # plt.legend(loc='best')
-    # # save figure
-    # plt.savefig(directory_result + 'tradeoff_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    # plt.savefig(directory_result + 'tradeoff_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
-    # /////////////////////////////////////// BEAMPATTERN /////////////////////////////
-    fig_beam = plt.figure(4)
-    angles_theta = theta[0, :] * 180 / np.pi
-    # benchmark beampattern
-    at_H = torch.transpose(at, 2, 3).conj()
-    beam_bm = torch.diagonal(at_H @ R @ at, offset=0, dim1=-1, dim2=-2) / snr
-    beam_bm_array = beam_bm[0,0,:]
-    plt.plot(angles_theta, np.real(beam_bm_array), '--', markevery=5, color='green', linewidth=1,
-             label='Benchmark beampattern')  # ideal beampattern
-    # if run_UPGA_J1 == 1:
-    #     plt.plot(angles_theta, beam_UPGA_J1, '--', markevery=5, color='blue', linewidth=2, markersize=7)
-    if run_UPGA_J10 == 1:
-        plt.plot(angles_theta, beam_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7)
-    # if run_UPGA_J20 == 1:
-    #     plt.plot(angles_theta, beam_UPGA_J20, '-', markevery=5, color='red', linewidth=2, markersize=7)
-    # if run_conv_PGA == 1:
-    #     plt.plot(angles_theta, beam_conv_PGA, ':', markevery=5, color='black', linewidth=2, markersize=7)
-    # if benchmark == 1:
-    #     benchmark_results = scipy.io.loadmat(directory_benchmark + 'result_benchmark')
-    #     plt.plot(angles_theta, beam_SCA, '-x', markevery=5, color='black', linewidth=1, markersize=7)
-    #     plt.plot(angles_theta, beam_ZF, '-o', markevery=5, color='purple', linewidth=1, markersize=7)
-    if run_conv_PGA_J10 == 1:
-        plt.plot(angles_theta, beam_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=2, markersize=7)
-    if run_UPGA_J10_PC == 1:
-        plt.plot(angles_theta, beam_UPGA_J10_PC, '-.', markevery=5, color='green', linewidth=2, markersize=7)
-    if run_conv_PGA_J10_PC == 1:
-        plt.plot(angles_theta, beam_PGA_J10_PC, '-.', markevery=5, color='black', linewidth=2, markersize=7)
-
-    # plt.title(system_params)
-    plt.xlabel(r'Angle $(\theta_t)$', fontsize="14")
-    plt.ylabel('Normalized sensing beampattern', fontsize="14")
-    # if Nt == 32:
-    #     plt.ylim([0, 6.5])
-    # else:
-    #     plt.ylim([0, 12])
-    plt.xticks(np.arange(-90, 91, step=30))
-    plt.grid()
-    plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)
-    # save figure
-    plt.savefig(directory_result + 'beampattern_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    plt.savefig(directory_result + 'beampattern_' + str(Nt) + '_' + str(OMEGA) + '.eps')
-    # plt.ylim([0, 0.4])
-    # plt.show()
+ 
