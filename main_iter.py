@@ -33,6 +33,16 @@ if run_program == 1:
         rate_iter_conv_PGA_J10 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
         crb_iter_conv_PGA_J10 = [e.detach().numpy() for e in (sum(crb_conv_PGA_J10) / (len(H_test[0])))]
  
+ # ====================================================== Conv. PGA with J = 20 ====================================
+    if run_conv_PGA_J20 == 1:
+        print('Running conventional PGA with J = 20...')
+        model_conv_PGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
+        rate_conv_PGA_J20, crb_conv_PGA_J20, F_conv_PGA_J20, W_conv_PGA_J20 = model_conv_PGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J20)
+        rate_iter_conv_PGA_J20 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J20) / len(H_test[0]))]
+        crb_iter_conv_PGA_J20 = [e.detach().numpy() for e in (sum(crb_conv_PGA_J20) / (len(H_test[0])))]
     # ====================================================== Unfolded PGA with J = 1====================================
     if run_UPGA_J1 == 1:
         print('Running unfolded PGA with J = 1...')
@@ -71,7 +81,21 @@ if run_program == 1:
                                                                                              n_iter_inner_J20)
         rate_iter_UPGA_J20 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
         crb_iter_UPGA_J20 = [e.detach().numpy() for e in (sum(crb_UPGA_J20) / (len(H_test[0])))]
+    
+    # ====================================================== Propsed Unofolded PGA with PRCDN ====================================
 
+    if run_UPGA_J10_PRCDN:
+        print('Running unfolded PGA with J = 10 and PRCDN...')
+        # Create new model and load states
+        model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
+        model_UPGA_J10_PRCDN.load_state_dict(torch.load(model_file_name_UPGA_J10_PRCDN))
+
+        sum_rate_UPGA_J10_PRCDN, crb_UPGA_J10_PRCDN, F_UPGA_J10_PRCDN, W_UPGA_J10_PRCDN = model_UPGA_J10_PRCDN.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J10)
+        rate_iter_UPGA_J10_PRCDN = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10_PRCDN) / len(H_test[0]))]
+        crb_iter_UPGA_J10_PRCDN = [e.detach().numpy() for e in (sum(crb_UPGA_J10_PRCDN) / (len(H_test[0])))]
     # ====================================================== Propsed Unofolded PGA with RMSProp-like adaptive step sizes ====================================
     if run_UPGA_J10_RMSProp == 1:
         print('Running unfolded PGA with J = 10 and RMSProp-like adaptive step sizes...')
@@ -179,17 +203,19 @@ if plot_figure == 1:
     if run_UPGA_J1 == 1:
         plt.plot(iter_number_UPGA_J1, rate_iter_UPGA_J1, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_UPGA_J10 == 1:
-        plt.plot(iter_number_UPGA_J10, crb_iter_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7,
+        plt.plot(iter_number_UPGA_J10, rate_iter_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7,
                  label=label_UPGA_J10)
     if run_UPGA_J20 == 1:
-        plt.plot(iter_number_UPGA_J20, crb_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+        plt.plot(iter_number_UPGA_J20, rate_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     if run_conv_PGA == 1:
         plt.plot(iter_number_conv_PGA, rate_iter_conv, ':', markevery=5, color='black', linewidth=3, markersize=7, label=label_conv)
     if benchmark == 1:
         plt.plot(iter_number_conv_PGA, rate_SCA, '-x', markevery=5, color='black', linewidth=3, markersize=7, label=label_SCA)
         plt.plot(iter_number_conv_PGA, rate_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
     if run_conv_PGA_J10 == 1:
-        plt.plot(iter_number_UPGA_J10, crb_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+        plt.plot(iter_number_UPGA_J10, rate_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    if run_UPGA_J10_PRCDN == 1:
+        plt.plot(iter_number_UPGA_J10, rate_iter_UPGA_J10_PRCDN, ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     # plt.title(system_params)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel('$R$ [bits/s/Hz]', fontsize="14")
@@ -208,6 +234,9 @@ if plot_figure == 1:
     if run_conv_PGA_J10 == 1:
         obj_iter_conv_PGA_J10 = [OMEGA * rate + crb for rate, crb in zip(rate_iter_conv_PGA_J10, crb_iter_conv_PGA_J10)]
         plt.plot(iter_number_UPGA_J10, obj_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    if run_conv_PGA_J20 == 1:
+        obj_iter_conv_PGA_J20 = [OMEGA * rate + crb for rate, crb in zip(rate_iter_conv_PGA_J20, crb_iter_conv_PGA_J20)]
+        plt.plot(iter_number_UPGA_J20, obj_iter_conv_PGA_J20, '-', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = [OMEGA * rate + crb for rate, crb in zip(rate_iter_UPGA_J10, crb_iter_UPGA_J10)]
         plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10, ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J10)
@@ -217,10 +246,12 @@ if plot_figure == 1:
     if run_UPGA_J10_RMSProp == 1:
         obj_iter_UPGA_J10_RMSProp = [OMEGA * rate + crb for rate, crb in zip(rate_iter_UPGA_J10_RMSProp, crb_iter_UPGA_J10_RMSProp)]
         plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10_RMSProp, ':', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, RMSProp)')
-    
+    if run_UPGA_J10_PRCDN == 1:
+        obj_iter_UPGA_J10_PRCDN = [OMEGA * rate + crb for rate, crb in zip(rate_iter_UPGA_J10_PRCDN, crb_iter_UPGA_J10_PRCDN)]
+        plt.plot(iter_number_UPGA_J10, obj_iter_UPGA_J10_PRCDN, ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel(r'$\omega R + 1/\text{crb}$', fontsize="14")
-    plt.title("Objective function vs Iterations (Preconditioning)", fontsize="14")
+    plt.title("Objective function vs Iterations", fontsize="14")
     # plt.ylim(-70, 20)
     plt.grid()
     plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)

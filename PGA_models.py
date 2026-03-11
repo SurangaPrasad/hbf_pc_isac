@@ -370,10 +370,9 @@ class PGA_Unfold_J20(nn.Module):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
         rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
         crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
-
-        for ii in range(n_iter_outer):
-            # update F over
-            for jj in range(n_iter_inner):
+        
+        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+            for jj in range(n_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                 if grad_F_com.isnan().any() or grad_F_crb.isnan().any(): # check gradient
@@ -383,7 +382,11 @@ class PGA_Unfold_J20(nn.Module):
                 F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
                 # normalize by power to ensure non-NaN gradients if F becomes too large
                 F = normalize_power(F, W, H, Pt)
-            # Projection
+            return F
+
+        for ii in range(n_iter_outer):
+            # update F over
+            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
 
             # update W
@@ -400,11 +403,11 @@ class PGA_Unfold_J20(nn.Module):
             F, W = normalize(F, W_new, H, Pt)
 
             # get the rate in this iteration
-            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt)
+            rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
             # print(rate_over_iters[ii])
-            rates = torch.cat([rate_over_iters], dim=0)
-            crb_over_iters[ii] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
-            crb_fes = torch.cat([crb_over_iters], dim=0)
+            rates = torch.cat([rate_over_iters], dim=0).detach()
+            crb_over_iters[ii] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            crb_fes = torch.cat([crb_over_iters], dim=0).detach()
 
         return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
 
