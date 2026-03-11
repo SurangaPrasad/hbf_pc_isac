@@ -40,8 +40,10 @@ if run_UPGA_J1 == 1:
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
         for i_batch in range(0, len(H_train), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]  # actual batch size (last mini-batch may be smaller)
+            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)          # (B,) per-sample
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)        # (B,) tensor
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
             __, __, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer, track_metrics=False)
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
@@ -78,8 +80,10 @@ if run_UPGA_J20 == 1:
         
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
             
             rate, __, F, W = model_UPGA_J20.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20, track_metrics=False)
             
@@ -125,8 +129,10 @@ if run_UPGA_J10 == 1:
         
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
             
             rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             
@@ -186,8 +192,10 @@ if run_UPGA_J10 == 1:
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
         for i_batch in range(0, len(H_train), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
             __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
@@ -214,8 +222,10 @@ if run_UPGA_J10_PRCDN == 1:
         
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
             
             rate, __, F, W = model_UPGA_J10_PRCDN.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             

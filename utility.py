@@ -94,8 +94,13 @@ def initialize(H, Pt, normalization, pc=False):
         F, W = normalize(F, W, H, Pt)
     else:
         # only normalize W for power constraint
-        norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
-        W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
+        B = len(H[0])
+        norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
+        if torch.is_tensor(Pt) and Pt.dim() >= 1:
+            Pt_vec = Pt.to(dtype=norm2_FW.dtype, device=F.device)
+        else:
+            Pt_vec = torch.full((B,), float(Pt), dtype=norm2_FW.dtype, device=F.device)
+        W = torch.sqrt(Pt_vec / norm2_FW).view(B, 1, 1) * W
     # rate_0 = get_sum_rate(H, F, W)
     rate_init = torch.zeros(1, len(H[0]), device=H.device)
     # beam_error_init = torch.zeros(1, len(H[0]))
@@ -189,8 +194,13 @@ def initialize_schemes(H, R, Pt, init_method):
         W = FQ / (torch.linalg.matrix_norm(FQ, ord='fro').reshape(len(H[0]), 1, 1))
 
     # only normalize W for power constraint
+    B = len(H[0])
     norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
-    W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
+    if torch.is_tensor(Pt) and Pt.dim() >= 1:
+        Pt_vec = Pt.to(dtype=norm2_FW.dtype, device=F.device)
+    else:
+        Pt_vec = torch.full((B,), float(Pt), dtype=norm2_FW.dtype, device=F.device)
+    W = torch.sqrt(Pt_vec / norm2_FW).view(B, 1, 1) * W
 
     # rate_0 = get_sum_rate(H, F, W)
     rate_init = torch.zeros(1, len(H[0]), device=H.device)
@@ -335,22 +345,44 @@ def get_trace(A):
 
 # ======== normalization to meet constant modulus and power constraint ===========================
 def normalize(F, W, H, Pt):
+    """Normalize F (constant-modulus) and W (power constraint).
+
+    Pt can be:
+      - a Python scalar / 0-dim tensor  → applied uniformly to all samples
+      - a 1-D tensor of shape (B,)      → per-sample power budget
+    """
+    B = len(H[0])
     F = F / (torch.abs(F) + 1e-12)
-    sum_norm_BB = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
+    sum_norm_BB = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
     sum_norm_BB = torch.clamp(sum_norm_BB, min=1e-6)
-    normalize_factor = torch.sqrt(K * Pt / sum_norm_BB).reshape(len(H[0]), 1, 1)
+    # Unify Pt to a (B,) tensor on the correct device
+    if torch.is_tensor(Pt) and Pt.dim() >= 1:
+        Pt_vec = Pt.to(dtype=sum_norm_BB.real.dtype if sum_norm_BB.is_complex() else sum_norm_BB.dtype,
+                       device=F.device)
+    else:
+        Pt_vec = torch.full((B,), float(Pt), dtype=sum_norm_BB.real.dtype if sum_norm_BB.is_complex() else sum_norm_BB.dtype,
+                            device=F.device)
+    normalize_factor = torch.sqrt(K * Pt_vec / sum_norm_BB).view(B, 1, 1)
     W = normalize_factor * W
-    # sum_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)/K
-    # print(sum_power)
-    # print(Pt)
     return F, W
 
 
 # ========================= normalize F based on power constraint =====================
 def normalize_power(F, W, H, Pt):
-    sum_norm_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
+    """Normalize F to meet the per-sample power constraint.
+
+    Pt can be a scalar or a 1-D tensor of shape (B,).
+    """
+    B = len(H[0])
+    sum_norm_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
     sum_norm_power = torch.clamp(sum_norm_power, min=1e-6)
-    normalize_factor = torch.sqrt(Pt / sum_norm_power).reshape(len(H[0]), 1, 1)
+    if torch.is_tensor(Pt) and Pt.dim() >= 1:
+        Pt_vec = Pt.to(dtype=sum_norm_power.real.dtype if sum_norm_power.is_complex() else sum_norm_power.dtype,
+                       device=F.device)
+    else:
+        Pt_vec = torch.full((B,), float(Pt), dtype=sum_norm_power.real.dtype if sum_norm_power.is_complex() else sum_norm_power.dtype,
+                            device=F.device)
+    normalize_factor = torch.sqrt(Pt_vec / sum_norm_power).view(B, 1, 1)
     F = normalize_factor * F
     return F
 
@@ -463,38 +495,77 @@ def get_data_tensor(data_source):
 
 # =================================== load radar data generated in Matlab ==================================================
 def get_radar_data(snr_dB, H):
-    # radar info does not depend on channel
+    """Load pre-computed radar covariance matrix R and array-steering vectors.
+
+    snr_dB can be:
+      - a scalar (float / int / 0-d array) — same R replicated over the batch (original behaviour)
+      - a 1-D array of shape (B,)          — per-sample R assembled from the lookup table
+
+    Returns
+    -------
+    R          : torch tensor  (K, B, Nt, Nt)
+    at         : torch tensor  (K, B, Nt, n_angles)
+    theta      : np.ndarray    angle grid
+    ideal_beam : np.ndarray    ideal beampattern
+    """
     radar_data_file_name = directory_data + 'radar_data.mat'
     radar_data = scipy.io.loadmat(radar_data_file_name)
-    # R0_2D = radar_data['Cbar']
-    idx_snr = np.where(snr_dB_list == snr_dB)
+    R0_4D = radar_data['J']          # shape: (Nt, Nt, K_freq, n_snr)  or (Nt, Nt, n_snr) when K==1
+
+    at_2D = radar_data['a']
+    theta = radar_data['theta']
+    ideal_beam = radar_data['Pd_theta']
+
+    B = len(H[0])
+
+    # ------------------------------------------------------------------ #
+    # Determine whether snr_dB is a scalar or per-sample array
+    # ------------------------------------------------------------------ #
+    snr_dB_arr = np.atleast_1d(np.asarray(snr_dB, dtype=float)).ravel()
+    per_sample = snr_dB_arr.size > 1   # True  → per-sample path
+                                        # False → replicate-scalar path
 
     if K == 1:
-        R0_4D = radar_data['J']
-        R0_2D = np.squeeze(R0_4D[:, :, 0, idx_snr])
-        R_array = np.tile(R0_2D, [1, len(H[0]), 1, 1])
+        if per_sample:
+            # Build R per sample: shape (1, B, Nt, Nt)
+            R_list = []
+            for s in snr_dB_arr:
+                idx = np.where(snr_dB_list == s)[0]
+                R_s = np.squeeze(R0_4D[:, :, 0, idx])   # (Nt, Nt)
+                R_list.append(R_s[None, :, :])           # (1, Nt, Nt)
+            R_stack = np.stack(R_list, axis=0)           # (B, Nt, Nt)
+            R_array = R_stack[None, :, :, :]             # (1, B, Nt, Nt)
+        else:
+            idx_snr = np.where(snr_dB_list == snr_dB_arr[0])
+            R0_2D = np.squeeze(R0_4D[:, :, 0, idx_snr])
+            R_array = np.tile(R0_2D, [1, B, 1, 1])
 
-        at_2D = radar_data['a']
-        at_array_true = np.tile(at_2D, (1, train_size, 1, 1))
         at0 = np.expand_dims(at_2D, axis=0)
-        at_array1 = np.tile(at0, (train_size, 1, 1, 1))
-        at_array = np.transpose(at_array1, (1, 0, 2, 3))  # test
+        at_array1 = np.tile(at0, (B, 1, 1, 1))
+        at_array = np.transpose(at_array1, (1, 0, 2, 3))
     else:
-        R0_4D = radar_data['J']
-        R0_2D = np.squeeze(R0_4D[:, :, :, idx_snr])
-        R_array0 = np.transpose(R0_2D, (2, 0, 1))
-        R_array1 = np.tile(R_array0, [len(H[0]), 1, 1, 1])
-        R_array = np.transpose(R_array1, (1, 0, 2, 3))
+        if per_sample:
+            R_list = []
+            for s in snr_dB_arr:
+                idx = np.where(snr_dB_list == s)[0]
+                R_s = np.squeeze(R0_4D[:, :, :, idx])   # (Nt, Nt, K)
+                R_s_k = np.transpose(R_s, (2, 0, 1))    # (K, Nt, Nt)
+                R_list.append(R_s_k[:, None, :, :])     # (K, 1, Nt, Nt)
+            R_stack = np.concatenate(R_list, axis=1)    # (K, B, Nt, Nt)
+            R_array = R_stack
+        else:
+            idx_snr = np.where(snr_dB_list == snr_dB_arr[0])
+            R0_2D = np.squeeze(R0_4D[:, :, :, idx_snr])
+            R_array0 = np.transpose(R0_2D, (2, 0, 1))
+            R_array1 = np.tile(R_array0, [B, 1, 1, 1])
+            R_array = np.transpose(R_array1, (1, 0, 2, 3))
 
-        at_2D = radar_data['a']
         at0 = np.transpose(at_2D, (2, 0, 1))
-        at_array1 = np.tile(at0, (train_size, 1, 1, 1))
+        at_array1 = np.tile(at0, (B, 1, 1, 1))
         at_array = np.transpose(at_array1, (1, 0, 2, 3))
 
     R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous().to(device)
     at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous().to(device)
-    theta = radar_data['theta']
-    ideal_beam = radar_data['Pd_theta']
 
     return R, at, theta, ideal_beam[0, :]
 
