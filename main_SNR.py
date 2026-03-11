@@ -14,13 +14,13 @@ H_test = H_test0[:, :test_size, :, :]
 conv_PGA = PGA_Conv(step_size_conv_PGA)
 if run_UPGA_J1 == 1:
     model_UPGA_J1 = PGA_Conv(step_size_UPGA_J1)
-    model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1))
+    model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
 if run_UPGA_J20 == 1:
     model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
-    model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20))
+    model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
 if run_UPGA_J10 == 1:
     model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-    model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
+    model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
 if run_conv_PGA_J10 == 1:
     conv_PGA_J10 = PGA_Unfold_J10(
         torch.full_like(

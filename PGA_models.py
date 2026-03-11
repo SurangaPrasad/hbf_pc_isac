@@ -53,8 +53,8 @@ class PGA_Conv_comp_grad(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner, weight_grad_F_rad, init_method):
         rate_init, tau_init, F, W = initialize_schemes(H, R, Pt, init_method)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save beampattern errors over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)   # save beampattern errors over iterations
         # update F and W over iterations
         for ii in range(n_iter_outer):
             for jj in range(n_iter_inner):
@@ -102,8 +102,8 @@ class PGA_Conv(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save beampattern errors over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)   # save beampattern errors over iterations
         # update F and W over iterations
         for ii in range(n_iter_outer):
             # update F
@@ -148,8 +148,8 @@ class PGA_Unfold_J10(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)   # save CRB over iterations
         
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -210,8 +210,8 @@ class PGA_Unfold_J10_PRCDN(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)   # save CRB over iterations
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, mu_ii, n_inner, Pt):
             for jj in range(n_inner):
@@ -295,8 +295,8 @@ class PGA_Unfold_J10_RMSProp(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)   # save CRB over iterations
 
         s_F = torch.zeros_like(F)
         s_W = torch.zeros_like(W)
@@ -368,8 +368,8 @@ class PGA_Unfold_J20(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save CRB over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        crb_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)   # save CRB over iterations
         
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -422,7 +422,7 @@ def get_grad_F_com(H, F, W):
     F_H = torch.transpose(F, 2, 3).conj()
     W_H = torch.transpose(W, 2, 3).conj()  # _H, _T means hermitian and transpose of a matrix
     V = W @ W_H  # K x train_size x Nrf x Nrf
-    grad_F_sum_M = torch.zeros(len(H[0]), Nt, Nrf)
+    grad_F_sum_M = torch.zeros(len(H[0]), Nt, Nrf, dtype=H.dtype, device=H.device)
     for m in range(M):
         W_m = W[:, :, :, torch.arange(W.size(3)) != m]
         V_mk = W_m @ torch.transpose(W_m, 2, 3).conj()  # need to change to remove 1 column
@@ -453,7 +453,7 @@ def get_grad_W_com(H, F, W):
     F_H = torch.transpose(F, 2, 3).conj()
     W_H = torch.transpose(W, 2, 3).conj()
     V = W @ W_H  # K x train_size x Nrf x Nrf
-    grad_W = torch.zeros(len(H), len(H[0]), Nrf, M)
+    grad_W = torch.zeros(len(H), len(H[0]), Nrf, M, dtype=H.dtype, device=H.device)
 
     for m in range(M):
         W_m = W
@@ -471,8 +471,8 @@ def get_grad_W_com(H, F, W):
 
         denom_2 = np.log(2) * (get_trace(W_m @ W_m_H @ Hbar_mk) + sigma2)
         grad_W_2 = Hbar_mk @ W_m / denom_2[:, :, None, None]  # expand dimension
-        mask_m = torch.ones(len(H), len(H[0]), Nrf, M)
-        mask_m[:, :, :, m] = torch.zeros(len(H), len(H[0]), Nrf)
+        mask_m = torch.ones(len(H), len(H[0]), Nrf, M, device=H.device)
+        mask_m[:, :, :, m] = 0.0
         grad_W_2_masked = grad_W_2 * mask_m  # need element-wise multiplication for masking
         grad_W = grad_W + (grad_W_1 - grad_W_2_masked)
 
@@ -503,27 +503,11 @@ def generate_pi_matrix(B_matrix, H_tilde, Nt, Nrf):
     Bsz = B_matrix.shape[0]
     antennas_per_rf = Nt // Nrf
     
-    Pi = torch.zeros(
-        (Bsz, Nt, Nt),
-        dtype=H_tilde.dtype,
-        device=H_tilde.device
-    )
-    
     Bt = B_matrix.transpose(-1, -2)  # (Bsz, Nrf, Nrf)
-    
-    for m in range(Nrf):
-        for n in range(Nrf):
-            row_start = m * antennas_per_rf
-            row_end = (m + 1) * antennas_per_rf
-            col_start = n * antennas_per_rf
-            col_end = (n + 1) * antennas_per_rf
-            
-            H_sub = H_tilde[:, row_start:row_end, col_start:col_end]
-            
-            Pi[:, row_start:row_end, col_start:col_end] = (
-                Bt[:, m, n].view(Bsz, 1, 1) * H_sub
-            )
-    
+    # Reshape H_tilde into (Bsz, Nrf, aprf, Nrf, aprf) blocks, scale by Bt, reshape back
+    H_blocks = H_tilde.reshape(Bsz, Nrf, antennas_per_rf, Nrf, antennas_per_rf)
+    Pi_blocks = Bt.unsqueeze(2).unsqueeze(4) * H_blocks  # (Bsz, Nrf, aprf, Nrf, aprf)
+    Pi = Pi_blocks.reshape(Bsz, Nt, Nt)
     return Pi
 
 
@@ -567,16 +551,12 @@ def extract_active_elements_pc(F, Nt, Nrf):
     B = F.shape[0]
     antennas_per_rf = Nt // Nrf
     
-    # Initialize output
-    f_active = torch.zeros((B, Nt, 1), dtype=F.dtype, device=F.device)
-    
-    for i in range(Nrf):
-        start_idx = i * antennas_per_rf
-        end_idx = (i + 1) * antennas_per_rf
-        
-        # Copy the active block from column i
-        f_active[:, start_idx:end_idx, 0] = F[:, start_idx:end_idx, i]
-    
+    # Reshape F into blocks: F_blocks[b, m, r, n] = F[b, m*aprf+r, n]
+    F_blocks = F.reshape(B, Nrf, antennas_per_rf, Nrf)
+    # Extract diagonal blocks: F_diag[b, r, m] = F_blocks[b, m, r, m] = F[b, m*aprf+r, m]
+    F_diag = torch.diagonal(F_blocks, dim1=1, dim2=3)  # (B, aprf, Nrf)
+    # Rearrange to active vector layout: f_active[b, m*aprf+r, 0] = F[b, m*aprf+r, m]
+    f_active = F_diag.permute(0, 2, 1).reshape(B, Nt, 1)
     return f_active
 
 
@@ -688,12 +668,11 @@ def get_grad_F_rad_AP(F, W, R, Pt, Nt, Nrf):
     # ---------------------------------------------------
     # 5. Lift gradient from active vector back to F matrix
     # ---------------------------------------------------
-    grad_F = torch.zeros_like(F_single)  # (B, Nt, Nrf)
-    antennas_per_rf = Nt // Nrf
-    for rf in range(Nrf):
-        start = rf * antennas_per_rf
-        end = (rf + 1) * antennas_per_rf
-        grad_F[:, start:end, rf] = grad_f_active[:, start:end, 0]
+    aprf = Nt // Nrf
+    eye_nrf = torch.eye(Nrf, device=grad_f_active.device, dtype=grad_f_active.dtype)
+    gf = grad_f_active.squeeze(-1).reshape(Bsz, Nrf, aprf)            # (B, Nrf, aprf)
+    grad_F_blocks = gf.unsqueeze(-1) * eye_nrf.unsqueeze(0).unsqueeze(2)  # (B, Nrf, aprf, Nrf)
+    grad_F = grad_F_blocks.reshape(Bsz, Nt, Nrf)
     
     # ---------------------------------------------------
     # 6. Replicate for all frequencies if needed
@@ -789,12 +768,11 @@ def get_grad_F_com_AP(f_active, H, F, W):
     # ---------------------------------------------------
     # 5. Lift gradient from active vector back to F matrix
     # ---------------------------------------------------
-    grad_F = torch.zeros_like(F[0])  # (B, Nt, Nrf)
-    antennas_per_rf = Nt // Nrf
-    for rf in range(Nrf):
-        start = rf * antennas_per_rf
-        end = (rf + 1) * antennas_per_rf
-        grad_F[:, start:end, rf] = grad_f_active[:, start:end, 0]
+    aprf = Nt // Nrf
+    eye_nrf = torch.eye(Nrf, device=grad_f_active.device, dtype=grad_f_active.dtype)
+    gf = grad_f_active.squeeze(-1).reshape(Bsz, Nrf, aprf)            # (B, Nrf, aprf)
+    grad_F_blocks = gf.unsqueeze(-1) * eye_nrf.unsqueeze(0).unsqueeze(2)  # (B, Nrf, aprf, Nrf)
+    grad_F = grad_F_blocks.reshape(Bsz, Nt, Nrf)
     
     # Replicate for all frequencies
     grad_F_all_freq = torch.cat([grad_F.unsqueeze(0)] * K_freq, dim=0)
@@ -844,10 +822,6 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt):
 # ================== compute CRLB gradients =========================
 def get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv):
 
-    # match the data type of A_dot and R_N_inv with F
-    A_dot = A_dot.to(F.dtype)
-    R_N_inv = R_N_inv.to(F.dtype)
-
     # reshape A_dot and R_N_inv for batch processing
     A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
     R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
@@ -869,9 +843,6 @@ def get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv):
     return grad_F_crb
 
 def get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv):
-
-    A_dot = A_dot.to(F.dtype)
-    R_N_inv = R_N_inv.to(F.dtype)
 
     A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
     R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]

@@ -61,7 +61,7 @@ def initialize(H, Pt, normalization, pc=False):
             F = torch.cat(((F[None, :, :, :],) * K), 0)
         else:
             sys.stderr.write('Error: Wrong RF chain configuration....\n')
-        F = F * generage_partial_connection_mask(Nt, Nrf) if pc else F
+        F = F * generage_partial_connection_mask(Nt, Nrf, device=F.device) if pc else F
     elif init_scheme == 'svd':
         U, S, V_H = torch.linalg.svd(H)
         V = V_H
@@ -97,7 +97,7 @@ def initialize(H, Pt, normalization, pc=False):
         norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
         W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
     # rate_0 = get_sum_rate(H, F, W)
-    rate_init = torch.zeros(1, len(H[0]))
+    rate_init = torch.zeros(1, len(H[0]), device=H.device)
     # beam_error_init = torch.zeros(1, len(H[0]))
     rate_init[0, :] = get_sum_rate(H, F, W, Pt)
     # beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
@@ -193,8 +193,8 @@ def initialize_schemes(H, R, Pt, init_method):
     W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
 
     # rate_0 = get_sum_rate(H, F, W)
-    rate_init = torch.zeros(1, len(H[0]))
-    beam_error_init = torch.zeros(1, len(H[0]))
+    rate_init = torch.zeros(1, len(H[0]), device=H.device)
+    beam_error_init = torch.zeros(1, len(H[0]), device=H.device)
     rate_init[0, :] = get_sum_rate(H, F, W, Pt)
     beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
 
@@ -250,33 +250,31 @@ def get_sum_rate(H, F, W, Pt):
     # if torch.any(power_all > power_high_threshold):
     #     sys.stderr.write('Error: power constraint violated\n')
 
-    F_H = torch.transpose(F, 2, 3).conj()
-    W_H = torch.transpose(W, 2, 3).conj()
-    V = W @ W_H  # K x train_size x Nrf x Nrf
-    rate = torch.zeros(len(H[0]), )
-    for m in range(M):
-        # mask_m = torch.ones(len(H), Nrf, M)
-        # mask_m[:, :, m] = torch.zeros(len(H), Nrf)
-        # W_m = W * mask_m
+    F_H = F.conj().transpose(-2, -1)              # (K, B, Nrf, Nt)
+    V = W @ W.conj().transpose(-2, -1)             # (K, B, Nrf, Nrf)
 
-        W_m = W.clone()  # Create a copy of the original matrix W
-        W_m[:, :, :, m] = 0.0  # Set the m-th column to zeros in the new matrix
+    # Build V_m for all m simultaneously: W_m = W with column m zeroed
+    Mval = W.shape[-1]
+    col_mask = (1.0 - torch.eye(Mval, device=W.device, dtype=W.real.dtype)).to(W.dtype)
+    W_m_all = W.unsqueeze(0) * col_mask.view(Mval, 1, 1, 1, Mval)  # (M, K, B, Nrf, M)
+    V_m_all = W_m_all @ W_m_all.conj().transpose(-1, -2)            # (M, K, B, Nrf, Nrf)
+    V_m_perm = V_m_all.permute(1, 2, 0, 3, 4)                       # (K, B, M, Nrf, Nrf)
 
-        # print(W_m[0][0])
-        # W_m = W[:, :, :, torch.arange(W.size(3)) != m]
-        V_m = W_m @ torch.transpose(W_m, 2, 3).conj()  # need to change to remove 1 column
-        h_mk0 = torch.unsqueeze(H[:, :, m, :], dim=2)
-        h_mk = torch.transpose(h_mk0, 2, 3)
-        h_mk_H = torch.transpose(h_mk, 2, 3).conj()
-        Htilde_mk = h_mk @ h_mk_H
-        trace_1 = get_trace(F @ V @ F_H @ Htilde_mk)
-        trace_2 = get_trace(F @ V_m @ F_H @ Htilde_mk)
-        rate = rate + (torch.log2(trace_1 + sigma2) - torch.log2(trace_2 + sigma2)).real
-        # print(rate)
-        # print((torch.log2(trace_1)).real)
-        # print((torch.log2(trace_2)).real)
-        # print('-------------------------------------')
-    sum_rate = torch.mean(rate)  # sum over all frequencies
+    # Channel outer products for all users: Htilde[k,b,m] = h_m h_m^H
+    h_all = H.unsqueeze(-1)                                           # (K, B, M, Nt, 1)
+    Htilde_all = h_all @ h_all.conj().transpose(-1, -2)               # (K, B, M, Nt, Nt)
+
+    # FVF_H: (K, B, Nt, Nt)
+    FVF_H = F @ V @ F_H
+    # trace_1[k,b,m] = trace(FVF_H[k,b] @ Htilde_all[k,b,m])
+    trace_1 = (FVF_H.unsqueeze(2) @ Htilde_all).diagonal(dim1=-1, dim2=-2).sum(-1)  # (K, B, M)
+
+    # trace_2[k,b,m] = trace(F[k,b] @ V_m[k,b,m] @ F_H[k,b] @ Htilde_all[k,b,m])
+    FVm_FH = F.unsqueeze(2) @ V_m_perm @ F_H.unsqueeze(2)            # (K, B, M, Nt, Nt)
+    trace_2 = (FVm_FH @ Htilde_all).diagonal(dim1=-1, dim2=-2).sum(-1)  # (K, B, M)
+
+    rate = (torch.log2(trace_1 + sigma2) - torch.log2(trace_2 + sigma2)).real.sum(-1)  # (K, B)
+    sum_rate = torch.mean(rate)
     return sum_rate
 
 
@@ -296,9 +294,6 @@ def get_beam_error(H, F, W, R, Pt):
 def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt):
     F, W = normalize(F, W, H, Pt)
     
-    A_dot = A_dot.to(F.dtype)
-    R_N_inv = R_N_inv.to(F.dtype)
-
     A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
     R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
 
@@ -360,8 +355,8 @@ def normalize_power(F, W, H, Pt):
     return F
 
 # ========================= generate PC mask =====================
-def generage_partial_connection_mask(N, M):
-    mask = torch.zeros((N, M), dtype=COMPLEX_DTYPE)
+def generage_partial_connection_mask(N, M, device=None):
+    mask = torch.zeros((N, M), dtype=COMPLEX_DTYPE, device=device)
     antennas_per_rf = N // M
     for rf in range(M):
         start_idx = rf * antennas_per_rf
@@ -461,8 +456,8 @@ def get_data_tensor(data_source):
     train_slice = np.ascontiguousarray(data_train_array[:, :max_train, :, :])
     test_slice = np.ascontiguousarray(data_test_array[:, :max_test, :, :])
 
-    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous()
-    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous()
+    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous().to(device)
+    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous().to(device)
     return H_train_tensor, H_test_tensor
 
 
@@ -496,8 +491,8 @@ def get_radar_data(snr_dB, H):
         at_array1 = np.tile(at0, (train_size, 1, 1, 1))
         at_array = np.transpose(at_array1, (1, 0, 2, 3))
 
-    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous()
-    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous()
+    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous().to(device)
+    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous().to(device)
     theta = radar_data['theta']
     ideal_beam = radar_data['Pd_theta']
 
@@ -514,7 +509,7 @@ def get_beampattern(F, W, at, Pt):
     Bdiag = torch.diagonal(B, offset=0, dim1=-1, dim2=-2) / Pt
     # Bmean = 10 * torch.log10(torch.real(torch.mean(Bdiag, 1)))
     Bmean = torch.real(torch.mean(torch.mean(Bdiag, 1), 0))
-    B_array = Bmean.detach().numpy()
+    B_array = Bmean.detach().cpu().numpy()
     return B_array
 
 # if __name__ == '__main__':
@@ -542,20 +537,10 @@ def extract_active_elements(F):
         F_active: (B, Nt, 1) complex
     """
     B, _, Nt, Nrf = F.shape
-    antennas_per_rf = Nt // Nrf
-
-    F_active = torch.zeros(
-        (B, Nt, 1),
-        dtype=F.dtype,
-        device=F.device
-    )
-
-    for rf in range(Nrf):
-        start = rf * antennas_per_rf
-        end = (rf + 1) * antennas_per_rf
-
-        # Correct indexing: keep batch + freq dim
-        F_active[:, start:end, 0] = F[:, 0, start:end, rf]
-
+    aprf = Nt // Nrf
+    F_2d = F[:, 0, :, :]                               # (B, Nt, Nrf)
+    F_blocks = F_2d.reshape(B, Nrf, aprf, Nrf)          # (B, Nrf, aprf, Nrf)
+    F_diag = torch.diagonal(F_blocks, dim1=1, dim2=3)   # (B, aprf, Nrf)
+    F_active = F_diag.permute(0, 2, 1).reshape(B, Nt, 1)
     return F_active
     

@@ -22,8 +22,8 @@ if run_conv_PGA == 1:
     R, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
 
     rate_iter_conv, beam_iter_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
-    rate_conv = [r.detach().numpy() for r in (sum(rate_iter_conv) / len(H_test[0]))]
-    beam_error_conv = [e.detach().numpy() for e in (sum(beam_iter_conv) / (len(H_test[0])))]
+    rate_conv = [r.detach().cpu().numpy() for r in (sum(rate_iter_conv) / len(H_test[0]))]
+    beam_error_conv = [e.detach().cpu().numpy() for e in (sum(beam_iter_conv) / (len(H_test[0])))]
     iter_number_conv = np.array(list(range(n_iter_outer + 1)))
 
 # ====================================================== Unfolded PGA with J = 1 ====================================
@@ -55,13 +55,13 @@ if run_UPGA_J1 == 1:
 
     # Create new model and load states
     model_test = PGA_Conv(step_size_UPGA_J1)
-    model_test.load_state_dict(torch.load(model_file_name_UPGA_J1))
+    model_test.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
 
     # executing unfolded PGA on the test set
     Rtest, _, _, _ = get_radar_data(snr_dB, H_test)
     rate_iter_UPGA_J1, beam_error_iter_UPGA_J1, F_UPGA_J1, W_UPGA_J1 = model_test.execute_PGA(H_test, Rtest, snr, n_iter_outer)
-    rate_UPGA_J1 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J1) / len(H_test[0]))]
-    beam_error_UPGA_J1 = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J1) / len(H_test[0]))]
+    rate_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(rate_iter_UPGA_J1) / len(H_test[0]))]
+    beam_error_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(beam_error_iter_UPGA_J1) / len(H_test[0]))]
     iter_number_UPGA_J1 = np.array(list(range(n_iter_outer + 1)))
 
 # ============================================================= proposed unfolding PGA =================================

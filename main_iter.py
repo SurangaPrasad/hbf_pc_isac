@@ -20,8 +20,8 @@ if run_program == 1:
         print('Running conventional PGA...')
         model_conv_PGA = PGA_Conv(step_size_conv_PGA)
         rate_conv, tau_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
-        rate_iter_conv = [r.detach().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
-        tau_iter_conv = [e.detach().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
+        rate_iter_conv = [r.detach().cpu().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
+        tau_iter_conv = [e.detach().cpu().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
@@ -30,8 +30,8 @@ if run_program == 1:
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_conv_PGA_J10 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
-        crb_iter_conv_PGA_J10 = [e.detach().numpy() for e in (sum(crb_conv_PGA_J10) / (len(H_test[0])))]
+        rate_iter_conv_PGA_J10 = [r.detach().cpu().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
+        crb_iter_conv_PGA_J10 = [e.detach().cpu().numpy() for e in (sum(crb_conv_PGA_J10) / (len(H_test[0])))]
  
  # ====================================================== Conv. PGA with J = 20 ====================================
     if run_conv_PGA_J20 == 1:
@@ -41,46 +41,46 @@ if run_program == 1:
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J20)
-        rate_iter_conv_PGA_J20 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J20) / len(H_test[0]))]
-        crb_iter_conv_PGA_J20 = [e.detach().numpy() for e in (sum(crb_conv_PGA_J20) / (len(H_test[0])))]
+        rate_iter_conv_PGA_J20 = [r.detach().cpu().numpy() for r in (sum(rate_conv_PGA_J20) / len(H_test[0]))]
+        crb_iter_conv_PGA_J20 = [e.detach().cpu().numpy() for e in (sum(crb_conv_PGA_J20) / (len(H_test[0])))]
     # ====================================================== Unfolded PGA with J = 1====================================
     if run_UPGA_J1 == 1:
         print('Running unfolded PGA with J = 1...')
         # Create new model and load states
         model_UPGA_J1 = PGA_Conv(step_size_UPGA_J1)
-        model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1))
+        model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
 
         # executing unfolded PGA on the test set
         sum_rate_UPGA_J1, tau_UPGA_J1, F_UPGA_J1, W_UPGA_J1 = model_UPGA_J1.execute_PGA(H_test, R, snr, n_iter_outer)
-        rate_iter_UPGA_J1 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J1) / len(H_test[0]))]
-        tau_iter_UPGA_J1 = [e.detach().numpy() for e in (sum(tau_UPGA_J1) / (len(H_test[0])))]
+        rate_iter_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J1) / len(H_test[0]))]
+        tau_iter_UPGA_J1 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J1) / (len(H_test[0])))]
 
     # ====================================================== Proposed Unfolded PGA light ====================================
     if run_UPGA_J10 == 1:
         print('Running unfolded PGA with J = 10...')
         # Create new model and load states
         model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
+        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
 
         sum_rate_UPGA_J10, crb_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_UPGA_J10 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
-        crb_iter_UPGA_J10 = [e.detach().numpy() for e in (sum(crb_UPGA_J10) / (len(H_test[0])))]
+        rate_iter_UPGA_J10 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
+        crb_iter_UPGA_J10 = [e.detach().cpu().numpy() for e in (sum(crb_UPGA_J10) / (len(H_test[0])))]
 
     # ====================================================== Proposed Unfolded PGA ====================================
     if run_UPGA_J20 == 1:
         print('Running unfolded PGA with J = 20...')
         # Create new model and load states
         model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
-        model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20))
+        model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
 
         sum_rate_UPGA_J20, crb_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J20)
-        rate_iter_UPGA_J20 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
-        crb_iter_UPGA_J20 = [e.detach().numpy() for e in (sum(crb_UPGA_J20) / (len(H_test[0])))]
+        rate_iter_UPGA_J20 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J20) / len(H_test[0]))]
+        crb_iter_UPGA_J20 = [e.detach().cpu().numpy() for e in (sum(crb_UPGA_J20) / (len(H_test[0])))]
     
     # ====================================================== Propsed Unofolded PGA with PRCDN ====================================
 
@@ -88,14 +88,14 @@ if run_program == 1:
         print('Running unfolded PGA with J = 10 and PRCDN...')
         # Create new model and load states
         model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
-        model_UPGA_J10_PRCDN.load_state_dict(torch.load(model_file_name_UPGA_J10_PRCDN))
+        model_UPGA_J10_PRCDN.load_state_dict(torch.load(model_file_name_UPGA_J10_PRCDN, map_location=device))
 
         sum_rate_UPGA_J10_PRCDN, crb_UPGA_J10_PRCDN, F_UPGA_J10_PRCDN, W_UPGA_J10_PRCDN = model_UPGA_J10_PRCDN.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_UPGA_J10_PRCDN = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10_PRCDN) / len(H_test[0]))]
-        crb_iter_UPGA_J10_PRCDN = [e.detach().numpy() for e in (sum(crb_UPGA_J10_PRCDN) / (len(H_test[0])))]
+        rate_iter_UPGA_J10_PRCDN = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J10_PRCDN) / len(H_test[0]))]
+        crb_iter_UPGA_J10_PRCDN = [e.detach().cpu().numpy() for e in (sum(crb_UPGA_J10_PRCDN) / (len(H_test[0])))]
     # ====================================================== Propsed Unofolded PGA with RMSProp-like adaptive step sizes ====================================
     if run_UPGA_J10_RMSProp == 1:
         print('Running unfolded PGA with J = 10 and RMSProp-like adaptive step sizes...')
@@ -107,8 +107,8 @@ if run_program == 1:
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_UPGA_J10_RMSProp = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10_RMSProp) / len(H_test[0]))]
-        crb_iter_UPGA_J10_RMSProp = [e.detach().numpy() for e in (sum(crb_UPGA_J10_RMSProp) / (len(H_test[0])))]
+        rate_iter_UPGA_J10_RMSProp = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J10_RMSProp) / len(H_test[0]))]
+        crb_iter_UPGA_J10_RMSProp = [e.detach().cpu().numpy() for e in (sum(crb_UPGA_J10_RMSProp) / (len(H_test[0])))]
 
     # ============================== generate beampattern ////////////////////////////////////////////////////////////////////
     print('generating beampattern...')
