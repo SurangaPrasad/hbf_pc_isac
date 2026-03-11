@@ -180,37 +180,37 @@ if run_UPGA_J10 == 1:
 
 
     # Object defining
-    model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC)
+    # model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC)
 
-    # training procedure
-    optimizer = torch.optim.Adam(model_UPGA_J10_PC_AP.parameters(), lr=learning_rate)
+    # # training procedure
+    # optimizer = torch.optim.Adam(model_UPGA_J10_PC_AP.parameters(), lr=learning_rate)
 
-    train_losses, valid_losses = [], []
+    # train_losses, valid_losses = [], []
 
-    for i_epoch in range(n_epoch):
-        print(i_epoch)
-        H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
-            H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
-            cur_bs = H.shape[1]
-            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
-            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
-                                     dtype=torch.float32, device=device)
-            Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
-            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
+    # for i_epoch in range(n_epoch):
+    #     print(i_epoch)
+    #     H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+    #     for i_batch in range(0, len(H_train), batch_size):
+    #         H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
+    #         cur_bs = H.shape[1]
+    #         snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+    #         snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+    #                                  dtype=torch.float32, device=device)
+    #         Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
+    #         __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
+    #         loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
 
 
-            optimizer.zero_grad()  # zero the gradient buffers
-            loss.backward()
-            optimizer.step()  # Does the update
+    #         optimizer.zero_grad()  # zero the gradient buffers
+    #         loss.backward()
+    #         optimizer.step()  # Does the update
 
-    # Save trained model
-    torch.save(model_UPGA_J10_PC_AP.state_dict(), model_file_name_UPGA_J10_PC)
+    # # Save trained model
+    # torch.save(model_UPGA_J10_PC_AP.state_dict(), model_file_name_UPGA_J10_PC)
 
 
 if run_UPGA_J10_PRCDN == 1:
-    model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
+    model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4).to(device)
     optimizer = torch.optim.Adam(model_UPGA_J10_PRCDN.parameters(), lr=learning_rate)
 
     epoch_losses = [] # To store average loss per epoch

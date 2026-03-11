@@ -192,11 +192,11 @@ class PGA_Unfold_J10_PRCDN(nn.Module):
 
         # ===== Diagonal preconditioner for F =====
         # Shape: [n_iter_inner, n_iter_outer, 64]
-        self.mu = nn.Parameter( 1e-2 * torch.ones(n_iter_inner, n_iter_outer, dim_F))
+        self.mu = nn.Parameter( 1e-2 * torch.ones(n_iter_inner, n_iter_outer, dim_F, device=device))
 
         # ===== Diagonal preconditioner for W =====
         # Shape: [n_iter_outer, 4]
-        self.lambda_ = nn.Parameter( 1e-2 * torch.ones(n_iter_outer, dim_W))
+        self.lambda_ = nn.Parameter( 1e-2 * torch.ones(n_iter_outer, dim_W, device=device))
 
 
 
