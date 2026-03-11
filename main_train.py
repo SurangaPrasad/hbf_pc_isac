@@ -43,7 +43,7 @@ if run_UPGA_J1 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            __, __, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer)
+            __, __, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer, track_metrics=False)
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
 
             optimizer.zero_grad()  # zero the gradient buffers
@@ -81,7 +81,7 @@ if run_UPGA_J20 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             
-            rate, __, F, W = model_UPGA_J20.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20)
+            rate, __, F, W = model_UPGA_J20.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -128,7 +128,7 @@ if run_UPGA_J10 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             
-            rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10)
+            rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -189,7 +189,7 @@ if run_UPGA_J10 == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10)
+            __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
 
 
@@ -217,7 +217,7 @@ if run_UPGA_J10_PRCDN == 1:
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
             
-            rate, __, F, W = model_UPGA_J10_PRCDN.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10)
+            rate, __, F, W = model_UPGA_J10_PRCDN.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")

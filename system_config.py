@@ -66,7 +66,7 @@ print(system_info)
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 256    # size of training set
 test_size = 1      # size of testing set
-batch_size = 16     # batch size when training
+batch_size = 32     # batch size when training (increased from 16 for better GPU utilisation)
 n_epoch = 30         # number of training epochs
 learning_rate = 0.0001 # learning rate
 
