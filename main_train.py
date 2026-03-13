@@ -41,7 +41,7 @@ if run_UPGA_J1 == 1:
         for i_batch in range(0, len(H_train), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]  # actual batch size (last mini-batch may be smaller)
-            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)          # (B,) per-sample
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)        # (B,) tensor
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
@@ -81,7 +81,7 @@ if run_UPGA_J20 == 1:
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]
-            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             
@@ -130,7 +130,7 @@ if run_UPGA_J10 == 1:
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]
-            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             
@@ -223,7 +223,7 @@ if run_UPGA_J10_PRCDN == 1:
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]
-            snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             

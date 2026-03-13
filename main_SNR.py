@@ -6,7 +6,8 @@ benchmark = 1
 # torch.manual_seed(3407)
 
 # ///////////////////////////////////////// SHOW RATES VS. SNRs ///////////////////////////////////
-
+snr_dB_list = np.array([0,2,4,6,8,10,12], dtype='float64')
+run_UPGA_J20 = 1 
 # Load training data
 _, H_test0 = get_data_tensor(data_source)
 H_test = H_test0[:, :test_size, :, :]
@@ -122,9 +123,9 @@ if run_conv_PGA_J10_PC == 1:
     plt.plot(snr_dB_list, rate_conv_PGA_J10_PC, ':', color='orange', linewidth=3, markersize=7, label=label_conv_PGA_J10_PC)
 if run_conv_PGA_J10 == 1:
     plt.plot(snr_dB_list, rate_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
-if benchmark == 1:
-    plt.plot(snr_dB_list, rate_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
-    plt.plot(snr_dB_list, rate_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
+# if benchmark == 1:
+#     plt.plot(snr_dB_list, rate_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
+#     plt.plot(snr_dB_list, rate_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
 
 system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
 # plt.title(system_params)
@@ -153,9 +154,9 @@ if run_conv_PGA_J10_PC == 1:
 if run_conv_PGA_J10 == 1:
     plt.plot(snr_dB_list, CRB_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
 
-if benchmark == 1:
-    plt.plot(snr_dB_list, MSE_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
-    plt.plot(snr_dB_list, MSE_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
+# if benchmark == 1:
+#     plt.plot(snr_dB_list, MSE_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
+#     plt.plot(snr_dB_list, MSE_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
 
 # plt.title(system_params)
 plt.xlabel('SNR [dB]')

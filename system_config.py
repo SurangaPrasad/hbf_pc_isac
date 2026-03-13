@@ -16,11 +16,11 @@ run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 1
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
+run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
-run_UPGA_J10_PRCDN = 1 
+run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
 
@@ -64,11 +64,11 @@ system_info = str(Nt) + " Tx antennas, " + str(M) + " users, " + str(Nrf) + " RF
 print(system_info)
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
-train_size = 1024    # size of training set
+train_size = 476    # size of training set
 test_size = 1      # size of testing set
-batch_size = 32     # batch size when training (increased from 16 for better GPU utilisation)
+batch_size = len(snr_dB_list) * 4
 n_epoch = 30         # number of training epochs
-learning_rate = 0.00001 # learning rate
+learning_rate = 0.0001 # learning rate
 
 n_iter_outer = 120      # Number of outer iterations (I)
 n_iter_inner_J5 = 5     # Number of inner iterations (J = 5)
@@ -127,8 +127,8 @@ if data_source == 'python':
     train_data_file_name = "train_data.mat"
     test_data_file_name = "test_data.mat"
 else:  # matlab
-    train_data_file_name = "train_data_matlab.mat"
-    test_data_file_name = "test_data_matlab.mat"
+    train_data_file_name = "comm_data_new.mat"
+    test_data_file_name = "comm_data_new.mat"
 
 data_path_train = directory_data + train_data_file_name
 data_path_test = directory_data + test_data_file_name

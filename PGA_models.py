@@ -145,8 +145,12 @@ class PGA_Unfold_J10(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
-        crb_over_iters  = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
+        B = len(H[0])
+        # Shape: (n_outer, J+1, B)
+        #   [:, 0, :] = metrics after W-update (start of each outer iter)
+        #   [:, 1..J, :] = metrics after each inner F-update
+        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -161,8 +165,19 @@ class PGA_Unfold_J10(nn.Module):
             return F
 
         for ii in range(n_iter_outer):
-            # update F
-            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
+            if track_metrics:
+                # Run inner loop without checkpoint so we can record per-inner metrics
+                for jj in range(n_iter_inner):
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    F = normalize_power(F, W, H, Pt)
+                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            else:
+                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
 
             # update W  (K == 1 always, unroll the k-loop)
@@ -175,14 +190,15 @@ class PGA_Unfold_J10(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # per-iteration metrics (skip during training for speed)
+            # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
-                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
 
-        rates   = torch.cat([rate_over_iters], dim=0).detach()
-        crb_fes = torch.cat([crb_over_iters],  dim=0).detach()
-        return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
+        # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
+        rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
 
 # ============================================== Proposed PGA model light with preconditioner=============================
 class PGA_Unfold_J10_PRCDN(nn.Module):
@@ -203,47 +219,52 @@ class PGA_Unfold_J10_PRCDN(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
-        crb_over_iters  = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
+        B = len(H[0])
+        # Shape: (n_outer, J+1, B)
+        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, mu_ii, n_inner, Pt):
             for jj in range(n_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-                if grad_F_com.isnan().any() or grad_F_crb.isnan().any(): # check gradient
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                     print('Error NaN gradients!!!!!!!!!!!!!!!')
-                # reshape gradient from [ K, Batch , Nt , M] to [64, -1]
                 grad_vec_com = grad_F_com.reshape(64, -1)
                 grad_vec_crb = grad_F_crb.reshape(64, -1)
-
-                # get diagonal scaling vector for this iteration
-                mu_vec = mu_ii[jj]   # shape: [64]
-
-                # apply column-wise scaling
-                delta_vec_com = mu_vec.unsqueeze(1) * grad_vec_com  # shape [64 , 1] * [64, -1] -> [64, -1]
+                mu_vec = mu_ii[jj]
+                delta_vec_com = mu_vec.unsqueeze(1) * grad_vec_com
                 delta_vec_crb = mu_vec.unsqueeze(1) * grad_vec_crb
-
-                # reshape back
                 delta_F_com = delta_vec_com.reshape_as(grad_F_com)
                 delta_F_crb = delta_vec_crb.reshape_as(grad_F_crb)
-
-                # update
                 F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
-                # normalize by power to ensure non-NaN gradients if F becomes too large
-                #if sum(torch.abs(F[0, :, 0, 0])) > 1e3:
                 F = normalize_power(F, W, H, Pt)
             return F
-        
+
         for ii in range(n_iter_outer):
-            # update F
-            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, self.mu[:, ii], n_iter_inner, Pt, use_reentrant=False)
+            if track_metrics:
+                # Run inner loop without checkpoint so we can record per-inner metrics
+                mu_ii = self.mu[:, ii]
+                for jj in range(n_iter_inner):
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                    grad_vec_com = grad_F_com.reshape(64, -1)
+                    grad_vec_crb = grad_F_crb.reshape(64, -1)
+                    mu_vec = mu_ii[jj]
+                    delta_F_com = (mu_vec.unsqueeze(1) * grad_vec_com).reshape_as(grad_F_com)
+                    delta_F_crb = (mu_vec.unsqueeze(1) * grad_vec_crb).reshape_as(grad_F_crb)
+                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    F = normalize_power(F, W, H, Pt)
+                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            else:
+                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, self.mu[:, ii], n_iter_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
 
             # update W  (K == 1 always, unroll the k-loop)
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-            lambda_vec = self.lambda_[ii]   # shape: [4]
-
+            lambda_vec = self.lambda_[ii]
             grad_vec_com = grad_W_k_com[0].reshape(4, -1)
             grad_vec_crb = grad_W_k_crb[0].reshape(4, -1)
             delta_vec_com = lambda_vec.unsqueeze(1) * grad_vec_com
@@ -255,14 +276,15 @@ class PGA_Unfold_J10_PRCDN(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # per-iteration metrics (skip during training for speed)
+            # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
-                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
 
-        rates   = torch.cat([rate_over_iters], dim=0).detach()
-        crb_fes = torch.cat([crb_over_iters],  dim=0).detach()
-        return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
+        # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
+        rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
 
 # ============================================== Proposed PGA model light for RMSProp=============================
 
@@ -281,8 +303,10 @@ class PGA_Unfold_J10_RMSProp(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
-        crb_over_iters  = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
+        B = len(H[0])
+        # Shape: (n_outer, J+1, B)
+        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         s_F = torch.zeros_like(F)
         s_W = torch.zeros_like(W)
@@ -292,42 +316,47 @@ class PGA_Unfold_J10_RMSProp(nn.Module):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                 grad_F = grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB
-
-                # RMSProp update
                 s_F = self.beta * s_F + (1 - self.beta) * grad_F
-
                 F = F + self.eta_F * grad_F / (torch.sqrt(s_F) + self.eps)
-
                 F = normalize_power(F, W, H, Pt)
             return F
-        
+
         for ii in range(n_iter_outer):
-            # update F
-            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, s_F, use_reentrant=False)
+            if track_metrics:
+                # Run inner loop without checkpoint so we can record per-inner metrics
+                for jj in range(n_iter_inner):
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                    grad_F = grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB
+                    s_F = self.beta * s_F + (1 - self.beta) * grad_F
+                    F = F + self.eta_F * grad_F / (torch.sqrt(s_F) + self.eps)
+                    F = normalize_power(F, W, H, Pt)
+                    rate_over_iters[ii, jj + 1] = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, jj + 1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            else:
+                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, s_F, use_reentrant=False)
             F = project_unit_modulus(F)
 
             # update W with RMSProp (K == 1 always, unroll the k-loop)
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-
             if ii == 0:
                 s_W = torch.zeros_like(W)
-
             grad_W_0 = grad_W_k_com[0] * WEIGHT_W_COM + grad_W_k_crb[0] * WEIGHT_W_CRB
             s_W[0] = self.beta * s_W[0] + (1 - self.beta) * grad_W_0
             W_new = W.clone()
             W_new[0] = W[0] + self.eta_W * grad_W_0 / (torch.sqrt(s_W[0]) + self.eps)
-
             F, W = normalize(F, W_new, H, Pt)
 
-            # per-iteration metrics (skip during training for speed)
+            # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
-                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                rate_over_iters[ii, 0] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, 0]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
 
-        rates   = torch.cat([rate_over_iters], dim=0).detach()
-        crb_fes = torch.cat([crb_over_iters],  dim=0).detach()
-        return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
+        # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
+        rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
 
 # ============================================== Proposed PGA model=============================
 class PGA_Unfold_J20(nn.Module):
@@ -339,8 +368,10 @@ class PGA_Unfold_J20(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
-        crb_over_iters  = torch.zeros(n_iter_outer, len(H[0]), device=H.device)
+        B = len(H[0])
+        # Shape: (n_outer, J+1, B)
+        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -355,8 +386,19 @@ class PGA_Unfold_J20(nn.Module):
             return F
 
         for ii in range(n_iter_outer):
-            # update F
-            F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
+            if track_metrics:
+                # Run inner loop without checkpoint so we can record per-inner metrics
+                for jj in range(n_iter_inner):
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    F = normalize_power(F, W, H, Pt)
+                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+            else:
+                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
 
             # update W  (K == 1 always, unroll the k-loop)
@@ -369,14 +411,15 @@ class PGA_Unfold_J20(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # per-iteration metrics (skip during training for speed)
+            # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
-                rate_over_iters[ii] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
 
-        rates   = torch.cat([rate_over_iters], dim=0).detach()
-        crb_fes = torch.cat([crb_over_iters],  dim=0).detach()
-        return torch.transpose(rates, 0, 1), torch.transpose(crb_fes, 0, 1), F, W
+        # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
+        rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////
