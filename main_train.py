@@ -22,8 +22,8 @@ if run_conv_PGA == 1:
     R, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
 
     rate_iter_conv, beam_iter_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
-    rate_conv = [r.detach().numpy() for r in (sum(rate_iter_conv) / len(H_test[0]))]
-    beam_error_conv = [e.detach().numpy() for e in (sum(beam_iter_conv) / (len(H_test[0])))]
+    rate_conv = [r.detach().cpu().numpy() for r in (sum(rate_iter_conv) / len(H_test[0]))]
+    beam_error_conv = [e.detach().cpu().numpy() for e in (sum(beam_iter_conv) / (len(H_test[0])))]
     iter_number_conv = np.array(list(range(n_iter_outer + 1)))
 
 # ====================================================== Unfolded PGA with J = 1 ====================================
@@ -40,10 +40,12 @@ if run_UPGA_J1 == 1:
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
         for i_batch in range(0, len(H_train), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]  # actual batch size (last mini-batch may be smaller)
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)        # (B,) tensor
             Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            __, __, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer)
+            __, __, F, W = model_UPGA_J1.execute_PGA(H, Rtrain, snr_train, n_iter_outer, track_metrics=False)
             loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
 
             optimizer.zero_grad()  # zero the gradient buffers
@@ -55,13 +57,13 @@ if run_UPGA_J1 == 1:
 
     # Create new model and load states
     model_test = PGA_Conv(step_size_UPGA_J1)
-    model_test.load_state_dict(torch.load(model_file_name_UPGA_J1))
+    model_test.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
 
     # executing unfolded PGA on the test set
     Rtest, _, _, _ = get_radar_data(snr_dB, H_test)
     rate_iter_UPGA_J1, beam_error_iter_UPGA_J1, F_UPGA_J1, W_UPGA_J1 = model_test.execute_PGA(H_test, Rtest, snr, n_iter_outer)
-    rate_UPGA_J1 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J1) / len(H_test[0]))]
-    beam_error_UPGA_J1 = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J1) / len(H_test[0]))]
+    rate_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(rate_iter_UPGA_J1) / len(H_test[0]))]
+    beam_error_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(beam_error_iter_UPGA_J1) / len(H_test[0]))]
     iter_number_UPGA_J1 = np.array(list(range(n_iter_outer + 1)))
 
 # ============================================================= proposed unfolding PGA =================================
@@ -78,10 +80,12 @@ if run_UPGA_J20 == 1:
         
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
             
-            rate, __, F, W = model_UPGA_J20.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20)
+            rate, __, F, W = model_UPGA_J20.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -125,10 +129,12 @@ if run_UPGA_J10 == 1:
         
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
             
-            rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10)
+            rate, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -174,35 +180,37 @@ if run_UPGA_J10 == 1:
 
 
     # Object defining
-    model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC)
+    # model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC)
 
-    # training procedure
-    optimizer = torch.optim.Adam(model_UPGA_J10_PC_AP.parameters(), lr=learning_rate)
+    # # training procedure
+    # optimizer = torch.optim.Adam(model_UPGA_J10_PC_AP.parameters(), lr=learning_rate)
 
-    train_losses, valid_losses = [], []
+    # train_losses, valid_losses = [], []
 
-    for i_epoch in range(n_epoch):
-        print(i_epoch)
-        H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
-            H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
-            Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-            __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10)
-            loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
+    # for i_epoch in range(n_epoch):
+    #     print(i_epoch)
+    #     H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+    #     for i_batch in range(0, len(H_train), batch_size):
+    #         H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
+    #         cur_bs = H.shape[1]
+    #         snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
+    #         snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+    #                                  dtype=torch.float32, device=device)
+    #         Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
+    #         __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
+    #         loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
 
 
-            optimizer.zero_grad()  # zero the gradient buffers
-            loss.backward()
-            optimizer.step()  # Does the update
+    #         optimizer.zero_grad()  # zero the gradient buffers
+    #         loss.backward()
+    #         optimizer.step()  # Does the update
 
-    # Save trained model
-    torch.save(model_UPGA_J10_PC_AP.state_dict(), model_file_name_UPGA_J10_PC)
+    # # Save trained model
+    # torch.save(model_UPGA_J10_PC_AP.state_dict(), model_file_name_UPGA_J10_PC)
 
 
 if run_UPGA_J10_PRCDN == 1:
-    model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
+    model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4).to(device)
     optimizer = torch.optim.Adam(model_UPGA_J10_PRCDN.parameters(), lr=learning_rate)
 
     epoch_losses = [] # To store average loss per epoch
@@ -214,10 +222,12 @@ if run_UPGA_J10_PRCDN == 1:
         
         for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
-            snr_dB_train = np.random.choice(snr_dB_list)
-            snr_train = 10 ** (snr_dB_train / 10)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
             
-            rate, __, F, W = model_UPGA_J10_PRCDN.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10)
+            rate, __, F, W = model_UPGA_J10_PRCDN.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")

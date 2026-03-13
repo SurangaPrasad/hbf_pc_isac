@@ -7,6 +7,8 @@ import torch
 # specific routine requires doubles.
 REAL_DTYPE = torch.float32
 COMPLEX_DTYPE = torch.complex64
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
@@ -15,7 +17,7 @@ run_conv_PGA_J20 = 1
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
-run_UPGA_J20 = 1           # Unfolded PGA with setting J = 20
+run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
@@ -62,9 +64,9 @@ system_info = str(Nt) + " Tx antennas, " + str(M) + " users, " + str(Nrf) + " RF
 print(system_info)
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
-train_size = 256    # size of training set
+train_size = 476    # size of training set
 test_size = 1      # size of testing set
-batch_size = 16     # batch size when training
+batch_size = len(snr_dB_list) * 4
 n_epoch = 30         # number of training epochs
 learning_rate = 0.0001 # learning rate
 
@@ -96,19 +98,19 @@ a_dot_phi_0 = ((1j * 2 * torch.pi * delta * torch.cos(desired_angle_rad_torch) *
 a_phi_0 = a_phi_0.unsqueeze(1)  # shape: (Nt, 1)
 a_dot_phi_0 = a_dot_phi_0.unsqueeze(1)  # shape: (Nt, 1)
 
-A_dot = a_dot_phi_0 @ a_phi_0.transpose(0, 1) + a_phi_0 @ a_dot_phi_0.transpose(0, 1)
+A_dot = (a_dot_phi_0 @ a_phi_0.transpose(0, 1) + a_phi_0 @ a_dot_phi_0.transpose(0, 1)).to(COMPLEX_DTYPE).to(device)
 
 R_N = torch.eye(Nt)  # noise covariance matrix
-R_N_inv = torch.linalg.inv(R_N)  # inverse of noise covariance matrix
+R_N_inv = torch.linalg.inv(R_N).to(COMPLEX_DTYPE).to(device)  # pre-cast to complex64 and move to device
 
 
 # ========================== initiate step sizes as tensor for training ================
 step_size_fixed = 1e-2  # step size of conventional PGA
-step_size_conv_PGA = torch.full([n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J1 = torch.full([n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
+step_size_conv_PGA = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J1 = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 
 # # ========================== Initialize step sizes seperately for lambda and mu ============
 # step_size_lambda = torch.diag([Nt, M], step_size_fixed, requires_grad=True)
@@ -125,8 +127,8 @@ if data_source == 'python':
     train_data_file_name = "train_data.mat"
     test_data_file_name = "test_data.mat"
 else:  # matlab
-    train_data_file_name = "train_data_matlab.mat"
-    test_data_file_name = "test_data_matlab.mat"
+    train_data_file_name = "comm_data_new.mat"
+    test_data_file_name = "comm_data_new.mat"
 
 data_path_train = directory_data + train_data_file_name
 data_path_test = directory_data + test_data_file_name
