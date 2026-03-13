@@ -26,24 +26,26 @@ if run_program == 1:
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
         model_conv_PGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-        rate_conv_PGA_J10, crb_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
         # rate_conv_PGA_J10: (B, n_outer*(J+1))  — average over batch
-        rate_iter_conv_PGA_J10 = rate_conv_PGA_J10.mean(0).cpu().numpy()
-        crb_iter_conv_PGA_J10  = crb_conv_PGA_J10.mean(0).cpu().numpy()
+        rate_iter_conv_PGA_J10  = rate_conv_PGA_J10.mean(0).cpu().numpy()
+        crb_iter_conv_PGA_J10   = crb_conv_PGA_J10.mean(0).cpu().numpy()
+        power_iter_conv_PGA_J10 = power_conv_PGA_J10.mean(0).cpu().numpy()
 
     # ====================================================== Conv. PGA with J = 20 ====================================
     if run_conv_PGA_J20 == 1:
         print('Running conventional PGA with J = 20...')
         model_conv_PGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
-        rate_conv_PGA_J20, crb_conv_PGA_J20, F_conv_PGA_J20, W_conv_PGA_J20 = model_conv_PGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J20, crb_conv_PGA_J20, power_conv_PGA_J20, F_conv_PGA_J20, W_conv_PGA_J20 = model_conv_PGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J20)
         rate_iter_conv_PGA_J20 = rate_conv_PGA_J20.mean(0).cpu().numpy()
         crb_iter_conv_PGA_J20  = crb_conv_PGA_J20.mean(0).cpu().numpy()
+        power_iter_conv_PGA_J20 = power_conv_PGA_J20.mean(0).cpu().numpy()
     # ====================================================== Unfolded PGA with J = 1====================================
     if run_UPGA_J1 == 1:
         print('Running unfolded PGA with J = 1...')
@@ -63,13 +65,14 @@ if run_program == 1:
         model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
         model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
 
-        sum_rate_UPGA_J10, crb_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J10, crb_UPGA_J10, power_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J10)
         print(f'Shape of the sum_rate_UPGA_J10: {sum_rate_UPGA_J10.shape}')
-        rate_iter_UPGA_J10 = sum_rate_UPGA_J10.mean(0).cpu().numpy()
-        crb_iter_UPGA_J10  = crb_UPGA_J10.mean(0).cpu().numpy()
+        rate_iter_UPGA_J10  = sum_rate_UPGA_J10.mean(0).cpu().numpy()
+        crb_iter_UPGA_J10   = crb_UPGA_J10.mean(0).cpu().numpy()
+        power_iter_UPGA_J10 = power_UPGA_J10.mean(0).cpu().numpy()
 
     # ====================================================== Proposed Unfolded PGA ====================================
     if run_UPGA_J20 == 1:
@@ -92,12 +95,13 @@ if run_program == 1:
         model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4)
         model_UPGA_J10_PRCDN.load_state_dict(torch.load(model_file_name_UPGA_J10_PRCDN, map_location=device))
 
-        sum_rate_UPGA_J10_PRCDN, crb_UPGA_J10_PRCDN, F_UPGA_J10_PRCDN, W_UPGA_J10_PRCDN = model_UPGA_J10_PRCDN.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J10_PRCDN, crb_UPGA_J10_PRCDN, power_UPGA_J10_PRCDN, F_UPGA_J10_PRCDN, W_UPGA_J10_PRCDN = model_UPGA_J10_PRCDN.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_UPGA_J10_PRCDN = sum_rate_UPGA_J10_PRCDN.mean(0).cpu().numpy()
-        crb_iter_UPGA_J10_PRCDN  = crb_UPGA_J10_PRCDN.mean(0).cpu().numpy()
+        rate_iter_UPGA_J10_PRCDN  = sum_rate_UPGA_J10_PRCDN.mean(0).cpu().numpy()
+        crb_iter_UPGA_J10_PRCDN   = crb_UPGA_J10_PRCDN.mean(0).cpu().numpy()
+        power_iter_UPGA_J10_PRCDN = power_UPGA_J10_PRCDN.mean(0).cpu().numpy()
     # ====================================================== Propsed Unofolded PGA with RMSProp-like adaptive step sizes ====================================
     if run_UPGA_J10_RMSProp == 1:
         print('Running unfolded PGA with J = 10 and RMSProp-like adaptive step sizes...')
@@ -316,6 +320,28 @@ if plot_figure == 1:
     plt.tight_layout()
     plt.savefig(directory_result + 'objective_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'objective_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.eps')
-    
+
+
+    # ===================== TRANSMIT POWER INCLUDING ALL INNER ITERATIONS (first 20 outer iters) =========
+    # Only J10-based models return power_fes; J20 and RMSProp do not.
+    fig_power_inner = plt.figure(7)
+    if run_conv_PGA_J10 == 1:
+        plt.plot(frac_J10[mask_J10], power_iter_conv_PGA_J10[mask_J10], ':*', markevery=10, color='orange', linewidth=2, markersize=5, label='PGA (J=10)')
+    if run_UPGA_J10 == 1:
+        plt.plot(frac_J10[mask_J10], power_iter_UPGA_J10[mask_J10], ':*', markevery=10, color='blue', linewidth=2, markersize=5, label=label_UPGA_J10)
+    if run_UPGA_J10_PRCDN == 1:
+        plt.plot(frac_J10[mask_J10], power_iter_UPGA_J10_PRCDN[mask_J10], ':s', markevery=10, color='green', linewidth=2, markersize=5, label='PGA (J=10, PRCDN)')
+    # Mark outer-iteration boundaries with vertical grid lines
+    for ii in range(1, n_plot_outer):
+        plt.axvline(x=ii, color='grey', linestyle='--', linewidth=0.6, alpha=0.5)
+    plt.xlabel(r'Outer iteration $I$ (inner steps shown as fractions)', fontsize="13")
+    plt.ylabel(r'Transmit Power', fontsize="13")
+    plt.title(f"Transmit Power — first {n_plot_outer} outer iterations (incl. inner)", fontsize="13")
+    plt.grid(axis='y')
+    plt.legend(loc='best', fontsize="12", labelspacing=0.15)
+    plt.tight_layout()
+    plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.png')
+    plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+
 
  

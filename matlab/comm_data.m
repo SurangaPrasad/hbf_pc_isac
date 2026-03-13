@@ -24,7 +24,7 @@ for ii = 1:n_train
             alpha = (randn + 1i*randn) / sqrt(2);
             phi   = 2*pi*rand;
             a_t   = (1/sqrt(Nt)) * exp(1i * k_wave * d * n * sin(phi));
-            h     = h + sqrt(Nt/L) * alpha * a_t.';
+            h     = h + alpha * a_t.';
         end
         H_train(1, ii, m, :) = h;
     end
@@ -39,7 +39,7 @@ for ii = 1:n_test
             alpha = (randn + 1i*randn) / sqrt(2);
             phi   = 2*pi*rand;
             a_t   = (1/sqrt(Nt)) * exp(1i * k_wave * d * n * sin(phi));
-            h     = h + sqrt(Nt/L) * alpha * a_t.';
+            h     = h + alpha * a_t.';
         end
         H_test(1, ii, m, :) = h;
     end

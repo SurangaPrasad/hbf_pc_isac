@@ -321,6 +321,12 @@ def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt):
 
     return crb
 
+# ====================================compute power of F and W ==========================
+
+def get_power(F, W):
+    # power = frobinus_norm(F * W)^2
+    power = torch.linalg.matrix_norm(F @ W, ord='fro') ** 2
+    return power
 # ==================================== compute MSE ===========================
 def get_MSE(F, W, at, R, Pt):
     X = F @ W

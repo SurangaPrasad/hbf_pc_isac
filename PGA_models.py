@@ -151,6 +151,7 @@ class PGA_Unfold_J10(nn.Module):
         #   [:, 1..J, :] = metrics after each inner F-update
         rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -176,6 +177,7 @@ class PGA_Unfold_J10(nn.Module):
                     F = normalize_power(F, W, H, Pt)
                     rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
                     crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    power_over_iters[ii, jj] = get_power(F, W).detach()
             else:
                 F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
@@ -194,11 +196,13 @@ class PGA_Unfold_J10(nn.Module):
             if track_metrics:
                 rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
                 crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                power_over_iters[ii, -1] = get_power(F, W).detach()
 
         # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
+        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
 # ============================================== Proposed PGA model light with preconditioner=============================
 class PGA_Unfold_J10_PRCDN(nn.Module):
@@ -372,6 +376,7 @@ class PGA_Unfold_J20(nn.Module):
         # Shape: (n_outer, J+1, B)
         rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -397,6 +402,7 @@ class PGA_Unfold_J20(nn.Module):
                     F = normalize_power(F, W, H, Pt)
                     rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
                     crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    power_over_iters[ii, jj] = get_power(F, W).detach()
             else:
                 F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
@@ -415,11 +421,13 @@ class PGA_Unfold_J20(nn.Module):
             if track_metrics:
                 rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
                 crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                power_over_iters[ii, -1] = get_power(F, W).detach()
 
         # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
+        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////
