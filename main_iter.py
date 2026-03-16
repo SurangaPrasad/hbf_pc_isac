@@ -81,11 +81,12 @@ if run_program == 1:
         model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
         model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
 
-        sum_rate_UPGA_J20, crb_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
+        sum_rate_UPGA_J20, crb_UPGA_J20,power_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J20)
         rate_iter_UPGA_J20 = sum_rate_UPGA_J20.mean(0).cpu().numpy()
         crb_iter_UPGA_J20  = crb_UPGA_J20.mean(0).cpu().numpy()
+        power_iter_UPGA_J20 = power_UPGA_J20.mean(0).cpu().numpy()
     
     # ====================================================== Propsed Unofolded PGA with PRCDN ====================================
 
@@ -243,6 +244,8 @@ if plot_figure == 1:
         plt.plot(iter_number_conv_PGA, rate_ZF, '-o', markevery=5, color='purple', linewidth=3, markersize=7, label=label_ZF)
     if run_conv_PGA_J10 == 1:
         plt.plot(iter_outer_x, rate_iter_conv_PGA_J10[outer_idx_J10], ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    if run_conv_PGA_J20 ==1:
+        plt.plot(iter_outer_x, rate_iter_conv_PGA_J20[outer_idx_J20], ':s', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')    
     if run_UPGA_J10_PRCDN == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
@@ -252,8 +255,29 @@ if plot_figure == 1:
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
+    # ==================================== CRB (outer iters only) ================================================
+    plt.figure()
+    if run_conv_PGA_J10 == 1:
+        plt.plot(iter_outer_x, crb_iter_conv_PGA_J10[outer_idx_J10], ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
+    if run_conv_PGA_J20 == 1:
+        plt.plot(iter_outer_x, crb_iter_conv_PGA_J20[outer_idx_J20], ':s', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
+    if run_UPGA_J10 == 1:
+        plt.plot(iter_outer_x, crb_iter_UPGA_J10[outer_idx_J10], ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J10)
+    if run_UPGA_J20 == 1:
+        plt.plot(iter_outer_x, crb_iter_UPGA_J20[outer_idx_J20], ':s', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+    if run_UPGA_J10_RMSProp == 1:
+        plt.plot(iter_outer_x, crb_iter_UPGA_J10_RMSProp[outer_idx_J10], ':', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, RMSProp)')
+    if run_UPGA_J10_PRCDN == 1:
+        plt.plot(iter_outer_x, crb_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
+    plt.ylabel(r'$1/\text{crb}$', fontsize="14")
+    plt.grid()
+    plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)
+    plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
+    plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
     # ===================== OBJECTIVE (outer iters only) =============================================
+    plt.figure()
     fig_obj = plt.figure(5)
     if run_UPGA_J1 == 1:
         obj_iter_UPGA_J1 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J1, tau_iter_UPGA_J1)]
@@ -287,7 +311,7 @@ if plot_figure == 1:
 
     # ===================== OBJECTIVE INCLUDING ALL INNER ITERATIONS (first 20 outer iters) =========
     # x-axis: fractional outer iteration so inner steps are visible between integers
-    n_plot_outer = 20   # number of outer iterations to display
+    n_plot_outer = 1   # number of outer iterations to display
     mask_J10 = frac_J10 < n_plot_outer
     mask_J20 = frac_J20 < n_plot_outer
     fig_obj_inner = plt.figure(6)
@@ -331,12 +355,18 @@ if plot_figure == 1:
         plt.plot(frac_J10[mask_J10], power_iter_UPGA_J10[mask_J10], ':*', markevery=10, color='blue', linewidth=2, markersize=5, label=label_UPGA_J10)
     if run_UPGA_J10_PRCDN == 1:
         plt.plot(frac_J10[mask_J10], power_iter_UPGA_J10_PRCDN[mask_J10], ':s', markevery=10, color='green', linewidth=2, markersize=5, label='PGA (J=10, PRCDN)')
+    if run_conv_PGA_J20 ==1:
+        plt.plot(frac_J20[mask_J20], power_iter_conv_PGA_J20[mask_J20], ':s', markevery=10, color='green', linewidth=2, markersize=5, label='PGA (J=20)')
+    if run_UPGA_J20 == 1:
+        plt.plot(frac_J20[mask_J20], power_iter_UPGA_J20[mask_J20], ':s', markevery=10, color='black', linewidth=2, markersize=5, label=label_UPGA_J20)
+    # plot the maximum available power (Pt)
+    plt.plot(frac_J10[mask_J10], snr * np.ones_like(frac_J10[mask_J10]), '--', color='red', linewidth=2, label='Maximum Power (Pt)')
     # Mark outer-iteration boundaries with vertical grid lines
     for ii in range(1, n_plot_outer):
         plt.axvline(x=ii, color='grey', linestyle='--', linewidth=0.6, alpha=0.5)
     plt.xlabel(r'Outer iteration $I$ (inner steps shown as fractions)', fontsize="13")
-    plt.ylabel(r'Transmit Power', fontsize="13")
-    plt.title(f"Transmit Power — first {n_plot_outer} outer iterations (incl. inner)", fontsize="13")
+    plt.ylabel(r'F x W', fontsize="13")
+    plt.title(f"F x W — first {n_plot_outer} outer iterations (incl. inner)", fontsize="13")
     plt.grid(axis='y')
     plt.legend(loc='best', fontsize="12", labelspacing=0.15)
     plt.tight_layout()
