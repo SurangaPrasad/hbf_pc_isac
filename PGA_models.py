@@ -204,6 +204,89 @@ class PGA_Unfold_J10(nn.Module):
         power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
+# ============================================== Unfolded PGA with decaying inner iterations ==============================
+class PGA_Unfold_J_decay(nn.Module):
+    """Unfolded PGA where the number of inner iterations decays every ``max_inner`` outer iters.
+
+    With max_inner = step_size.shape[0] (= 10 by default):
+        outer iters  0 –  9 : n_inner = 10
+        outer iters 10 – 19 : n_inner =  9
+        outer iters 20 – 29 : n_inner =  8
+        ...
+        outer iters 90+     : n_inner =  1  (minimum)
+
+    step_size shape: [max_inner, n_iter_outer, K+1]  (identical to PGA_Unfold_J10).
+    """
+
+    def __init__(self, step_size):
+        super().__init__()
+        self.step_size = nn.Parameter(step_size)  # [max_inner, n_iter_outer, K+1]
+
+    def _n_inner(self, ii):
+        """Number of inner iterations for outer iteration *ii* (0-indexed)."""
+        max_inner = self.step_size.shape[0]
+        return max(1, max_inner - ii // max_inner)
+
+    # =========== Projection Gradient Ascent execution ===================
+    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, track_metrics=True):
+        rate_init, F, W = initialize(H, Pt, initial_normalization)
+        B = len(H[0])
+
+        # Pre-compute the total number of measurement slots across all outer iterations.
+        # Each outer iter ii contributes n_inner(ii) inner F-update slots + 1 W-update slot.
+        total_slots = sum(self._n_inner(ii) + 1 for ii in range(n_iter_outer))
+
+        rate_over_iters  = torch.zeros(total_slots, B, device=H.device)
+        crb_over_iters   = torch.zeros(total_slots, B, device=H.device)
+        power_over_iters = torch.zeros(total_slots, B, device=H.device)
+
+        slot = 0  # running index into the flat metric arrays
+        for ii in range(n_iter_outer):
+            n_inner_ii = self._n_inner(ii)
+
+            # Note: torch.utils.checkpoint cannot be used here because n_inner changes
+            # per outer iteration (the varying loop count causes a tensor-count mismatch
+            # during recomputation).  Run the inner loop directly in all cases.
+            for jj in range(n_inner_ii):
+                grad_F_com = get_grad_F_com(H, F, W)
+                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                    print('Error NaN gradients!!!!!!!!!!!!!!!')
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                F = normalize_power(F, W, H, Pt)
+                if track_metrics:
+                    rate_over_iters[slot]  = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[slot]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    power_over_iters[slot] = get_power(F, W).detach()
+                slot += 1
+
+            F = project_unit_modulus(F)
+
+            # update W  (K == 1 always, unroll the k-loop)
+            grad_W_k_com = get_grad_W_com(H, F, W)
+            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+            W_new = W.clone().detach()
+            W_new[0] = W[0].detach() + (self.step_size[0][ii][1] * grad_W_k_com[0]) * WEIGHT_W_COM \
+                                     + (self.step_size[0][ii][1] * grad_W_k_crb[0]) * WEIGHT_W_CRB
+
+            # Projection
+            F, W = normalize(F, W_new, H, Pt)
+
+            # Record metric after W-update (last slot of this outer iter)
+            if track_metrics:
+                rate_over_iters[slot]  = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[slot]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                power_over_iters[slot] = get_power(F, W).detach()
+            slot += 1
+
+        # Shape: (total_slots, B) → transpose → (B, total_slots)
+        return (rate_over_iters.transpose(0, 1),
+                crb_over_iters.transpose(0, 1),
+                power_over_iters.transpose(0, 1),
+                F, W)
+
 # ============================================== Proposed PGA model light with preconditioner=============================
 class PGA_Unfold_J10_PRCDN(nn.Module):
 
@@ -225,8 +308,9 @@ class PGA_Unfold_J10_PRCDN(nn.Module):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
         B = len(H[0])
         # Shape: (n_outer, J+1, B)
-        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        rate_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters   = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, mu_ii, n_inner, Pt):
             for jj in range(n_inner):
@@ -259,8 +343,9 @@ class PGA_Unfold_J10_PRCDN(nn.Module):
                     delta_F_crb = (mu_vec.unsqueeze(1) * grad_vec_crb).reshape_as(grad_F_crb)
                     F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
                     F = normalize_power(F, W, H, Pt)
-                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    rate_over_iters[ii, jj]  = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, jj]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    power_over_iters[ii, jj] = get_power(F, W).detach()
             else:
                 F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, self.mu[:, ii], n_iter_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
@@ -280,15 +365,17 @@ class PGA_Unfold_J10_PRCDN(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # Record metrics after W-update (slot 0 of this outer iter)
+            # Record metrics after W-update (last slot of this outer iter)
             if track_metrics:
-                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                rate_over_iters[ii, -1]  = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, -1]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                power_over_iters[ii, -1] = get_power(F, W).detach()
 
         # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
-        rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
+        rates     = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes   = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
 # ============================================== Proposed PGA model light for RMSProp=============================
 
