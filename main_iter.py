@@ -114,6 +114,18 @@ if run_program == 1:
         rate_iter_UPGA_J_decay  = sum_rate_UPGA_J_decay.mean(0).cpu().numpy()
         crb_iter_UPGA_J_decay   = crb_UPGA_J_decay.mean(0).cpu().numpy()
         power_iter_UPGA_J_decay = power_UPGA_J_decay.mean(0).cpu().numpy()
+    # ====================================================== Proposed Unfolded PGA with gradient reuse ====================================
+    if run_UPGA_J_GradReuse == 1:
+        print('Running unfolded PGA with gradient reuse (J = 10)...')
+        model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)
+        model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J_GradReuse, map_location=device))
+
+        sum_rate_UPGA_J_GradReuse, crb_UPGA_J_GradReuse, power_UPGA_J_GradReuse, F_UPGA_J_GradReuse, W_UPGA_J_GradReuse = model_UPGA_J_GradReuse.execute_PGA(
+            H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, n_iter_inner_J10)
+        print(f'  GradReuse fallback recomputations: {model_UPGA_J_GradReuse.grad_recalc_count}')
+        rate_iter_UPGA_J_GradReuse  = sum_rate_UPGA_J_GradReuse.mean(0).cpu().numpy()
+        crb_iter_UPGA_J_GradReuse   = crb_UPGA_J_GradReuse.mean(0).cpu().numpy()
+        power_iter_UPGA_J_GradReuse = power_UPGA_J_GradReuse.mean(0).cpu().numpy()
     # ====================================================== Propsed Unofolded PGA with RMSProp-like adaptive step sizes ====================================
     if run_UPGA_J10_RMSProp == 1:
         print('Running unfolded PGA with J = 10 and RMSProp-like adaptive step sizes...')
@@ -209,6 +221,9 @@ if plot_figure == 1:
         outer_idx_J_decay.append(_pos)  # W-update position
         _pos += 1
     outer_idx_J_decay = np.array(outer_idx_J_decay)
+    # J_GradReuse has the same fixed J=10 structure as J10
+    outer_idx_J_GradReuse = outer_idx_J10
+    frac_J_GradReuse = frac_J10
     iter_outer_x  = np.arange(1, n_iter_outer + 1)    # x-axis: 1 .. n_iter_outer
 
     # //////////////////////////////// LOADING RESULTS //////////////////////////////////////////
@@ -281,6 +296,8 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J_decay == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J_decay[outer_idx_J_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+    if run_UPGA_J_GradReuse == 1:
+        plt.plot(iter_outer_x, rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel('$R$ [bits/s/Hz]', fontsize="14")
     plt.grid()
@@ -304,6 +321,8 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J_decay == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J_decay[outer_idx_J_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+    if run_UPGA_J_GradReuse == 1:
+        plt.plot(iter_outer_x, crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel(r'$1/\text{crb}$', fontsize="14")
     plt.grid()
@@ -338,6 +357,9 @@ if plot_figure == 1:
     if run_UPGA_J_decay == 1:
         obj_iter_UPGA_J_decay = OMEGA * rate_iter_UPGA_J_decay[outer_idx_J_decay] + crb_iter_UPGA_J_decay[outer_idx_J_decay]
         plt.plot(iter_outer_x, obj_iter_UPGA_J_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+    if run_UPGA_J_GradReuse == 1:
+        obj_iter_UPGA_J_GradReuse = OMEGA * rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse] + crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
+        plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel(r'$\omega R + 1/\text{crb}$', fontsize="14")
     plt.title("Objective function vs Iterations", fontsize="14")
@@ -375,6 +397,10 @@ if plot_figure == 1:
     if run_UPGA_J_decay == 1:
         obj = OMEGA * rate_iter_UPGA_J_decay + crb_iter_UPGA_J_decay
         plt.plot(frac_J_decay[mask_J_decay], obj[mask_J_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J_decay)
+    if run_UPGA_J_GradReuse == 1:
+        mask_J_GradReuse = frac_J_GradReuse < n_plot_outer
+        obj = OMEGA * rate_iter_UPGA_J_GradReuse + crb_iter_UPGA_J_GradReuse
+        plt.plot(frac_J_GradReuse[mask_J_GradReuse], obj[mask_J_GradReuse], ':^', markevery=10, color='teal', linewidth=2, markersize=5, label=label_UPGA_J_GradReuse)
     # Mark outer-iteration boundaries with vertical grid lines
     for ii in range(1, n_plot_outer):
         plt.axvline(x=ii, color='grey', linestyle='--', linewidth=0.6, alpha=0.5)
@@ -403,6 +429,9 @@ if plot_figure == 1:
         plt.plot(frac_J20[mask_J20], power_iter_UPGA_J20[mask_J20], ':s', markevery=10, color='black', linewidth=2, markersize=5, label=label_UPGA_J20)
     if run_UPGA_J_decay == 1:
         plt.plot(frac_J_decay[mask_J_decay], power_iter_UPGA_J_decay[mask_J_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J_decay)
+    if run_UPGA_J_GradReuse == 1:
+        mask_J_GradReuse = frac_J_GradReuse < n_plot_outer
+        plt.plot(frac_J_GradReuse[mask_J_GradReuse], power_iter_UPGA_J_GradReuse[mask_J_GradReuse], ':^', markevery=10, color='teal', linewidth=2, markersize=5, label=label_UPGA_J_GradReuse)
     # plot the maximum available power (Pt)
     plt.plot(frac_J10[mask_J10], snr * np.ones_like(frac_J10[mask_J10]), '--', color='red', linewidth=2, label='Maximum Power (Pt)')
     # Mark outer-iteration boundaries with vertical grid lines

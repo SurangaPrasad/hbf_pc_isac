@@ -302,3 +302,51 @@ if run_UPGA_J_decay == 1:
     plt.ylabel('Average Loss')
     plt.grid(True)
     plt.savefig(directory_result + "training_loss_UPGA_J_decay.png")
+
+# =========================================================== Unfolded PGA with gradient reuse ====
+if run_UPGA_J_GradReuse == 1:
+    model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)
+    optimizer = torch.optim.Adam(model_UPGA_J_GradReuse.parameters(), lr=learning_rate)
+
+    epoch_losses = []  # store average loss per epoch
+
+    for i_epoch in range(n_epoch):
+        batch_losses = []  # loss of each batch in current epoch
+
+        H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+
+        for i_batch in range(0, len(H_train[0]), batch_size):
+            H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
+
+            __, __, __, F, W = model_UPGA_J_GradReuse.execute_PGA(
+                H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
+
+            loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
+            print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            batch_losses.append(loss.item())
+
+        avg_loss = sum(batch_losses) / len(batch_losses)
+        epoch_losses.append(avg_loss)
+        print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
+        print(f"  [GradReuse total fallback recomputations this epoch: "
+              f"{model_UPGA_J_GradReuse.grad_recalc_count}]")
+
+    torch.save(model_UPGA_J_GradReuse.state_dict(), model_file_name_UPGA_J_GradReuse)
+
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, n_epoch + 1), epoch_losses, marker='o', linestyle='-', color='g')
+    plt.title('Training Loss per Epoch (J GradReuse)')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average Loss')
+    plt.grid(True)
+    plt.savefig(directory_result + "training_loss_UPGA_J_GradReuse.png")
