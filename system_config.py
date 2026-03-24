@@ -7,6 +7,8 @@ import torch
 # specific routine requires doubles.
 REAL_DTYPE = torch.float32
 COMPLEX_DTYPE = torch.complex64
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
@@ -76,11 +78,11 @@ WEIGHT_W_COM = 1
 
 # ========================== initiate step sizes as tensor for training ================
 step_size_fixed = 1e-2  # step size of conventional PGA
-step_size_conv_PGA = torch.full([n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J1 = torch.full([n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
-step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, requires_grad=True)
+step_size_conv_PGA = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J1 = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 
 # ////////////////////////////////////////////// SAVING RESULTS AND DATA //////////////////////////////////////////////
 directory_data = "./dataset/" + system_config + "/"

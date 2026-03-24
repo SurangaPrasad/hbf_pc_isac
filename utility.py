@@ -438,8 +438,8 @@ def get_data_tensor(data_source):
     train_slice = np.ascontiguousarray(data_train_array[:, :max_train, :, :])
     test_slice = np.ascontiguousarray(data_test_array[:, :max_test, :, :])
 
-    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous()
-    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous()
+    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous().to(device)
+    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous().to(device)
     return H_train_tensor, H_test_tensor
 
 
@@ -473,8 +473,8 @@ def get_radar_data(snr_dB, H):
         at_array1 = np.tile(at0, (train_size, 1, 1, 1))
         at_array = np.transpose(at_array1, (1, 0, 2, 3))
 
-    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous()
-    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous()
+    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous().to(device)
+    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous().to(device)
     theta = radar_data['theta']
     ideal_beam = radar_data['Pd_theta']
 

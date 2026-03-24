@@ -21,15 +21,15 @@ if run_conv_PGA == 1:
     R, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
 
     rate_iter_conv, beam_iter_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
-    rate_conv = [r.detach().numpy() for r in (sum(rate_iter_conv) / len(H_test[0]))]
-    beam_error_conv = [e.detach().numpy() for e in (sum(beam_iter_conv) / (len(H_test[0])))]
+    rate_conv = [r.detach().cpu().numpy() for r in (sum(rate_iter_conv) / len(H_test[0]))]
+    beam_error_conv = [e.detach().cpu().numpy() for e in (sum(beam_iter_conv) / (len(H_test[0])))]
     iter_number_conv = np.array(list(range(n_iter_outer + 1)))
 
 # ====================================================== Unfolded PGA with J = 1 ====================================
 if run_UPGA_J1 == 1:
 
     # Object defining
-    model_UPGA_J1 = PGA_Conv(step_size_UPGA_J1)
+    model_UPGA_J1 = PGA_Conv(step_size_UPGA_J1).to(device)
     # training procedure
     optimizer = torch.optim.Adam(model_UPGA_J1.parameters(), lr=learning_rate)
     train_losses, valid_losses = [], []
@@ -37,7 +37,7 @@ if run_UPGA_J1 == 1:
     for i_epoch in range(n_epoch):
         print(i_epoch)
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
+        for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
@@ -53,21 +53,21 @@ if run_UPGA_J1 == 1:
     torch.save(model_UPGA_J1.state_dict(), model_file_name_UPGA_J1)
 
     # Create new model and load states
-    model_test = PGA_Conv(step_size_UPGA_J1)
-    model_test.load_state_dict(torch.load(model_file_name_UPGA_J1))
+    model_test = PGA_Conv(step_size_UPGA_J1).to(device)
+    model_test.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
 
     # executing unfolded PGA on the test set
     Rtest, _, _, _ = get_radar_data(snr_dB, H_test)
     rate_iter_UPGA_J1, beam_error_iter_UPGA_J1, F_UPGA_J1, W_UPGA_J1 = model_test.execute_PGA(H_test, Rtest, snr, n_iter_outer)
-    rate_UPGA_J1 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J1) / len(H_test[0]))]
-    beam_error_UPGA_J1 = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J1) / len(H_test[0]))]
+    rate_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(rate_iter_UPGA_J1) / len(H_test[0]))]
+    beam_error_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(beam_error_iter_UPGA_J1) / len(H_test[0]))]
     iter_number_UPGA_J1 = np.array(list(range(n_iter_outer + 1)))
 
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J20 == 1:
 
     # Object defining
-    model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
+    model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20).to(device)
 
     # training procedure
     optimizer = torch.optim.Adam(model_UPGA_J20.parameters(), lr=learning_rate)
@@ -77,7 +77,7 @@ if run_UPGA_J20 == 1:
     for i_epoch in range(n_epoch):
         print(i_epoch)
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
+        for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
@@ -94,20 +94,20 @@ if run_UPGA_J20 == 1:
     torch.save(model_UPGA_J20.state_dict(), model_file_name_UPGA_J20)
 
     # test proposed model
-    model_test = PGA_Unfold_J20(step_size_UPGA_J20)
-    model_test.load_state_dict(torch.load(model_file_name_UPGA_J20))
+    model_test = PGA_Unfold_J20(step_size_UPGA_J20).to(device)
+    model_test.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
     Rtest, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
     rate_iter_UPGA_J20, beam_error_iter_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_test.execute_PGA(H_test, Rtest, snr, n_iter_outer,
                                                                                              n_iter_inner_J20)
-    rate_UPGA_J20 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J20) / len(H_test[0]))]
-    beam_error_UPGA_J20 = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J20) / (len(H_test[0])))]
+    rate_UPGA_J20 = [r.detach().cpu().numpy() for r in (sum(rate_iter_UPGA_J20) / len(H_test[0]))]
+    beam_error_UPGA_J20 = [r.detach().cpu().numpy() for r in (sum(beam_error_iter_UPGA_J20) / (len(H_test[0])))]
     iter_number_UPGA_J20 = np.array(list(range(n_iter_outer + 1)))
 
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J10 == 1:
 
     # Object defining
-    model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+    model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10).to(device)
 
     # training procedure
     optimizer = torch.optim.Adam(model_UPGA_J10.parameters(), lr=learning_rate)
@@ -117,7 +117,7 @@ if run_UPGA_J10 == 1:
     for i_epoch in range(n_epoch):
         print(i_epoch)
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
+        for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
@@ -135,15 +135,15 @@ if run_UPGA_J10 == 1:
     torch.save(model_UPGA_J10.state_dict(), model_file_name_UPGA_J10)
 
     # test proposed model
-    model_test = PGA_Unfold_J10(step_size_UPGA_J10)
-    model_test.load_state_dict(torch.load(model_file_name_UPGA_J10))
+    model_test = PGA_Unfold_J10(step_size_UPGA_J10).to(device)
+    model_test.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
     Rtest, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
     rate_iter_UPGA_J10, beam_error_iter_UPGA_J10, F_prop_UPGA_J10, W_prop_UPGA_J10 = model_test.execute_PGA(H_test, Rtest,
                                                                                                             snr,
                                                                                                             n_iter_outer,
                                                                                                             n_iter_inner_J10)
-    rate_UPGA_J10 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J10) / len(H_test[0]))]
-    beam_error_UPGA_J10 = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J10) / (len(H_test[0])))]
+    rate_UPGA_J10 = [r.detach().cpu().numpy() for r in (sum(rate_iter_UPGA_J10) / len(H_test[0]))]
+    beam_error_UPGA_J10 = [r.detach().cpu().numpy() for r in (sum(beam_error_iter_UPGA_J10) / (len(H_test[0])))]
     iter_number_UPGA_J10 = np.array(list(range(n_iter_outer + 1)))
 
 # ============================================= Proposed unfolded PGA J=10 PC ============================================
@@ -151,7 +151,7 @@ if run_UPGA_J10 == 1:
 if run_UPGA_J10_PC == 1:
 
     # Object defining
-    model_UPGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10_PC)
+    model_UPGA_J10_PC = PGA_Unfold_J10_PC(step_size_UPGA_J10_PC).to(device)
 
     # training procedure
     optimizer = torch.optim.Adam(model_UPGA_J10_PC.parameters(), lr=learning_rate)
@@ -161,7 +161,7 @@ if run_UPGA_J10_PC == 1:
     for i_epoch in range(1):
         print(i_epoch)
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
+        for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)
@@ -178,15 +178,15 @@ if run_UPGA_J10_PC == 1:
     torch.save(model_UPGA_J10_PC.state_dict(), model_file_name_UPGA_J10_PC)
 
     # test proposed model
-    model_test = PGA_Unfold_J10_PC(step_size_UPGA_J10_PC)
-    model_test.load_state_dict(torch.load(model_file_name_UPGA_J10_PC))
+    model_test = PGA_Unfold_J10_PC(step_size_UPGA_J10_PC).to(device)
+    model_test.load_state_dict(torch.load(model_file_name_UPGA_J10_PC, map_location=device))
     Rtest, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
     rate_iter_UPGA_J10_PC, beam_error_iter_UPGA_J10_PC, F_prop_UPGA_J10_PC, W_prop_UPGA_J10_PC = model_test.execute_PGA(H_test, Rtest,
                                                                                                             snr,
                                                                                                             n_iter_outer,
                                                                                                             n_iter_inner_J10)
-    rate_UPGA_J10_PC = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J10_PC) / len(H_test[0]))]
-    beam_error_UPGA_J10_PC = [r.detach().numpy() for r in (sum(beam_error_iter_UPGA_J10_PC) / (len(H_test[0])))]
+    rate_UPGA_J10_PC = [r.detach().cpu().numpy() for r in (sum(rate_iter_UPGA_J10_PC) / len(H_test[0]))]
+    beam_error_UPGA_J10_PC = [r.detach().cpu().numpy() for r in (sum(beam_error_iter_UPGA_J10_PC) / (len(H_test[0])))]
     iter_number_UPGA_J10_PC = np.array(list(range(n_iter_outer + 1)))
 
     ## Plot results
@@ -209,7 +209,7 @@ if run_UPGA_J10_PC == 1:
 if run_UPGA_J10_PC_AP == 1:
 
     # Object defining
-    model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC)
+    model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC).to(device)
 
     # training procedure
     optimizer = torch.optim.Adam(model_UPGA_J10_PC_AP.parameters(), lr=learning_rate)
@@ -219,7 +219,7 @@ if run_UPGA_J10_PC_AP == 1:
     for i_epoch in range(n_epoch):
         print(i_epoch)
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-        for i_batch in range(0, len(H_train), batch_size):
+        for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
             snr_dB_train = np.random.choice(snr_dB_list)
             snr_train = 10 ** (snr_dB_train / 10)

@@ -101,8 +101,8 @@ class PGA_Conv(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))  # save beampattern errors over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save beampattern errors over iterations
         # update F and W over iterations
         for ii in range(n_iter_outer):
             # update F
@@ -147,8 +147,8 @@ class PGA_Unfold_J10(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save beam errors over iterations
 
         for ii in range(n_iter_outer):
             # update F over
@@ -227,8 +227,8 @@ class PGA_Unfold_J10_PC(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save beam errors over iterations
 
         for ii in range(1):
             activation_map = self._activation_map(F)
@@ -295,8 +295,8 @@ class PGA_Unfold_J10_PC_AP(nn.Module):
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization, pc=True)
         # print(f'The size of F: {F.shape}')
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save beam errors over iterations
 
         # pc_mask = generage_partial_connection_mask(Nt, Nrf).to(device=F.device, dtype=F.dtype)
         for ii in range(n_iter_outer):
@@ -366,8 +366,8 @@ class PGA_Unfold_J20(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, R, Pt, n_iter_outer, n_iter_inner):
         rate_init, tau_init, F, W = initialize(H, R, Pt, initial_normalization)
-        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save rates over iterations
-        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]))# save beam errors over iterations
+        rate_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)  # save rates over iterations
+        tau_over_iters = torch.zeros(n_iter_outer, len(H[0]), device=H.device)   # save beam errors over iterations
 
         for ii in range(n_iter_outer):
             # update F over
