@@ -5,20 +5,31 @@ import h5py
 import scipy.io
 from system_config import *
 import matplotlib.pyplot as plt
+from torch.cuda.amp import autocast
 
 
-def randn_complex(shape, device=None):
-    """Sample a complex tensor with IID unit-variance entries."""
-    real = torch.randn(shape, dtype=REAL_DTYPE, device=device)
-    imag = torch.randn(shape, dtype=REAL_DTYPE, device=device)
-    return torch.complex(real, imag)
+def _get_real_dtype_like(tensor: torch.Tensor) -> torch.dtype:
+    """Return a floating dtype compatible with the provided tensor."""
+    if torch.is_complex(tensor):
+        return torch.float64 if tensor.dtype == torch.complex128 else torch.float32
+    return tensor.dtype
+
+
+def _randn_complex(shape, device, real_dtype):
+    """Generate complex Gaussian noise on the requested device."""
+    real = torch.randn(shape, device=device, dtype=real_dtype)
+    imag = torch.randn(shape, device=device, dtype=real_dtype)
+    return real + 1j * imag
 
 
 # ==================================== initialize F and W ===========================
 def initialize(H, R, Pt, normalization, pc=False):
+    device = H.device
+    complex_dtype = H.dtype
+    real_dtype = _get_real_dtype_like(H)
     if init_scheme == 'conv':
         # randomizing F
-        F = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
+        F = _randn_complex((len(H[0]), Nt, Nrf), device, real_dtype)
         F = F / torch.abs(F)
         F = torch.cat(((F[None, :, :, :],) * K), 0)
         W = torch.linalg.pinv(H @ F)
@@ -34,7 +45,7 @@ def initialize(H, R, Pt, normalization, pc=False):
         if Nrf == M:
             F = H[K // 2, :, :, :] / torch.abs(H[K // 2, :, :, :])
             F = torch.transpose(F, 1, 2)
-            W = randn_complex((K, len(H[0]), Nrf, M), device=H.device)
+            W = _randn_complex((K, len(H[0]), Nrf, M), device, real_dtype)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -49,7 +60,7 @@ def initialize(H, R, Pt, normalization, pc=False):
             F = G / torch.abs(G)
 
             F = torch.transpose(F, 1, 2)
-            W = randn_complex((K, len(H[0]), Nrf, M), device=H.device)
+            W = _randn_complex((K, len(H[0]), Nrf, M), device, real_dtype)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -61,7 +72,8 @@ def initialize(H, R, Pt, normalization, pc=False):
             F = torch.cat(((F[None, :, :, :],) * K), 0)
         else:
             sys.stderr.write('Error: Wrong RF chain configuration....\n')
-        F = F * generage_partial_connection_mask(Nt, Nrf) if pc else F
+        mask = generage_partial_connection_mask(Nt, Nrf, device=device, dtype=complex_dtype)
+        F = F * mask if pc else F
     elif init_scheme == 'svd':
         U, S, V_H = torch.linalg.svd(H)
         V = V_H
@@ -97,8 +109,8 @@ def initialize(H, R, Pt, normalization, pc=False):
         norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
         W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
     # rate_0 = get_sum_rate(H, F, W)
-    rate_init = torch.zeros(1, len(H[0]))
-    beam_error_init = torch.zeros(1, len(H[0]))
+    rate_init = torch.zeros(1, len(H[0]), device=device, dtype=real_dtype)
+    beam_error_init = torch.zeros(1, len(H[0]), device=device, dtype=real_dtype)
     rate_init[0, :] = get_sum_rate(H, F, W, Pt)
     beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
 
@@ -107,9 +119,12 @@ def initialize(H, R, Pt, normalization, pc=False):
 
 # ==================================== initialize F and W with different methods for comparison ===========================
 def initialize_schemes(H, R, Pt, init_method):
+    device = H.device
+    complex_dtype = H.dtype
+    real_dtype = _get_real_dtype_like(H)
     if init_method == 'conv':
         # randomizing F
-        F = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
+        F = _randn_complex((len(H[0]), Nt, Nrf), device, real_dtype)
         F = F / torch.abs(F)
         F = torch.cat(((F[None, :, :, :],) * K), 0)
         W = torch.linalg.pinv(H @ F)
@@ -117,7 +132,7 @@ def initialize_schemes(H, R, Pt, init_method):
         if Nrf == M:
             F = H[K // 2, :, :, :] / torch.abs(H[K // 2, :, :, :])
             F = torch.transpose(F, 1, 2)
-            W = randn_complex((K, test_size, Nrf, M), device=H.device)
+            W = _randn_complex((K, test_size, Nrf, M), device, real_dtype)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -132,7 +147,7 @@ def initialize_schemes(H, R, Pt, init_method):
             F = G / torch.abs(G)
 
             F = torch.transpose(F, 1, 2)
-            W = randn_complex((K, test_size, Nrf, M), device=H.device)
+            W = _randn_complex((K, test_size, Nrf, M), device, real_dtype)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -148,7 +163,7 @@ def initialize_schemes(H, R, Pt, init_method):
             # V = torch.transpose(V_H, 2, 3).conj()
             F = V[:, :, :, :Nrf]
             F = F / torch.abs(F)
-            W = randn_complex((K, test_size, Nrf, M), device=H.device)
+            W = _randn_complex((K, test_size, Nrf, M), device, real_dtype)
             for k in range(K):
                 Hk = H[k, :, :, :]
                 Hp = Hk.conj()
@@ -162,7 +177,7 @@ def initialize_schemes(H, R, Pt, init_method):
             F = G / torch.abs(G)
 
             F = torch.transpose(F, 1, 2)
-            W = randn_complex((K, test_size, Nrf, M), device=H.device)
+            W = _randn_complex((K, test_size, Nrf, M), device, real_dtype)
             for k in range(K):
                 Hk = H[k]
                 Hp = Hk.conj()
@@ -193,8 +208,8 @@ def initialize_schemes(H, R, Pt, init_method):
     W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
 
     # rate_0 = get_sum_rate(H, F, W)
-    rate_init = torch.zeros(1, len(H[0]))
-    beam_error_init = torch.zeros(1, len(H[0]))
+    rate_init = torch.zeros(1, len(H[0]), device=device, dtype=real_dtype)
+    beam_error_init = torch.zeros(1, len(H[0]), device=device, dtype=real_dtype)
     rate_init[0, :] = get_sum_rate(H, F, W, Pt)
     beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
 
@@ -203,12 +218,14 @@ def initialize_schemes(H, R, Pt, init_method):
 
 # ================== get matrix G for initalization when Nrf > K
 def get_mat_G(H,fre_indx,snr_dB):
-    G = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
+    device = H.device
+    real_dtype = _get_real_dtype_like(H)
+    G = _randn_complex((len(H[0]), Nt, Nrf), device, real_dtype)
     Htmp = torch.transpose(H[fre_indx, :, :, :], 1, 2)
     G[:, :, :M] = Htmp
 
     R, at0, theta, ideal_beam = get_radar_data(snr_dB, H)
-    at_batch = at0[:, : batch_size, :, :]
+    at_batch = at0[:, : batch_size, :, :].to(device=device)
     theta_degree = np.around(theta[0, :] * 180 / np.pi)
     for t in range(Nrf - M):
         angle_index = np.where(theta_degree == theta_desire[t])
@@ -220,13 +237,15 @@ def get_mat_G(H,fre_indx,snr_dB):
     return G
 
 def get_mat_G_SVD(H,fre_indx,snr_dB):
-    G = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
+    device = H.device
+    real_dtype = _get_real_dtype_like(H)
+    G = _randn_complex((len(H[0]), Nt, Nrf), device, real_dtype)
     U, S, V_H = torch.linalg.svd(H)
     V = V_H
     G[:, :, :M] = V[:, :, :, :M]
 
     R, at0, theta, ideal_beam = get_radar_data(snr_dB, H)
-    at_batch = at0[:, : batch_size, :, :]
+    at_batch = at0[:, : batch_size, :, :].to(device=device)
     theta_degree = np.around(theta[0, :] * 180 / np.pi)
     for t in range(Nrf - M):
         angle_index = np.where(theta_degree == theta_desire[t])
@@ -253,7 +272,7 @@ def get_sum_rate(H, F, W, Pt):
     F_H = torch.transpose(F, 2, 3).conj()
     W_H = torch.transpose(W, 2, 3).conj()
     V = W @ W_H  # K x train_size x Nrf x Nrf
-    rate = torch.zeros(len(H[0]), )
+    rate = torch.zeros(len(H[0]), device=H.device, dtype=_get_real_dtype_like(H))
     for m in range(M):
         # mask_m = torch.ones(len(H), Nrf, M)
         # mask_m[:, :, m] = torch.zeros(len(H), Nrf)
@@ -337,8 +356,9 @@ def normalize_power(F, W, H, Pt):
     return F
 
 # ========================= generate PC mask =====================
-def generage_partial_connection_mask(N, M):
-    mask = torch.zeros((N, M), dtype=COMPLEX_DTYPE)
+def generage_partial_connection_mask(N, M, device=None, dtype=torch.cfloat):
+
+    mask = torch.zeros((N, M), dtype=dtype, device=device)
     antennas_per_rf = N // M
     for rf in range(M):
         start_idx = rf * antennas_per_rf
@@ -432,14 +452,8 @@ def get_data_tensor(data_source):
     else:  # use matlab data
         data_train_array, data_test_array = load_data_matlab()
     # then convert numpy to tensor
-    max_train = min(train_size, data_train_array.shape[1])
-    max_test = min(test_size, data_test_array.shape[1])
-
-    train_slice = np.ascontiguousarray(data_train_array[:, :max_train, :, :])
-    test_slice = np.ascontiguousarray(data_test_array[:, :max_test, :, :])
-
-    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous().to(device)
-    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous().to(device)
+    H_train_tensor = torch.from_numpy(data_train_array)
+    H_test_tensor = torch.from_numpy(data_test_array)
     return H_train_tensor, H_test_tensor
 
 
@@ -473,8 +487,8 @@ def get_radar_data(snr_dB, H):
         at_array1 = np.tile(at0, (train_size, 1, 1, 1))
         at_array = np.transpose(at_array1, (1, 0, 2, 3))
 
-    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous().to(device)
-    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous().to(device)
+    R = torch.from_numpy(R_array)
+    at = torch.from_numpy(at_array)
     theta = radar_data['theta']
     ideal_beam = radar_data['Pd_theta']
 
@@ -491,10 +505,81 @@ def get_beampattern(F, W, at, Pt):
     Bdiag = torch.diagonal(B, offset=0, dim1=-1, dim2=-2) / Pt
     # Bmean = 10 * torch.log10(torch.real(torch.mean(Bdiag, 1)))
     Bmean = torch.real(torch.mean(torch.mean(Bdiag, 1), 0))
-    B_array = Bmean.detach().numpy()
+    B_array = Bmean.detach().cpu().numpy()
     return B_array
 
-# if __name__ == '__main__':
+
+# =================================== RKD loss functions ==================================================
+
+def rkd_distance_loss(teacher, student):
+    """RKD distance loss: penalises discrepancy in pairwise L2 distances.
+    Works for both real and complex-valued representations."""
+    def _to_real(x):
+        if torch.is_complex(x):
+            return torch.view_as_real(x).flatten(-2)  # (N, 2D)
+        return x
+
+    t = _to_real(teacher.detach())
+    s = _to_real(student)
+
+    with torch.no_grad():
+        t_dist = torch.cdist(t, t, p=2)
+        t_dist = t_dist / t_dist.mean().clamp(min=1e-12)
+
+    s_dist = torch.cdist(s, s, p=2)
+    s_dist = s_dist / s_dist.mean().clamp(min=1e-12)
+
+    return torch.nn.functional.smooth_l1_loss(s_dist, t_dist)
+
+
+def rkd_angle_loss(teacher, student):
+    """RKD angle loss: penalises discrepancy in triplet cosine angles.
+    Works for both real and complex-valued representations."""
+    def _to_real(x):
+        if torch.is_complex(x):
+            return torch.view_as_real(x).flatten(-2)  # (N, 2D)
+        return x
+
+    t = _to_real(teacher.detach())  # (N, D)
+    s = _to_real(student)           # (N, D)
+
+    with torch.no_grad():
+        t_e = t.unsqueeze(0) - t.unsqueeze(1)          # (N, N, D)
+        t_e = torch.nn.functional.normalize(t_e, p=2, dim=-1)
+        t_cos = torch.bmm(t_e, t_e.permute(0, 2, 1))  # (N, N, N)
+
+    s_e = s.unsqueeze(0) - s.unsqueeze(1)              # (N, N, D)
+    s_e = torch.nn.functional.normalize(s_e, p=2, dim=-1)
+    s_cos = torch.bmm(s_e, s_e.permute(0, 2, 1))      # (N, N, N)
+
+    return torch.nn.functional.smooth_l1_loss(s_cos, t_cos)
+
+
+def _train_with_micro_batches(model, optimizer, H, R, Pt, n_iter_outer, scaler, n_iter_inner=None):
+    """Single training step with AMP GradScaler support.
+    Computes the combined communication + radar loss and updates model parameters."""
+    optimizer.zero_grad()
+
+    with autocast(enabled=scaler.is_enabled()):
+        if n_iter_inner is not None:
+            _, _, F, W = model.execute_PGA(H, R, Pt, n_iter_outer, n_iter_inner)
+        else:
+            _, _, F, W = model.execute_PGA(H, R, Pt, n_iter_outer)
+
+        sum_rate = get_sum_rate(H, F, W, Pt)
+        X = F @ W
+        X_H = torch.transpose(X, 2, 3).conj()
+        if normalize_tau == 1:
+            error = (torch.linalg.matrix_norm(X @ X_H - R, ord='fro') ** 2
+                     / torch.linalg.matrix_norm(R[:, 0, :, :], ord='fro') ** 2)
+        else:
+            error = torch.linalg.matrix_norm(X @ X_H - R, ord='fro') ** 2
+        sum_error = torch.mean(error)
+        loss = -(sum_rate - OMEGA * sum_error)
+
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
 #     # generate data
 #     channel_train = gen_channel(train_size)
 #     channel_test = gen_channel(test_size)
@@ -511,28 +596,3 @@ def get_beampattern(F, W, at, Pt):
 # print(channel_test[0][0])
 # print(data_test_array[0][0])
 # print('------------------------------')
-
-def extract_active_elements(F):
-    """
-    F: (B, 1, Nt, Nrf) complex
-    Returns:
-        F_active: (B, Nt, 1) complex
-    """
-    B, _, Nt, Nrf = F.shape
-    antennas_per_rf = Nt // Nrf
-
-    F_active = torch.zeros(
-        (B, Nt, 1),
-        dtype=F.dtype,
-        device=F.device
-    )
-
-    for rf in range(Nrf):
-        start = rf * antennas_per_rf
-        end = (rf + 1) * antennas_per_rf
-
-        # Correct indexing: keep batch + freq dim
-        F_active[:, start:end, 0] = F[:, 0, start:end, rf]
-
-    return F_active
-    

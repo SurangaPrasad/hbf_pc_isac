@@ -2,24 +2,23 @@ import numpy as np
 import os
 import torch
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 # ////////////////////////////////////////////// GLOBAL DTYPES //////////////////////////////////////////////
 # Use single-precision complex tensors to keep memory usage manageable unless a
 # specific routine requires doubles.
 REAL_DTYPE = torch.float32
 COMPLEX_DTYPE = torch.complex64
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
-run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
-run_conv_PGA_J10_PC = 1    # Conventional PGA with J = 10 and partial coupling (PC) 
+run_conv_PGA_J10 = 0      # Conventional PGA with setting J = 10
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
-run_UPGA_J20 = 1           # Unfolded PGA with setting J = 20
-run_UPGA_J10_PC = 1        # Unfolded PGA with J = 10 and partial coupling (PC)
-run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
-
+run_UPGA_J10 = 0          # Unfolded PGA with setting J = 10
+run_UPGA_J20 = 0          # Unfolded PGA with setting J = 20
+run_RKD_Distillation= 1
+run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC)
+run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
 M = 4                   # Num of Users
@@ -62,14 +61,14 @@ print(system_info)
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 500    # size of training set
 test_size = 1      # size of testing set
-batch_size = 4     # batch size when training
-n_epoch = 30         # number of training epochs
-learning_rate = 0.0001 # learning rate
+batch_size = 64 # batch size when training
+n_epoch = 30      # number of training epochs
+learning_rate = 0.001 # learning rate
 
 n_iter_outer = 120      # Number of outer iterations (I)
 n_iter_inner_J5 = 5     # Number of inner iterations (J = 5)
 n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
-
+n_iter_inner_J10 = 10
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
@@ -101,14 +100,14 @@ data_path_train = directory_data + train_data_file_name
 data_path_test = directory_data + test_data_file_name
 
 # To save trained model
-directory_model = "./model/" + system_config  + "_001/"
+directory_model = "./model/" + system_config  + "/"
 directory_model03 = "./model/" + system_config  + "/"
 if not os.path.exists(directory_model):
     os.makedirs(directory_model)
 
 model_file_name_UPGA_J1 = directory_model + 'UPGA_J1.pth'
-model_file_name_UPGA_J10 = directory_model + 'UPGA_J10.pth'
-model_file_name_UPGA_J20 = directory_model + 'UPGA_J20.pth'
+model_file_name_UPGA_J10 = directory_model + 'UPGA_J10_all.pth'
+model_file_name_UPGA_J20 = directory_model + 'UPGA_J20_all.pth'
 model_file_name_UPGA_J10_PC = directory_model + 'UPGA_J10_PC.pth'
 model_file_name_UPGA_J10_PC_omega03 = directory_model03 + 'UPGA_J10_PC.pth'
 # To save result figures
