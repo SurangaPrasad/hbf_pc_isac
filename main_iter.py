@@ -9,7 +9,8 @@ save_result = 0
 # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
 # Load training data
 H_train, H_test0 = get_data_tensor(data_source)
-H_test = H_test0[:, :test_size, :, :]
+# H_test = H_train[:, :test_size, :, :]
+H_test = H_train[:, 100:1+100, :, :]
 
 R, at0, theta, ideal_beam = get_radar_data(snr_dB, H_test)
 at = at0[:, : test_size, :, :]
@@ -118,7 +119,7 @@ if run_program == 1:
     if run_UPGA_J_GradReuse == 1:
         print('Running unfolded PGA with gradient reuse (J = 10)...')
         model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)
-        model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J_GradReuse, map_location=device))
+        # model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
 
         sum_rate_UPGA_J_GradReuse, crb_UPGA_J_GradReuse, power_UPGA_J_GradReuse, F_UPGA_J_GradReuse, W_UPGA_J_GradReuse = model_UPGA_J_GradReuse.execute_PGA(
             H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, n_iter_inner_J10)

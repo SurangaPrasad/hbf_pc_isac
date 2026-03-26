@@ -154,7 +154,7 @@ class PGA_Unfold_J10(nn.Module):
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
-            for jj in range(n_inner):
+            for jj in range(10):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                 if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
@@ -293,7 +293,7 @@ class PGA_Unfold_J_GradReuse(nn.Module):
 
     Uses J = n_iter_inner (default 10) fixed inner iterations per outer iteration.
 
-    Inner-iteration strategy for each outer iteration ``ii``:
+    F inner-iteration strategy for each outer iteration ``ii``:
       jj = 0  : Always compute fresh gradients (get_grad_F_com + get_grad_F_crb).
       jj >= 1 : Propose F_trial by reusing the last stored gradient with the current
                 step size.  Then evaluate the combined objective:
@@ -302,12 +302,28 @@ class PGA_Unfold_J_GradReuse(nn.Module):
                 - Otherwise                        → recompute fresh gradients
                   (fallback), log the recomputation, and step normally.
 
-    The stored gradient is refreshed only at jj=0 or on a fallback recomputation,
+    The stored F gradient is refreshed only at jj=0 or on a fallback recomputation,
     so a sequence of accepted reuses all share the same fixed gradient direction.
 
-    Attribute ``grad_recalc_count`` records the total number of fallback gradient
-    recomputations (NOT counting the mandatory jj=0 computations) during the most
-    recent ``execute_PGA`` call.
+    W-update strategy across outer iterations:
+      ii = 0  : Always compute fresh W gradients (get_grad_W_com + get_grad_W_crb).
+      ii >= 1 : Propose W_trial by reusing the stored W gradients from the previous
+                outer iteration.  Compare against the baseline objective at
+                (F_projected, W_current) just before the W step:
+                    obj = sum_rate * WEIGHT_W_COM + mean(crb_fe) * WEIGHT_W_CRB
+                - If obj(W_trial) > obj(W_current) → accept W_trial (reuse).
+                - Otherwise                        → recompute fresh W gradients
+                  (fallback), log the recomputation, and step normally.
+
+    The stored W gradient is refreshed only at ii=0 or on a fallback recomputation,
+    so consecutive outer iterations may reuse the same W gradient direction.
+
+    Attributes
+    ----------
+    grad_recalc_count   : total F fallback recomputations (excludes mandatory jj=0)
+                          from the most recent ``execute_PGA`` call.
+    W_grad_recalc_count : total W fallback recomputations (excludes mandatory ii=0)
+                          from the most recent ``execute_PGA`` call.
 
     step_size shape: [n_iter_inner, n_iter_outer, K+1]  (identical to PGA_Unfold_J10).
     """
@@ -315,7 +331,8 @@ class PGA_Unfold_J_GradReuse(nn.Module):
     def __init__(self, step_size):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # [n_iter_inner, n_iter_outer, K+1]
-        self.grad_recalc_count = 0  # updated by execute_PGA; not a trainable parameter
+        self.grad_recalc_count = 0    # F fallback recomputations; updated by execute_PGA
+        self.W_grad_recalc_count = 0  # W fallback recomputations; updated by execute_PGA
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
@@ -329,7 +346,12 @@ class PGA_Unfold_J_GradReuse(nn.Module):
         crb_over_iters   = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
-        grad_recalc = 0  # fallback recomputations this call (excludes mandatory jj=0 gradients)
+        grad_recalc = 0    # F fallback recomputations (excludes mandatory jj=0 gradients)
+        W_grad_recalc = 0  # W fallback recomputations (excludes mandatory ii=0 gradients)
+
+        # W gradient state persists across outer iterations (unlike F which resets each outer iter).
+        prev_grad_W_k_com = None
+        prev_grad_W_k_crb = None
 
         for ii in range(n_iter_outer):
             prev_grad_F_com = None  # last stored gradient, refreshed at jj=0 or on fallback
@@ -344,8 +366,8 @@ class PGA_Unfold_J_GradReuse(nn.Module):
                     if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                         print('Error NaN gradients!!!!!!!!!!!!!!!')
                 else:
-                    # ---- jj >= 1: attempt gradient reuse ----
-                    # Propose a step using the last stored gradient.
+                    # # ---- jj >= 1: attempt gradient reuse ----
+                    # # Propose a step using the last stored gradient.
                     F_trial = (F
                                + self.step_size[jj][ii][0] * prev_grad_F_com * WEIGHT_F_COM
                                + self.step_size[jj][ii][0] * prev_grad_F_crb * WEIGHT_F_CRB)
@@ -397,25 +419,76 @@ class PGA_Unfold_J_GradReuse(nn.Module):
 
             F = project_unit_modulus(F)
 
-            # ---- W update ----
-            grad_W_k_com = get_grad_W_com(H, F, W)
-            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-            W_new = W.clone().detach()
-            W_new[0] = (W[0].detach()
-                        + (self.step_size[0][ii][1] * grad_W_k_com[0]) * WEIGHT_W_COM
-                        + (self.step_size[0][ii][1] * grad_W_k_crb[0]) * WEIGHT_W_CRB)
-            F, W = normalize(F, W_new, H, Pt)
+            # ---- W update with gradient reuse across outer iterations ----
+            # Baseline objective at (F_projected, W_current) for the reuse comparison.
+            with torch.no_grad():
+                r_preW = get_sum_rate(H, F, W, Pt)
+                c_preW = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
+                obj_preW = (r_preW * WEIGHT_W_COM + c_preW.mean() * WEIGHT_W_CRB).item()
 
-            if track_metrics:
-                rate_over_iters[ii, -1]  = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, -1]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                power_over_iters[ii, -1] = get_power(F, W).detach()
+            w_reuse_accepted = False
+            if ii > 0 and prev_grad_W_k_com is not None:
+                # ---- ii >= 1: attempt gradient reuse for W ----
+                W_trial_new = W.clone().detach()
+                W_trial_new[0] = (W[0].detach()
+                                  + (self.step_size[0][ii][1] * prev_grad_W_k_com) * WEIGHT_W_COM
+                                  + (self.step_size[0][ii][1] * prev_grad_W_k_crb) * WEIGHT_W_CRB)
+                F_wt, W_trial = normalize(F, W_trial_new, H, Pt)
 
-        # Log and store gradient recomputation count.
+                with torch.no_grad():
+                    r_wt = get_sum_rate(H, F_wt, W_trial, Pt)
+                    c_wt = get_crb_fe(H, F_wt, W_trial, xi_0, A_dot, R_N_inv, Pt)
+                    obj_wt = (r_wt * WEIGHT_W_COM + c_wt.mean() * WEIGHT_W_CRB).item()
+
+                if obj_wt > obj_preW:
+                    # ---- W reuse accepted ----
+                    F, W = F_wt, W_trial
+                    w_reuse_accepted = True
+                    # prev_grad_W_k_com/crb left unchanged: next outer iter reuses same gradient.
+                    if track_metrics:
+                        rate_over_iters[ii, -1]  = r_wt.detach()
+                        crb_over_iters[ii, -1]   = c_wt.detach()
+                        power_over_iters[ii, -1] = get_power(F, W).detach()
+                else:
+                    # ---- W reuse rejected: recompute W gradients from current (F, W) ----
+                    grad_W_k_com = get_grad_W_com(H, F, W)
+                    grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+                    if grad_W_k_com[0].isnan().any() or grad_W_k_crb[0].isnan().any():
+                        print('Error NaN gradients (W)!!!!!!!!!!!!!!!')
+                    W_grad_recalc += 1
+            else:
+                # ---- ii == 0: always compute fresh W gradients ----
+                grad_W_k_com = get_grad_W_com(H, F, W)
+                grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+                if grad_W_k_com[0].isnan().any() or grad_W_k_crb[0].isnan().any():
+                    print('Error NaN gradients (W)!!!!!!!!!!!!!!!')
+
+            if not w_reuse_accepted:
+                # ---- Apply W gradient step (ii=0 or reuse-rejected) ----
+                W_new = W.clone().detach()
+                W_new[0] = (W[0].detach()
+                            + (self.step_size[0][ii][1] * grad_W_k_com[0]) * WEIGHT_W_COM
+                            + (self.step_size[0][ii][1] * grad_W_k_crb[0]) * WEIGHT_W_CRB)
+                F, W = normalize(F, W_new, H, Pt)
+
+                # Store W gradients for reuse in the next outer iteration.
+                prev_grad_W_k_com = grad_W_k_com[0].detach()
+                prev_grad_W_k_crb = grad_W_k_crb[0].detach()
+
+                if track_metrics:
+                    rate_over_iters[ii, -1]  = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, -1]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    power_over_iters[ii, -1] = get_power(F, W).detach()
+
+        # Log and store gradient recomputation counts.
         self.grad_recalc_count = grad_recalc
-        max_possible = n_iter_outer * (n_iter_inner - 1)
-        print(f'[GradReuse] fallback recomputations = {grad_recalc} / {max_possible} '
-              f'({100.0 * grad_recalc / max(max_possible, 1):.1f}%)')
+        self.W_grad_recalc_count = W_grad_recalc
+        max_possible_F = n_iter_outer * (n_iter_inner - 1)
+        max_possible_W = n_iter_outer - 1
+        print(f'[GradReuse] F fallback recomputations = {grad_recalc} / {max_possible_F} '
+              f'({100.0 * grad_recalc / max(max_possible_F, 1):.1f}%)')
+        print(f'[GradReuse] W fallback recomputations = {W_grad_recalc} / {max_possible_W} '
+              f'({100.0 * W_grad_recalc / max(max_possible_W, 1):.1f}%)')
 
         # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1)).
         rates     = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
@@ -696,6 +769,95 @@ def get_grad_F_com(H, F, W):
     # Sum over M users, average over K frequencies
     grad_F = (grad1 - grad2).sum(dim=2) / K_d             # (K, B, Nt, Nrf)
     return grad_F
+
+# def get_grad_F_com(H, F, W, M_sub=2):
+#     """
+#     Optimized gradient of sum-rate w.r.t. F
+#     - Top-k users based on channel strength
+#     - Avoids explicit V_mk construction
+#     """
+
+#     F_H = F.conj().transpose(-2, -1)          # (K, B, Nrf, Nt)
+#     W_H = W.conj().transpose(-2, -1)          # (K, B, M, Nrf)
+#     V   = W @ W_H                             # (K, B, Nrf, Nrf)
+#     K_d = W.shape[0]
+
+#     # --------------------------------------------------
+#     # 1) Select dominant users via channel strength
+#     # --------------------------------------------------
+#     power = (H.abs()**2).sum(dim=-1)          # (K, B, M)
+#     print(power)
+#     top_idx = power.topk(k=M_sub, dim=2).indices  # (K, B, M_sub)
+
+#     # Select H
+#     idx_H = top_idx.unsqueeze(-1).expand(-1, -1, -1, H.size(-1))
+#     H_sel = torch.gather(H, 2, idx_H)         # (K, B, M_sub, Nt)
+#     h = H_sel.unsqueeze(-1)                   # (K, B, M_sub, Nt, 1)
+
+#     # Select W columns (w_m)
+#     W_perm = W.permute(0, 1, 3, 2)            # (K, B, M, Nrf)
+#     idx_W = top_idx.unsqueeze(-1).expand(-1, -1, -1, W_perm.size(-1))
+#     W_sel = torch.gather(W_perm, 2, idx_W)    # (K, B, M_sub, Nrf)
+#     w = W_sel.unsqueeze(-1)                   # (K, B, M_sub, Nrf, 1)
+
+#     # --------------------------------------------------
+#     # 2) Precompute shared terms
+#     # --------------------------------------------------
+#     FVF_H = F @ V @ F_H                       # (K, B, Nt, Nt)
+
+#     # --------------------------------------------------
+#     # 3) First quadratic form (same as before)
+#     # --------------------------------------------------
+#     qf1 = (
+#         h.conj().transpose(-2, -1)
+#         @ FVF_H.unsqueeze(2)
+#         @ h
+#     ).squeeze(-1).squeeze(-1)                 # (K, B, M_sub)
+
+#     denom1 = np.log(2) * (qf1 + sigma2)
+
+#     # --------------------------------------------------
+#     # 4) Efficient computation of second term
+#     #    FVmk = FV - (F w)(w^H)
+#     # --------------------------------------------------
+#     FV = F @ V                                # (K, B, Nt, Nrf)
+
+#     Fw = (F.unsqueeze(2) @ w)                 # (K, B, M_sub, Nt, 1)
+#     wH = w.conj().transpose(-2, -1)           # (K, B, M_sub, 1, Nrf)
+
+#     FVmk = FV.unsqueeze(2) - (Fw @ wH)        # (K, B, M_sub, Nt, Nrf)
+#     FVmkF_H = FVmk @ F_H.unsqueeze(2)         # (K, B, M_sub, Nt, Nt)
+
+#     qf2 = (
+#         h.conj().transpose(-2, -1)
+#         @ FVmkF_H
+#         @ h
+#     ).squeeze(-1).squeeze(-1)                 # (K, B, M_sub)
+
+#     denom2 = np.log(2) * (qf2 + sigma2)
+
+#     # --------------------------------------------------
+#     # 5) Gradient terms
+#     # --------------------------------------------------
+#     Htilde = h @ h.conj().transpose(-2, -1)   # (K, B, M_sub, Nt, Nt)
+#     HtF = Htilde @ F.unsqueeze(2)             # (K, B, M_sub, Nt, Nrf)
+
+#     grad1 = HtF @ V.unsqueeze(2) / (
+#         denom1.unsqueeze(-1).unsqueeze(-1) + 1e-4
+#     )
+
+#     grad2 = HtF @ (
+#         V.unsqueeze(2) - (w @ wH)
+#     ) / (
+#         denom2.unsqueeze(-1).unsqueeze(-1) + 1e-4
+#     )
+
+#     # --------------------------------------------------
+#     # 6) Final aggregation
+#     # --------------------------------------------------
+#     grad_F = (grad1 - grad2).sum(dim=2) / K_d   # (K, B, Nt, Nrf)
+
+#     return grad_F
 
 def get_grad_W_com(H, F, W):
     F_H = torch.transpose(F, 2, 3).conj()
