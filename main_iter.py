@@ -204,17 +204,19 @@ if plot_figure == 1:
     def fractional_iters_from_w_slots(w_slots, n_outer):
         """Build fractional x-axis from the actual per-outer W-update slot positions.
 
-        For each outer iteration ii the block runs from the previous W-update slot + 1
-        up to w_slots[ii] (inclusive).  The W-update slot maps to integer ii; the
-        preceding inner F-update slots are spread evenly in (ii-1, ii).
+        Matches the convention used by fractional_iters(): for outer iter ii,
+        F-step jj gets x = ii + jj/(n_inner+1)  (starting at exactly ii for jj=0),
+        and the W-update gets x = ii + n_inner/(n_inner+1)  (at the end of the block).
+        This produces a strictly monotonically increasing x-axis, consistent with
+        the J10/J20 convention and avoids backward-jump visual artefacts in the line.
         """
         x = []
         prev = -1
         for ii, ws in enumerate(w_slots):
             n_inner_ii = ws - prev - 1   # number of inner F-updates in this block
             for jj in range(n_inner_ii):
-                x.append(ii + (jj + 1) / (n_inner_ii + 1))
-            x.append(float(ii))          # W-update maps to integer outer index
+                x.append(ii + jj / (n_inner_ii + 1))        # F-update slots
+            x.append(ii + n_inner_ii / (n_inner_ii + 1))    # W-update at end of block
             prev = ws
         return np.array(x)
 
