@@ -306,9 +306,12 @@ class PGA_Unfold_J_decay(nn.Module):
     def __init__(self, step_size, hidden1=32, hidden2=16):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # [max_inner, n_iter_outer, K+1]
-        self.controller = HaltingController(hidden1=hidden1, hidden2=hidden2)
+        # Place controller and threshold on the same device as step_size so the
+        # model works on both CPU and CUDA without needing an explicit .to(device) call.
+        _dev = step_size.device
+        self.controller = HaltingController(hidden1=hidden1, hidden2=hidden2).to(_dev)
         # Learnable halting threshold initialised at 0.95 (inverse-sigmoid ≈ 3.0)
-        self.halt_threshold = nn.Parameter(torch.tensor(3.0))
+        self.halt_threshold = nn.Parameter(torch.tensor(3.0, device=_dev))
         self.ponder_cost = 0.0
         self.total_inner_steps = 0
         self.w_update_slots = []  # slot index of each W-update; set during execute_PGA
@@ -320,6 +323,11 @@ class PGA_Unfold_J_decay(nn.Module):
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer,
                     track_metrics=True, hard_halt=False):
+        # Guard: ensure controller is on the same device as the input data.
+        # This handles the case where the model was constructed before the
+        # device was known (e.g. loaded from checkpoint then moved).
+        if next(self.controller.parameters()).device != H.device:
+            self.controller.to(H.device)
         rate_init, F, W = initialize(H, Pt, initial_normalization)
         B = len(H[0])
         max_inner = self.max_inner

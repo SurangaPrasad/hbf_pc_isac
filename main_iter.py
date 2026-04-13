@@ -110,7 +110,7 @@ if run_program == 1:
         model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay,
                                                   hidden1=HALT_HIDDEN1,
                                                   hidden2=HALT_HIDDEN2)
-        # model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device), strict=True)
+        model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device), strict=True)
 
         sum_rate_UPGA_J_decay, crb_UPGA_J_decay, power_UPGA_J_decay, F_UPGA_J_decay, W_UPGA_J_decay = model_UPGA_J_decay.execute_PGA(
             H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, hard_halt=True)
