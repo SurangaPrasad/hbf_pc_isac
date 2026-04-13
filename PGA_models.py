@@ -272,15 +272,16 @@ class PGA_Unfold_J_decay(nn.Module):
     outer iteration index, a small MLP (``HaltingController``) decides at
     each inner step whether to *continue* or *halt*.
 
-    **Soft halting (differentiable):**  All ``max_inner`` steps are always
-    executed, but each gradient step is *gated* by the ``remaining``
-    probability — the cumulative product of all previous ``p_continue``
-    values.  Once the controller decides to halt, ``remaining → 0`` and
-    subsequent gradient steps have near-zero magnitude, mimicking early
-    stopping while keeping the computation graph fully differentiable.
-    Unlike averaging intermediate F candidates (which leaves the unit-modulus
-    manifold and causes ripples), this approach keeps F on the optimization
-    trajectory at all times.
+    **Soft halting (differentiable, training):**  All ``max_inner`` steps are
+    executed at **full magnitude** — identical to what hard halting would do
+    for the same number of steps.  The controller trains through the ponder
+    cost only:
+        ``ponder_cost = Σ_j  (j+1) · p_halt_j``
+    where ``p_halt_j = remaining · (1 − p_continue_j)``.  Minimising
+    ``λ_halt · ponder_cost`` pushes the controller to output low
+    ``p_continue`` early, so that at inference hard halting breaks sooner.
+    Because training and inference use identical step magnitudes there is
+    **no train/inference mismatch** and no instability at inference.
 
     **Hard halting (inference only):**  When ``hard_halt=True`` is passed to
     ``execute_PGA``, the inner loop actually breaks once the cumulative
@@ -402,13 +403,15 @@ class PGA_Unfold_J_decay(nn.Module):
                 prev_crb_outer  = prev_crb
 
             else:
-                # ---- Soft halting: gate gradient steps by remaining probability ----
-                # Instead of averaging F candidates (which leaves the unit-modulus
-                # manifold and creates ripples), we modulate each gradient step's
-                # magnitude by `remaining` — the probability of still being active.
-                # When the controller decides to halt, remaining → 0 and later
-                # steps contribute negligibly, giving a smooth, differentiable
-                # approximation of early stopping.
+                # ---- Soft halting: full gradient steps + ponder cost ----
+                # Steps are executed at full magnitude (identical to hard halting),
+                # so the learned step_size values are consistent between training and
+                # inference and there is no train/inference mismatch.
+                # The controller learns exclusively through the ponder cost gradient:
+                #   ponder_cost = Σ_j  (j+1) * p_halt_j
+                # where p_halt_j = remaining * (1 - p_continue_j).
+                # Minimising lambda_halt * ponder_cost pushes p_continue → 0 early,
+                # causing hard halting at inference to break sooner.
                 remaining    = torch.tensor(1.0, device=H.device)
                 halt_probs   = []  # p_halt per step, for ponder cost
 
@@ -419,10 +422,9 @@ class PGA_Unfold_J_decay(nn.Module):
                     if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                         print('Error NaN gradients!!!!!!!!!!!!!!!')
 
-                    # Gate gradient step by remaining probability (differentiable)
-                    gate = remaining
-                    delta_F_com = self.step_size[jj][ii][0] * gate * grad_F_com
-                    delta_F_crb = self.step_size[jj][ii][0] * gate * grad_F_crb
+                    # Full gradient step — no gating, consistent with hard halting
+                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
                     F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
                     F = normalize_power(F, W, H, Pt)
                     total_inner_steps += 1
