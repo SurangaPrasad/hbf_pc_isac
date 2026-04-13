@@ -106,12 +106,15 @@ if run_program == 1:
         power_iter_UPGA_J10_PRCDN = power_UPGA_J10_PRCDN.mean(0).cpu().numpy()
     # ====================================================== Proposed Unfolded PGA with decaying J ====================================
     if run_UPGA_J_decay == 1:
-        print('Running unfolded PGA with decaying J...')
-        model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay)
-        model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device))
+        print('Running unfolded PGA with learnable halting controller...')
+        model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay,
+                                                  hidden1=HALT_HIDDEN1,
+                                                  hidden2=HALT_HIDDEN2)
+        # model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device), strict=True)
 
         sum_rate_UPGA_J_decay, crb_UPGA_J_decay, power_UPGA_J_decay, F_UPGA_J_decay, W_UPGA_J_decay = model_UPGA_J_decay.execute_PGA(
-            H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer)
+            H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, hard_halt=True)
+        print(f'  Total inner steps (hard halt): {model_UPGA_J_decay.total_inner_steps}')
         rate_iter_UPGA_J_decay  = sum_rate_UPGA_J_decay.mean(0).cpu().numpy()
         crb_iter_UPGA_J_decay   = crb_UPGA_J_decay.mean(0).cpu().numpy()
         power_iter_UPGA_J_decay = power_UPGA_J_decay.mean(0).cpu().numpy()
@@ -119,7 +122,7 @@ if run_program == 1:
     if run_UPGA_J_GradReuse == 1:
         print('Running unfolded PGA with gradient reuse (J = 10)...')
         model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)
-        # model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
+        model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J_GradReuse, map_location=device))
 
         sum_rate_UPGA_J_GradReuse, crb_UPGA_J_GradReuse, power_UPGA_J_GradReuse, F_UPGA_J_GradReuse, W_UPGA_J_GradReuse = model_UPGA_J_GradReuse.execute_PGA(
             H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, n_iter_inner_J10)
@@ -194,16 +197,27 @@ if plot_figure == 1:
     frac_J10 = fractional_iters(n_iter_outer, n_iter_inner_J10)
     frac_J20 = fractional_iters(n_iter_outer, n_iter_inner_J20)
 
-    def fractional_iters_decay(n_outer, max_inner=10):
-        """Fractional x-axis for J_decay: block size varies as n_inner(ii)+1 per outer iter."""
+    def fractional_iters_from_w_slots(w_slots, n_outer):
+        """Build fractional x-axis from the actual per-outer W-update slot positions.
+
+        For each outer iteration ii the block runs from the previous W-update slot + 1
+        up to w_slots[ii] (inclusive).  The W-update slot maps to integer ii; the
+        preceding inner F-update slots are spread evenly in (ii-1, ii).
+        """
         x = []
-        for ii in range(n_outer):
-            n_inner_ii = max(1, max_inner - ii // max_inner)
-            x.append(float(ii))
+        prev = -1
+        for ii, ws in enumerate(w_slots):
+            n_inner_ii = ws - prev - 1   # number of inner F-updates in this block
             for jj in range(n_inner_ii):
                 x.append(ii + (jj + 1) / (n_inner_ii + 1))
+            x.append(float(ii))          # W-update maps to integer outer index
+            prev = ws
         return np.array(x)
-    frac_J_decay = fractional_iters_decay(n_iter_outer)
+
+    if run_UPGA_J_decay == 1:
+        frac_J_decay = fractional_iters_from_w_slots(model_UPGA_J_decay.w_update_slots, n_iter_outer)
+    else:
+        frac_J_decay = np.array([])
     # Indices of the last inner step of each outer iteration in the flattened arrays
     # J=10: indices 10, 21, 32, ...  (block size J+1=11, last slot = J=10)
     # J=20: indices 20, 41, 62, ...  (block size J+1=21, last slot = J=20)
@@ -213,15 +227,9 @@ if plot_figure == 1:
     outer_idx_J20 = np.arange(n_iter_inner_J20,
                               n_iter_outer * (n_iter_inner_J20 + 1),
                               n_iter_inner_J20 + 1)   # length = n_iter_outer
-    # outer_idx for J_decay: W-update is the LAST slot of each block (block sizes vary)
-    outer_idx_J_decay = []
-    _pos = 0
-    for _ii in range(n_iter_outer):
-        _ni = max(1, 10 - _ii // 10)
-        _pos += _ni         # skip inner F-update slots
-        outer_idx_J_decay.append(_pos)  # W-update position
-        _pos += 1
-    outer_idx_J_decay = np.array(outer_idx_J_decay)
+    # outer_idx for J_decay: taken directly from the model after execute_PGA
+    # (the learnable controller makes the per-outer block sizes data-dependent)
+    outer_idx_J_decay = model_UPGA_J_decay.w_update_slots if run_UPGA_J_decay == 1 else np.array([])
     # J_GradReuse has the same fixed J=10 structure as J10
     outer_idx_J_GradReuse = outer_idx_J10
     frac_J_GradReuse = frac_J10

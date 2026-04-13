@@ -257,9 +257,11 @@ if run_UPGA_J10_PRCDN == 1:
     # Save the plot of training loss
     plt.savefig(directory_result + "training_loss_UPGA_J10.png")
 
-# ============================================================= proposed unfolding PGA with decaying inner iterations ====
+# ============================================================= proposed unfolding PGA with learnable halting controller ====
 if run_UPGA_J_decay == 1:
-    model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay)
+    model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay,
+                                             hidden1=HALT_HIDDEN1,
+                                             hidden2=HALT_HIDDEN2)
     optimizer = torch.optim.Adam(model_UPGA_J_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
@@ -276,11 +278,16 @@ if run_UPGA_J_decay == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
 
-            # J_decay does not take n_iter_inner; the schedule is encoded in the class
-            __, __, __, F, W = model_UPGA_J_decay.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, track_metrics=False)
+            # Soft halting (default): all max_inner steps run, weighted by halting probs
+            __, __, __, F, W = model_UPGA_J_decay.execute_PGA(
+                H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer,
+                track_metrics=False, hard_halt=False)
 
-            loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
-            print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
+            loss = get_sum_loss_with_ponder(F, W, H, xi_0, A_dot, R_N_inv, snr_train,
+                                            model_UPGA_J_decay.ponder_cost,
+                                            lambda_halt=HALT_LAMBDA)
+            print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], "
+                  f"Loss: {loss.item():.4f}, Ponder: {model_UPGA_J_decay.ponder_cost:.1f}")
 
             optimizer.zero_grad()
             loss.backward()
@@ -297,7 +304,7 @@ if run_UPGA_J_decay == 1:
     # Plotting
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, n_epoch + 1), epoch_losses, marker='o', linestyle='-', color='b')
-    plt.title('Training Loss per Epoch (J decay)')
+    plt.title('Training Loss per Epoch (J decay - Learnable Halting)')
     plt.xlabel('Epoch')
     plt.ylabel('Average Loss')
     plt.grid(True)

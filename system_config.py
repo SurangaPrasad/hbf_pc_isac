@@ -16,15 +16,20 @@ run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
+run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
-run_UPGA_J_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
-run_UPGA_J_GradReuse = 1   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
+run_UPGA_J_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
+run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
+
+# Halting controller hyper-parameters (used by PGA_Unfold_J_decay)
+HALT_LAMBDA = 0.01          # computation penalty weight for ponder cost
+HALT_HIDDEN1 = 32           # first hidden layer size
+HALT_HIDDEN2 = 16           # second hidden layer size
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
@@ -69,7 +74,7 @@ print(system_info)
 train_size = 476    # size of training set
 test_size = 1      # size of testing set
 batch_size = len(snr_dB_list) * 4
-n_epoch = 30         # number of training epochs
+n_epoch = 20         # number of training epochs
 learning_rate = 0.0001 # learning rate
 
 n_iter_outer = 120      # Number of outer iterations (I)

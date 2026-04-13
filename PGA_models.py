@@ -204,67 +204,264 @@ class PGA_Unfold_J10(nn.Module):
         power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
-# ============================================== Unfolded PGA with decaying inner iterations ==============================
-class PGA_Unfold_J_decay(nn.Module):
-    """Unfolded PGA where the number of inner iterations decays every ``max_inner`` outer iters.
+# ============================================== Halting Controller ==============================
+class HaltingController(nn.Module):
+    """Small MLP that predicts a halting probability p_continue ∈ (0, 1).
 
-    With max_inner = step_size.shape[0] (= 10 by default):
-        outer iters  0 –  9 : n_inner = 10
-        outer iters 10 – 19 : n_inner =  9
-        outer iters 20 – 29 : n_inner =  8
-        ...
-        outer iters 90+     : n_inner =  1  (minimum)
+    Input features (per inner step):
+        0 : ii / n_iter_outer              – normalised outer iteration index
+        1 : jj / max_inner                 – normalised inner iteration index
+        2 : current_rate                   – sum-rate after the latest F-update
+        3 : Δrate                          – rate improvement w.r.t. previous inner step
+        4 : current_crb                    – CRB metric after the latest F-update
+        5 : Δcrb                           – CRB improvement w.r.t. previous inner step
+        6 : ||grad_F||                     – L2 norm of the combined F gradient
+        7 : power                          – current transmit power ||F W||_F^2
 
-    step_size shape: [max_inner, n_iter_outer, K+1]  (identical to PGA_Unfold_J10).
+    Output:
+        scalar p_continue ∈ (0, 1) via sigmoid.
     """
 
-    def __init__(self, step_size):
+    STATE_DIM = 8  # number of input features
+
+    def __init__(self, hidden1=32, hidden2=16):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(self.STATE_DIM, hidden1),
+            nn.ReLU(),
+            nn.Linear(hidden1, hidden2),
+            nn.ReLU(),
+            nn.Linear(hidden2, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, state):
+        """state: (STATE_DIM,) → scalar p_continue."""
+        return self.net(state).squeeze(-1)
+
+
+def build_halting_state(ii, jj, n_iter_outer, max_inner,
+                        current_rate, prev_rate,
+                        current_crb, prev_crb,
+                        grad_norm_F, power):
+    """Assemble the feature vector consumed by :class:`HaltingController`.
+
+    All metric inputs should be Python floats (or 0-dim tensors that will be
+    converted).  Returns a 1-D tensor of shape (STATE_DIM,) on CPU.
+    """
+    delta_rate = current_rate - prev_rate
+    delta_crb  = current_crb - prev_crb
+    state = torch.tensor([
+        ii / max(n_iter_outer, 1),
+        jj / max(max_inner, 1),
+        current_rate,
+        delta_rate,
+        current_crb,
+        delta_crb,
+        grad_norm_F,
+        power,
+    ], dtype=REAL_DTYPE)
+    return state
+
+
+# ============================================== Unfolded PGA with learnable halting controller ==============================
+class PGA_Unfold_J_decay(nn.Module):
+    """Unfolded PGA with an ACT-style learnable halting controller.
+
+    Instead of a fixed schedule that decays inner iterations based on the
+    outer iteration index, a small MLP (``HaltingController``) decides at
+    each inner step whether to *continue* or *halt*.
+
+    **Soft halting (differentiable):**  All ``max_inner`` steps are always
+    executed, but each gradient step is *gated* by the ``remaining``
+    probability — the cumulative product of all previous ``p_continue``
+    values.  Once the controller decides to halt, ``remaining → 0`` and
+    subsequent gradient steps have near-zero magnitude, mimicking early
+    stopping while keeping the computation graph fully differentiable.
+    Unlike averaging intermediate F candidates (which leaves the unit-modulus
+    manifold and causes ripples), this approach keeps F on the optimization
+    trajectory at all times.
+
+    **Hard halting (inference only):**  When ``hard_halt=True`` is passed to
+    ``execute_PGA``, the inner loop actually breaks once the cumulative
+    halting probability exceeds a learnable (or fixed) threshold, saving
+    real compute.  ``total_inner_steps`` records how many F-updates were
+    performed.
+
+    **Computation penalty:**  A ponder cost proportional to the expected
+    number of inner steps is exposed via ``self.ponder_cost`` so the
+    training loss can include a term ``λ_halt * ponder_cost`` to encourage
+    the controller to use fewer inner iterations.
+
+    step_size shape: [max_inner, n_iter_outer, K+1]  (identical to PGA_Unfold_J10).
+
+    Attributes
+    ----------
+    controller       : HaltingController MLP.
+    halt_threshold   : nn.Parameter – cumulative halting threshold for hard halting.
+    ponder_cost      : float – expected inner steps from the last ``execute_PGA`` call.
+    total_inner_steps: int   – actual inner steps executed (meaningful only with hard_halt).
+    """
+
+    def __init__(self, step_size, hidden1=32, hidden2=16):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # [max_inner, n_iter_outer, K+1]
+        self.controller = HaltingController(hidden1=hidden1, hidden2=hidden2)
+        # Learnable halting threshold initialised at 0.95 (inverse-sigmoid ≈ 3.0)
+        self.halt_threshold = nn.Parameter(torch.tensor(3.0))
+        self.ponder_cost = 0.0
+        self.total_inner_steps = 0
+        self.w_update_slots = []  # slot index of each W-update; set during execute_PGA
 
-    def _n_inner(self, ii):
-        """Number of inner iterations for outer iteration *ii* (0-indexed)."""
-        max_inner = self.step_size.shape[0]
-        return max(1, max_inner - ii // max_inner)
+    @property
+    def max_inner(self):
+        return self.step_size.shape[0]
 
     # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, track_metrics=True):
+    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer,
+                    track_metrics=True, hard_halt=False):
         rate_init, F, W = initialize(H, Pt, initial_normalization)
         B = len(H[0])
+        max_inner = self.max_inner
 
-        # Pre-compute the total number of measurement slots across all outer iterations.
-        # Each outer iter ii contributes n_inner(ii) inner F-update slots + 1 W-update slot.
-        total_slots = sum(self._n_inner(ii) + 1 for ii in range(n_iter_outer))
+        # Worst-case metric array size: max_inner F-slots + 1 W-slot per outer iter
+        total_slots_max = n_iter_outer * (max_inner + 1)
+        rate_over_iters  = torch.zeros(total_slots_max, B, device=H.device)
+        crb_over_iters   = torch.zeros(total_slots_max, B, device=H.device)
+        power_over_iters = torch.zeros(total_slots_max, B, device=H.device)
 
-        rate_over_iters  = torch.zeros(total_slots, B, device=H.device)
-        crb_over_iters   = torch.zeros(total_slots, B, device=H.device)
-        power_over_iters = torch.zeros(total_slots, B, device=H.device)
+        slot = 0
+        ponder_cost = torch.tensor(0.0, device=H.device)
+        total_inner_steps = 0
+        threshold = torch.sigmoid(self.halt_threshold)  # ∈ (0, 1)
+        w_update_slots = []  # records the slot index of each W-update
 
-        slot = 0  # running index into the flat metric arrays
+        # Tracking for controller state across outer iterations
+        prev_rate_outer = 0.0
+        prev_crb_outer  = 0.0
+
         for ii in range(n_iter_outer):
-            n_inner_ii = self._n_inner(ii)
+            # ---- Inner F-update loop with halting ----
+            prev_rate = prev_rate_outer
+            prev_crb  = prev_crb_outer
 
-            # Note: torch.utils.checkpoint cannot be used here because n_inner changes
-            # per outer iteration (the varying loop count causes a tensor-count mismatch
-            # during recomputation).  Run the inner loop directly in all cases.
-            for jj in range(n_inner_ii):
-                grad_F_com = get_grad_F_com(H, F, W)
-                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
-                    print('Error NaN gradients!!!!!!!!!!!!!!!')
-                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-                F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
-                F = normalize_power(F, W, H, Pt)
-                if track_metrics:
-                    rate_over_iters[slot]  = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[slot]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                    power_over_iters[slot] = get_power(F, W).detach()
-                slot += 1
+            if hard_halt:
+                # ---- Hard halting: actually break early (inference) ----
+                cum_halt = torch.tensor(0.0, device=H.device)
+                for jj in range(max_inner):
+                    # Compute gradients
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                        print('Error NaN gradients!!!!!!!!!!!!!!!')
+
+                    # Apply gradient step
+                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    F = normalize_power(F, W, H, Pt)
+                    total_inner_steps += 1
+
+                    # Evaluate metrics for controller state
+                    with torch.no_grad():
+                        cur_rate = get_sum_rate(H, F, W, Pt).item()
+                        cur_crb  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).mean().item()
+                        cur_power = get_power(F, W).mean().item()
+                        grad_norm = (grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB).norm().item()
+
+                    if track_metrics:
+                        rate_over_iters[slot]  = cur_rate
+                        crb_over_iters[slot]   = cur_crb
+                        power_over_iters[slot] = cur_power
+                    slot += 1
+
+                    # Query controller for halting decision
+                    state = build_halting_state(
+                        ii, jj, n_iter_outer, max_inner,
+                        cur_rate, prev_rate, cur_crb, prev_crb,
+                        grad_norm, cur_power,
+                    ).to(H.device)
+                    p_continue = self.controller(state)
+                    cum_halt = cum_halt + (1.0 - p_continue)
+
+                    prev_rate = cur_rate
+                    prev_crb  = cur_crb
+
+                    if cum_halt >= threshold:
+                        break
+
+                prev_rate_outer = prev_rate
+                prev_crb_outer  = prev_crb
+
+            else:
+                # ---- Soft halting: gate gradient steps by remaining probability ----
+                # Instead of averaging F candidates (which leaves the unit-modulus
+                # manifold and creates ripples), we modulate each gradient step's
+                # magnitude by `remaining` — the probability of still being active.
+                # When the controller decides to halt, remaining → 0 and later
+                # steps contribute negligibly, giving a smooth, differentiable
+                # approximation of early stopping.
+                remaining    = torch.tensor(1.0, device=H.device)
+                halt_probs   = []  # p_halt per step, for ponder cost
+
+                for jj in range(max_inner):
+                    # Compute gradients
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                        print('Error NaN gradients!!!!!!!!!!!!!!!')
+
+                    # Gate gradient step by remaining probability (differentiable)
+                    gate = remaining
+                    delta_F_com = self.step_size[jj][ii][0] * gate * grad_F_com
+                    delta_F_crb = self.step_size[jj][ii][0] * gate * grad_F_crb
+                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    F = normalize_power(F, W, H, Pt)
+                    total_inner_steps += 1
+
+                    # Evaluate metrics for controller state (detach to avoid 2nd-order grads)
+                    with torch.no_grad():
+                        cur_rate = get_sum_rate(H, F, W, Pt).item()
+                        cur_crb  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).mean().item()
+                        cur_power = get_power(F, W).mean().item()
+                        grad_norm = (grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB).norm().item()
+
+                    # Query controller
+                    state = build_halting_state(
+                        ii, jj, n_iter_outer, max_inner,
+                        cur_rate, prev_rate, cur_crb, prev_crb,
+                        grad_norm, cur_power,
+                    ).to(H.device)
+                    p_continue = self.controller(state)  # scalar ∈ (0,1)
+
+                    if jj < max_inner - 1:
+                        p_halt = remaining * (1.0 - p_continue)
+                    else:
+                        # Last step: assign all remaining probability mass
+                        p_halt = remaining
+
+                    halt_probs.append(p_halt)
+                    remaining = remaining * p_continue
+
+                    prev_rate = cur_rate
+                    prev_crb  = cur_crb
+
+                    if track_metrics:
+                        rate_over_iters[slot]  = cur_rate
+                        crb_over_iters[slot]   = cur_crb
+                        power_over_iters[slot] = cur_power
+                    slot += 1
+
+                # Ponder cost: expected number of inner steps for this outer iter
+                expected_steps = sum((j + 1) * w for j, w in enumerate(halt_probs))
+                ponder_cost = ponder_cost + expected_steps
+
+                prev_rate_outer = prev_rate
+                prev_crb_outer  = prev_crb
 
             F = project_unit_modulus(F)
 
-            # update W  (K == 1 always, unroll the k-loop)
+            # ---- W update (K == 1, unrolled) ----
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
             W_new = W.clone().detach()
@@ -274,14 +471,25 @@ class PGA_Unfold_J_decay(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            # Record metric after W-update (last slot of this outer iter)
+            # Record metric after W-update
+            w_update_slots.append(slot)  # record slot before incrementing
             if track_metrics:
                 rate_over_iters[slot]  = get_sum_rate(H, F, W, Pt).detach()
                 crb_over_iters[slot]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                 power_over_iters[slot] = get_power(F, W).detach()
             slot += 1
 
-        # Shape: (total_slots, B) → transpose → (B, total_slots)
+        # Store ponder cost, step count, and W-update positions for external use
+        self.ponder_cost = ponder_cost
+        self.total_inner_steps = total_inner_steps
+        self.w_update_slots = np.array(w_update_slots)
+
+        # Trim metric arrays to actual number of slots used
+        rate_over_iters  = rate_over_iters[:slot]
+        crb_over_iters   = crb_over_iters[:slot]
+        power_over_iters = power_over_iters[:slot]
+
+        # Shape: (slot, B) → transpose → (B, slot)
         return (rate_over_iters.transpose(0, 1),
                 crb_over_iters.transpose(0, 1),
                 power_over_iters.transpose(0, 1),
@@ -1226,6 +1434,26 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt):
     crb = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
     mean_crb = torch.mean(crb)
     loss = -(OMEGA * sum_rate + mean_crb)
+    return loss
+
+
+def get_sum_loss_with_ponder(F, W, H, xi_0, A_dot, R_N_inv, Pt, ponder_cost, lambda_halt=0.01):
+    """Task loss augmented with a computation penalty from the halting controller.
+
+    Parameters
+    ----------
+    ponder_cost : torch.Tensor
+        Expected total number of inner steps (from ``model.ponder_cost``).
+    lambda_halt : float
+        Weight of the computation penalty.  Larger values push the controller
+        to use fewer inner iterations.
+
+    Returns
+    -------
+    loss : torch.Tensor  (scalar, retains grad)
+    """
+    task_loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt)
+    loss = task_loss + lambda_halt * ponder_cost
     return loss
 
 
