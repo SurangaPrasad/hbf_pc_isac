@@ -27,7 +27,13 @@ run_UPGA_J_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
 # Halting controller hyper-parameters (used by PGA_Unfold_J_decay)
-HALT_LAMBDA = 0.01          # computation penalty weight for ponder cost
+# Ponder cost scale: with 120 outer iters and max_inner=10 steps, ponder_cost at
+# maximum effort ≈ 1200.  HALT_LAMBDA=0.01 gives a penalty ≈ 12, which is ~25% of
+# the task loss magnitude and pushes the controller to aggressively halt after 2-3
+# inner steps, causing train/inference mismatch.  Reduce to 0.001 so the penalty
+# is ~1.2 (~2.5% of task loss) and the controller only halts early when convergence
+# is genuinely detected.
+HALT_LAMBDA = 0.001         # computation penalty weight for ponder cost
 HALT_HIDDEN1 = 32           # first hidden layer size
 HALT_HIDDEN2 = 16           # second hidden layer size
 

@@ -112,9 +112,13 @@ if run_program == 1:
                                                   hidden2=HALT_HIDDEN2)
         model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device), strict=True)
 
+        # hard_halt=False: always run all max_inner steps using the trained step sizes.
+        # This matches the training distribution (soft mode also runs all 10 steps) so
+        # there is no train/inference mismatch.  Switch to hard_halt=True only after
+        # retraining with a smaller HALT_LAMBDA (see system_config.py).
         sum_rate_UPGA_J_decay, crb_UPGA_J_decay, power_UPGA_J_decay, F_UPGA_J_decay, W_UPGA_J_decay = model_UPGA_J_decay.execute_PGA(
-            H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, hard_halt=True)
-        print(f'  Total inner steps (hard halt): {model_UPGA_J_decay.total_inner_steps}')
+            H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, hard_halt=False)
+        print(f'  Avg inner steps (soft/full): {model_UPGA_J_decay.total_inner_steps / n_iter_outer:.1f}')
         rate_iter_UPGA_J_decay  = sum_rate_UPGA_J_decay.mean(0).cpu().numpy()
         crb_iter_UPGA_J_decay   = crb_UPGA_J_decay.mean(0).cpu().numpy()
         power_iter_UPGA_J_decay = power_UPGA_J_decay.mean(0).cpu().numpy()
