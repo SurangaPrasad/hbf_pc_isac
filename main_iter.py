@@ -119,6 +119,12 @@ if run_program == 1:
         sum_rate_UPGA_J_decay, crb_UPGA_J_decay, power_UPGA_J_decay, F_UPGA_J_decay, W_UPGA_J_decay = model_UPGA_J_decay.execute_PGA(
             H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, hard_halt=False)
         print(f'  Avg inner steps (soft/full): {model_UPGA_J_decay.total_inner_steps / n_iter_outer:.1f}')
+        # Per-outer-iteration inner step counts (derived from w_update_slots spacing)
+        ws = model_UPGA_J_decay.w_update_slots
+        inner_counts = np.diff(ws, prepend=-1) - 1  # ws[ii] - ws[ii-1] - 1
+        print(f'  Inner iterations per outer iteration:')
+        for ii, cnt in enumerate(inner_counts):
+            print(f'    outer_iter={ii+1:3d}: {int(cnt)} inner steps')
         rate_iter_UPGA_J_decay  = sum_rate_UPGA_J_decay.mean(0).cpu().numpy()
         crb_iter_UPGA_J_decay   = crb_UPGA_J_decay.mean(0).cpu().numpy()
         power_iter_UPGA_J_decay = power_UPGA_J_decay.mean(0).cpu().numpy()
