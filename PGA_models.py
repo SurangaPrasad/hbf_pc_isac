@@ -341,6 +341,13 @@ class PGA_Unfold_J_decay(nn.Module):
 
         slot = 0
         ponder_cost = torch.tensor(0.0, device=H.device)
+        # ACT-style halt-weighted task loss: gives the controller a quality signal.
+        # At each inner step j we accumulate p_halt_j * proxy_quality_j using the
+        # already-computed (no-grad) cur_rate and cur_crb values, so no extra
+        # forward passes are needed.  The gradient flows through p_halt_j →
+        # controller parameters only, giving the signal: "halt at j if quality
+        # is already good; keep going if quality is still improving".
+        weighted_task_loss = torch.tensor(0.0, device=H.device)
         total_inner_steps = 0
         threshold = torch.sigmoid(self.halt_threshold)  # ∈ (0, 1)
         w_update_slots = []  # records the slot index of each W-update
@@ -403,15 +410,17 @@ class PGA_Unfold_J_decay(nn.Module):
                 prev_crb_outer  = prev_crb
 
             else:
-                # ---- Soft halting: full gradient steps + ponder cost ----
+                # ---- Soft halting: full gradient steps + ACT-style training loss ----
                 # Steps are executed at full magnitude (identical to hard halting),
                 # so the learned step_size values are consistent between training and
-                # inference and there is no train/inference mismatch.
-                # The controller learns exclusively through the ponder cost gradient:
-                #   ponder_cost = Σ_j  (j+1) * p_halt_j
-                # where p_halt_j = remaining * (1 - p_continue_j).
-                # Minimising lambda_halt * ponder_cost pushes p_continue → 0 early,
-                # causing hard halting at inference to break sooner.
+                # inference — no train/inference mismatch.
+                # The controller is trained via two complementary signals:
+                #   weighted_task_loss = Σ_{j,ii} p_halt_j * proxy_quality_j
+                #     → pushes p_halt toward the step j with best task performance
+                #   ponder_cost = Σ_{j,ii} (j+1) * p_halt_j
+                #     → penalises taking unnecessary inner steps (efficiency)
+                # Their balance (controlled by HALT_LAMBDA) determines the optimal
+                # hard-halt point at inference.
                 remaining    = torch.tensor(1.0, device=H.device)
                 halt_probs   = []  # p_halt per step, for ponder cost
 
@@ -453,6 +462,10 @@ class PGA_Unfold_J_decay(nn.Module):
                     halt_probs.append(p_halt)
                     remaining = remaining * p_continue
 
+                    # ACT quality signal: proxy task quality at this F (scalars, no grad)
+                    proxy_quality_j = -(OMEGA * cur_rate + cur_crb)  # matches get_sum_loss sign
+                    weighted_task_loss = weighted_task_loss + p_halt * proxy_quality_j
+
                     prev_rate = cur_rate
                     prev_crb  = cur_crb
 
@@ -491,6 +504,8 @@ class PGA_Unfold_J_decay(nn.Module):
 
         # Store ponder cost, step count, and W-update positions for external use
         self.ponder_cost = ponder_cost
+        # Normalise by n_iter_outer so scale matches a single-step task loss
+        self.weighted_task_loss = weighted_task_loss / max(n_iter_outer, 1)
         self.total_inner_steps = total_inner_steps
         self.w_update_slots = np.array(w_update_slots)
 

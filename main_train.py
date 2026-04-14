@@ -283,9 +283,11 @@ if run_UPGA_J_decay == 1:
                 H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer,
                 track_metrics=False, hard_halt=False)
 
-            loss = get_sum_loss_with_ponder(F, W, H, xi_0, A_dot, R_N_inv, snr_train,
-                                            model_UPGA_J_decay.ponder_cost,
-                                            lambda_halt=HALT_LAMBDA)
+            # ACT-style loss: halt-weighted task quality + efficiency penalty.
+            # weighted_task_loss gives the controller a quality gradient (halt at
+            # the best-performing step); ponder_cost penalises excessive inner steps.
+            loss = (model_UPGA_J_decay.weighted_task_loss
+                    + HALT_LAMBDA * model_UPGA_J_decay.ponder_cost)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], "
                   f"Loss: {loss.item():.4f}, Ponder: {model_UPGA_J_decay.ponder_cost:.1f}")
 
