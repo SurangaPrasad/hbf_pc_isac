@@ -58,7 +58,7 @@ def execute_conv_PGA_J10(conv_PGA_J10, H_test, Pt):
     return rate_avr, crb_avr
 
 def execute_UPGA_J_decay(model_UPGA_J_decay, H_test, Pt):
-    rates, crbs, _, F, W = model_UPGA_J_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, hard_halt=False)
+    rates, crbs, _, F, W = model_UPGA_J_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, hard_halt=True)
     rate_avr = [r.detach().cpu().numpy() for r in (sum(rates) / len(H_test[0]))][-1]
     crb_avr = [r.detach().item() for r in (sum(crbs) / len(H_test[0]))][-1]
     return rate_avr, crb_avr
