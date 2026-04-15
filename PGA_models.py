@@ -239,7 +239,8 @@ class StepController(nn.Module):
 
     def forward(self, ii, n_iter_outer):
         """Returns j_soft: soft step count ∈ (0, max_inner]."""
-        x = torch.tensor([[ii / max(n_iter_outer, 1)]], dtype=REAL_DTYPE)
+        dev = next(self.parameters()).device
+        x = torch.tensor([[ii / max(n_iter_outer, 1)]], dtype=REAL_DTYPE, device=dev)
         return self.net(x).squeeze() * self.max_inner
 
     def gate(self, j_soft, jj):
