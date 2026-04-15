@@ -222,7 +222,7 @@ if run_RKD_Distillation == 1:
         num_batches = 0
         H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
 
-        for i_batch in range(0, len(H_train[0]), batch_size):
+        for i_batch in range(0, len(H_train), batch_size):
             H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1).to(device)
             current_bs = H.shape[1]
             snr_dB_train = np.random.choice(snr_dB_list)
@@ -235,34 +235,22 @@ if run_RKD_Distillation == 1:
             with torch.no_grad():
                 print(f'Calculating teacher outputs for batch {i_batch} ...')
                 _, _, F_t, W_t = model_teacher.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J20)
-                #print(W_t.shape)
                 T_rkd = torch.matmul(F_t, W_t).view(current_bs, -1)
-                #print(T_rkd.shape)
                 teacher_task_loss= get_sum_loss(F_t, W_t, H, Rtrain, snr_train, current_bs)
-                #Normalize
                 teacher_repr = torch.nn.functional.normalize(T_rkd, dim=1).detach()
-                #print(teacher_repr.shape)
             # Student
             rate, _, F_s, W_s = model_student.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10)
             S_rkd = torch.matmul(F_s, W_s).view(current_bs, -1)
             #Normalize
             student_repr = torch.nn.functional.normalize(S_rkd, dim=1)
-            #print(student_repr.shape)
-            # Loss
-            # print(f'Calculating losses for batch {i_batch} ...')
             loss_task = get_sum_loss(F_s, W_s, H, Rtrain, snr_train, current_bs)
-            # print(f'Loss task: {loss_task.item():.4f}, Loss teacher: {teacher_task_loss.item():.4f}')
             loss_dist = rkd_distance_loss(teacher_repr, student_repr)
-            # print(f'Loss dist: {loss_dist.item():.4f}')
             loss_angle = rkd_angle_loss(teacher_repr, student_repr)
             
             # print the loss for the batch nunber
             print(f'Batch {i_batch} | Loss task: {loss_task.item():.4f}, Loss dist: {loss_dist.item():.4f}, Loss angle: {loss_angle.item():.4f}')
 
             total_loss = loss_task + (lambda_dist * loss_dist + lambda_angle * loss_angle)
-            #criterion_mse = torch.nn.MSELoss()
-            #loss_mse = criterion_mse(teacher_task_loss, loss_task)
-            #total_loss = loss_mse
             
             optimizer.zero_grad()
             total_loss.backward()
