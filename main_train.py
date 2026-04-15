@@ -260,8 +260,7 @@ if run_UPGA_J10_PRCDN == 1:
 # ============================================================= proposed unfolding PGA with learnable halting controller ====
 if run_UPGA_J_decay == 1:
     model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay,
-                                             hidden1=HALT_HIDDEN1,
-                                             hidden2=HALT_HIDDEN2)
+                                             hidden=STEP_CTRL_HIDDEN)
     optimizer = torch.optim.Adam(model_UPGA_J_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
@@ -283,13 +282,13 @@ if run_UPGA_J_decay == 1:
                 H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer,
                 track_metrics=False, hard_halt=False)
 
-            # ACT-style loss: halt-weighted task quality + efficiency penalty.
-            # weighted_task_loss gives the controller a quality gradient (halt at
-            # the best-performing step); ponder_cost penalises excessive inner steps.
-            loss = (model_UPGA_J_decay.weighted_task_loss
-                    + HALT_LAMBDA * model_UPGA_J_decay.ponder_cost)
+            # Task loss + efficiency penalty (lambda * avg inner steps per outer iter).
+            # Gradient flows: task_loss → F_final → gate_jj → j_soft → controller.
+            # So the controller learns to halt when F quality is already good.
+            task_loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
+            loss = task_loss + HALT_LAMBDA * model_UPGA_J_decay.total_j_soft
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], "
-                  f"Loss: {loss.item():.4f}, Ponder: {model_UPGA_J_decay.ponder_cost:.1f}")
+                  f"Loss: {loss.item():.4f}, Avg steps: {model_UPGA_J_decay.total_j_soft.item():.2f}")
 
             optimizer.zero_grad()
             loss.backward()

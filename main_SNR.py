@@ -32,8 +32,7 @@ if run_conv_PGA_J10 == 1:
     )
 if run_UPGA_J_decay == 1:
     model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay,
-                                              hidden1=HALT_HIDDEN1,
-                                              hidden2=HALT_HIDDEN2)
+                                              hidden=STEP_CTRL_HIDDEN)
     model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device), strict=False)
 if run_UPGA_J_GradReuse == 1:
     model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)

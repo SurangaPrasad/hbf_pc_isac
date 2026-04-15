@@ -204,64 +204,47 @@ class PGA_Unfold_J10(nn.Module):
         power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
-# ============================================== Halting Controller ==============================
-class HaltingController(nn.Module):
-    """Small MLP that predicts a halting probability p_continue ∈ (0, 1).
+# ============================================== Step Controller ==============================
+class StepController(nn.Module):
+    """Predicts the number of inner F-steps for a given outer iteration.
 
-    Input features (per inner step):
-        0 : ii / n_iter_outer              – normalised outer iteration index
-        1 : jj / max_inner                 – normalised inner iteration index
-        2 : current_rate                   – sum-rate after the latest F-update
-        3 : Δrate                          – rate improvement w.r.t. previous inner step
-        4 : current_crb                    – CRB metric after the latest F-update
-        5 : Δcrb                           – CRB improvement w.r.t. previous inner step
-        6 : ||grad_F||                     – L2 norm of the combined F gradient
-        7 : power                          – current transmit power ||F W||_F^2
+    Input : ii / n_iter_outer  (outer-iteration progress, scalar in [0, 1])
+    Output: j_soft ∈ (0, max_inner]  (soft continuous step count)
 
-    Output:
-        scalar p_continue ∈ (0, 1) via sigmoid.
+    **Training (soft gate):**  A differentiable sigmoid gate
+        gate_jj = sigmoid(TEMPERATURE * (j_soft - jj))
+    is applied to each inner F-step delta, approximating:
+        gate_jj ≈ 1  for jj < j_soft  (step is included)
+        gate_jj ≈ 0  for jj > j_soft  (step is excluded)
+    Task-loss gradients flow through gate → j_soft → controller weights,
+    so the controller learns to halt when F quality is already good.
+    An efficiency penalty  lambda * j_soft  discourages unnecessary steps.
+
+    **Inference (hard round):**
+        j_hard = round(j_soft).clamp(1, max_inner)
+    Exactly j_hard steps are executed at full magnitude — no gates.
     """
 
-    STATE_DIM = 8  # number of input features
+    TEMPERATURE = 5.0  # gate sharpness: higher → more step-function-like
 
-    def __init__(self, hidden1=32, hidden2=16):
+    def __init__(self, max_inner, hidden=16):
         super().__init__()
+        self.max_inner = max_inner
         self.net = nn.Sequential(
-            nn.Linear(self.STATE_DIM, hidden1),
-            nn.ReLU(),
-            nn.Linear(hidden1, hidden2),
-            nn.ReLU(),
-            nn.Linear(hidden2, 1),
+            nn.Linear(1, hidden),
+            nn.Tanh(),
+            nn.Linear(hidden, 1),
             nn.Sigmoid(),
         )
 
-    def forward(self, state):
-        """state: (STATE_DIM,) → scalar p_continue."""
-        return self.net(state).squeeze(-1)
+    def forward(self, ii, n_iter_outer):
+        """Returns j_soft: soft step count ∈ (0, max_inner]."""
+        x = torch.tensor([[ii / max(n_iter_outer, 1)]], dtype=REAL_DTYPE)
+        return self.net(x).squeeze() * self.max_inner
 
-
-def build_halting_state(ii, jj, n_iter_outer, max_inner,
-                        current_rate, prev_rate,
-                        current_crb, prev_crb,
-                        grad_norm_F, power):
-    """Assemble the feature vector consumed by :class:`HaltingController`.
-
-    All metric inputs should be Python floats (or 0-dim tensors that will be
-    converted).  Returns a 1-D tensor of shape (STATE_DIM,) on CPU.
-    """
-    delta_rate = current_rate - prev_rate
-    delta_crb  = current_crb - prev_crb
-    state = torch.tensor([
-        ii / max(n_iter_outer, 1),
-        jj / max(max_inner, 1),
-        current_rate,
-        delta_rate,
-        current_crb,
-        delta_crb,
-        grad_norm_F,
-        power,
-    ], dtype=REAL_DTYPE)
-    return state
+    def gate(self, j_soft, jj):
+        """Soft on/off gate for inner step jj given soft step count j_soft."""
+        return torch.sigmoid(self.TEMPERATURE * (j_soft - jj))
 
 
 # ============================================== Unfolded PGA with learnable halting controller ==============================
@@ -304,18 +287,14 @@ class PGA_Unfold_J_decay(nn.Module):
     total_inner_steps: int   – actual inner steps executed (meaningful only with hard_halt).
     """
 
-    def __init__(self, step_size, hidden1=32, hidden2=16):
+    def __init__(self, step_size, hidden=16):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # [max_inner, n_iter_outer, K+1]
-        # Place controller and threshold on the same device as step_size so the
-        # model works on both CPU and CUDA without needing an explicit .to(device) call.
         _dev = step_size.device
-        self.controller = HaltingController(hidden1=hidden1, hidden2=hidden2).to(_dev)
-        # Learnable halting threshold initialised at 0.95 (inverse-sigmoid ≈ 3.0)
-        self.halt_threshold = nn.Parameter(torch.tensor(3.0, device=_dev))
-        self.ponder_cost = 0.0
+        self.controller = StepController(self.max_inner, hidden=hidden).to(_dev)
+        self.total_j_soft = 0.0       # avg predicted steps/outer iter (last execute_PGA)
         self.total_inner_steps = 0
-        self.w_update_slots = []  # slot index of each W-update; set during execute_PGA
+        self.w_update_slots = []      # slot index of each W-update; set during execute_PGA
 
     @property
     def max_inner(self):
@@ -325,162 +304,74 @@ class PGA_Unfold_J_decay(nn.Module):
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer,
                     track_metrics=True, hard_halt=False):
         # Guard: ensure controller is on the same device as the input data.
-        # This handles the case where the model was constructed before the
-        # device was known (e.g. loaded from checkpoint then moved).
         if next(self.controller.parameters()).device != H.device:
             self.controller.to(H.device)
         rate_init, F, W = initialize(H, Pt, initial_normalization)
         B = len(H[0])
         max_inner = self.max_inner
 
-        # Worst-case metric array size: max_inner F-slots + 1 W-slot per outer iter
+        # Worst-case metric array: max_inner F-slots + 1 W-slot per outer iter
         total_slots_max = n_iter_outer * (max_inner + 1)
         rate_over_iters  = torch.zeros(total_slots_max, B, device=H.device)
         crb_over_iters   = torch.zeros(total_slots_max, B, device=H.device)
         power_over_iters = torch.zeros(total_slots_max, B, device=H.device)
 
         slot = 0
-        ponder_cost = torch.tensor(0.0, device=H.device)
-        # ACT-style halt-weighted task loss: gives the controller a quality signal.
-        # At each inner step j we accumulate p_halt_j * proxy_quality_j using the
-        # already-computed (no-grad) cur_rate and cur_crb values, so no extra
-        # forward passes are needed.  The gradient flows through p_halt_j →
-        # controller parameters only, giving the signal: "halt at j if quality
-        # is already good; keep going if quality is still improving".
-        weighted_task_loss = torch.tensor(0.0, device=H.device)
+        total_j_soft = torch.tensor(0.0, device=H.device)
         total_inner_steps = 0
-        threshold = torch.sigmoid(self.halt_threshold)  # ∈ (0, 1)
-        w_update_slots = []  # records the slot index of each W-update
-
-        # Tracking for controller state across outer iterations
-        prev_rate_outer = 0.0
-        prev_crb_outer  = 0.0
+        w_update_slots = []
 
         for ii in range(n_iter_outer):
-            # ---- Inner F-update loop with halting ----
-            prev_rate = prev_rate_outer
-            prev_crb  = prev_crb_outer
-
             if hard_halt:
-                # ---- Hard halting: actually break early (inference) ----
-                cum_halt = torch.tensor(0.0, device=H.device)
-                for jj in range(max_inner):
-                    # Compute gradients
+                # ---- Hard halting (inference): controller predicts j_hard steps ----
+                with torch.no_grad():
+                    j_soft = self.controller(ii, n_iter_outer).to(H.device)
+                    j_hard = int(j_soft.round().clamp(min=1, max=max_inner).item())
+
+                for jj in range(j_hard):
                     grad_F_com = get_grad_F_com(H, F, W)
                     grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                     if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                         print('Error NaN gradients!!!!!!!!!!!!!!!')
-
-                    # Apply gradient step
-                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    delta_F = (self.step_size[jj][ii][0] * grad_F_com * WEIGHT_F_COM
+                               + self.step_size[jj][ii][0] * grad_F_crb * WEIGHT_F_CRB)
+                    F = F + delta_F
                     F = normalize_power(F, W, H, Pt)
                     total_inner_steps += 1
-
-                    # Evaluate metrics for controller state
-                    with torch.no_grad():
-                        cur_rate = get_sum_rate(H, F, W, Pt).item()
-                        cur_crb  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).mean().item()
-                        cur_power = get_power(F, W).mean().item()
-                        grad_norm = (grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB).norm().item()
-
                     if track_metrics:
-                        rate_over_iters[slot]  = cur_rate
-                        crb_over_iters[slot]   = cur_crb
-                        power_over_iters[slot] = cur_power
+                        with torch.no_grad():
+                            rate_over_iters[slot]  = get_sum_rate(H, F, W, Pt).detach()
+                            crb_over_iters[slot]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                            power_over_iters[slot] = get_power(F, W).detach()
                     slot += 1
-
-                    # Query controller for halting decision
-                    state = build_halting_state(
-                        ii, jj, n_iter_outer, max_inner,
-                        cur_rate, prev_rate, cur_crb, prev_crb,
-                        grad_norm, cur_power,
-                    ).to(H.device)
-                    p_continue = self.controller(state)
-                    cum_halt = cum_halt + (1.0 - p_continue)
-
-                    prev_rate = cur_rate
-                    prev_crb  = cur_crb
-
-                    if cum_halt >= threshold:
-                        break
-
-                prev_rate_outer = prev_rate
-                prev_crb_outer  = prev_crb
 
             else:
-                # ---- Soft halting: full gradient steps + ACT-style training loss ----
-                # Steps are executed at full magnitude (identical to hard halting),
-                # so the learned step_size values are consistent between training and
-                # inference — no train/inference mismatch.
-                # The controller is trained via two complementary signals:
-                #   weighted_task_loss = Σ_{j,ii} p_halt_j * proxy_quality_j
-                #     → pushes p_halt toward the step j with best task performance
-                #   ponder_cost = Σ_{j,ii} (j+1) * p_halt_j
-                #     → penalises taking unnecessary inner steps (efficiency)
-                # Their balance (controlled by HALT_LAMBDA) determines the optimal
-                # hard-halt point at inference.
-                remaining    = torch.tensor(1.0, device=H.device)
-                halt_probs   = []  # p_halt per step, for ponder cost
+                # ---- Soft gating (training): differentiable step-count prediction ----
+                # controller(ii) outputs j_soft ∈ (0, max_inner]; a sigmoid gate
+                #   gate_jj = sigmoid(T * (j_soft - jj))
+                # smoothly includes (≈1) or excludes (≈0) each F-update delta.
+                # Task-loss gradient flows: loss → F_final → gate_jj → j_soft → controller.
+                # Efficiency loss: lambda * total_j_soft encourages using fewer steps.
+                j_soft = self.controller(ii, n_iter_outer).to(H.device)
+                total_j_soft = total_j_soft + j_soft
 
                 for jj in range(max_inner):
-                    # Compute gradients
                     grad_F_com = get_grad_F_com(H, F, W)
                     grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                     if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                         print('Error NaN gradients!!!!!!!!!!!!!!!')
-
-                    # Full gradient step — no gating, consistent with hard halting
-                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    delta_F = (self.step_size[jj][ii][0] * grad_F_com * WEIGHT_F_COM
+                               + self.step_size[jj][ii][0] * grad_F_crb * WEIGHT_F_CRB)
+                    gate = self.controller.gate(j_soft, jj)
+                    F = F + gate * delta_F
                     F = normalize_power(F, W, H, Pt)
                     total_inner_steps += 1
-
-                    # Evaluate metrics for controller state (detach to avoid 2nd-order grads)
-                    with torch.no_grad():
-                        cur_rate = get_sum_rate(H, F, W, Pt).item()
-                        cur_crb  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).mean().item()
-                        cur_power = get_power(F, W).mean().item()
-                        grad_norm = (grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB).norm().item()
-
-                    # Query controller
-                    state = build_halting_state(
-                        ii, jj, n_iter_outer, max_inner,
-                        cur_rate, prev_rate, cur_crb, prev_crb,
-                        grad_norm, cur_power,
-                    ).to(H.device)
-                    p_continue = self.controller(state)  # scalar ∈ (0,1)
-
-                    if jj < max_inner - 1:
-                        p_halt = remaining * (1.0 - p_continue)
-                    else:
-                        # Last step: assign all remaining probability mass
-                        p_halt = remaining
-
-                    halt_probs.append(p_halt)
-                    remaining = remaining * p_continue
-
-                    # ACT quality signal: proxy task quality at this F (scalars, no grad)
-                    proxy_quality_j = -(OMEGA * cur_rate + cur_crb)  # matches get_sum_loss sign
-                    weighted_task_loss = weighted_task_loss + p_halt * proxy_quality_j
-
-                    prev_rate = cur_rate
-                    prev_crb  = cur_crb
-
                     if track_metrics:
-                        rate_over_iters[slot]  = cur_rate
-                        crb_over_iters[slot]   = cur_crb
-                        power_over_iters[slot] = cur_power
+                        with torch.no_grad():
+                            rate_over_iters[slot]  = get_sum_rate(H, F, W, Pt).detach()
+                            crb_over_iters[slot]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                            power_over_iters[slot] = get_power(F, W).detach()
                     slot += 1
-
-                # Ponder cost: expected number of inner steps for this outer iter
-                expected_steps = sum((j + 1) * w for j, w in enumerate(halt_probs))
-                ponder_cost = ponder_cost + expected_steps
-
-                prev_rate_outer = prev_rate
-                prev_crb_outer  = prev_crb
 
             F = project_unit_modulus(F)
 
@@ -502,10 +393,8 @@ class PGA_Unfold_J_decay(nn.Module):
                 power_over_iters[slot] = get_power(F, W).detach()
             slot += 1
 
-        # Store ponder cost, step count, and W-update positions for external use
-        self.ponder_cost = ponder_cost
-        # Normalise by n_iter_outer so scale matches a single-step task loss
-        self.weighted_task_loss = weighted_task_loss / max(n_iter_outer, 1)
+        # Store step count and W-update positions for external use
+        self.total_j_soft = total_j_soft / max(n_iter_outer, 1)  # avg predicted steps/outer
         self.total_inner_steps = total_inner_steps
         self.w_update_slots = np.array(w_update_slots)
 

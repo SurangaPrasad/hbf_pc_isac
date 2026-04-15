@@ -108,9 +108,8 @@ if run_program == 1:
     if run_UPGA_J_decay == 1:
         print('Running unfolded PGA with learnable halting controller...')
         model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay,
-                                                  hidden1=HALT_HIDDEN1,
-                                                  hidden2=HALT_HIDDEN2)
-        model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device), strict=True)
+                                                  hidden=STEP_CTRL_HIDDEN)
+        model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device), strict=False)
 
         # hard_halt=True: halting controller stops inner F-updates early (typically
         # after ~3 steps with the current checkpoint), saving ~64% of F-update
