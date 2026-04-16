@@ -286,10 +286,21 @@ if run_UPGA_J_decay == 1:
             # Gradient flows: task_loss → F_final → gate_jj → j_soft → controller.
             # So the controller learns to halt when F quality is already good.
             task_loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
-            loss = task_loss + HALT_LAMBDA * model_UPGA_J_decay.total_j_soft
+
+            # Position-aware efficiency penalty:
+            #   weight[ii] rises linearly from ~0 (early) to ~2 (late outer iters).
+            # Early iterations need many F-steps to converge → near-zero penalty.
+            # Late iterations are near convergence → heavy penalty pushes fewer steps.
+            # This breaks the flat-4-everywhere local minimum.
+            j_per_iter = model_UPGA_J_decay.j_soft_per_iter   # (n_iter_outer,) differentiable
+            n_outer_actual = j_per_iter.shape[0]
+            iter_weights = torch.linspace(0.1, 1.9, n_outer_actual,
+                                          dtype=REAL_DTYPE, device=j_per_iter.device)
+            weighted_penalty = (iter_weights * j_per_iter).mean()
+            loss = task_loss + HALT_LAMBDA * weighted_penalty
 
             # Per-iter stats: show step distribution across outer iterations
-            j_arr = model_UPGA_J_decay.j_soft_per_iter.detach()
+            j_arr = j_per_iter.detach()
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], "
                   f"Loss: {loss.item():.4f}, "
                   f"Steps min/mean/max: {j_arr.min().item():.1f}/{j_arr.mean().item():.1f}/{j_arr.max().item():.1f}")
