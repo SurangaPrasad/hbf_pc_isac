@@ -122,9 +122,11 @@ if run_program == 1:
         # Per-outer-iteration inner step counts (derived from w_update_slots spacing)
         ws = model_UPGA_J_decay.w_update_slots
         inner_counts = np.diff(ws, prepend=-1) - 1  # ws[ii] - ws[ii-1] - 1
-        print(f'  Inner iterations per outer iteration:')
-        for ii, cnt in enumerate(inner_counts):
-            print(f'    outer_iter={ii+1:3d}: {int(cnt)} inner steps')
+        print(f'  Inner steps per outer iteration (min/mean/max): '
+              f'{inner_counts.min()}/{inner_counts.mean():.1f}/{inner_counts.max()}')
+        # Print every 10th outer iteration for a quick overview
+        for ii in range(0, len(inner_counts), 10):
+            print(f'    outer_iter={ii+1:3d}: {int(inner_counts[ii])} inner steps')
         rate_iter_UPGA_J_decay  = sum_rate_UPGA_J_decay.mean(0).cpu().numpy()
         crb_iter_UPGA_J_decay   = crb_UPGA_J_decay.mean(0).cpu().numpy()
         power_iter_UPGA_J_decay = power_UPGA_J_decay.mean(0).cpu().numpy()

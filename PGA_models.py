@@ -295,7 +295,8 @@ class PGA_Unfold_J_decay(nn.Module):
         self.step_size = nn.Parameter(step_size)  # [max_inner, n_iter_outer, K+1]
         _dev = step_size.device
         self.controller = StepController(self.max_inner, hidden=hidden).to(_dev)
-        self.total_j_soft = 0.0       # avg predicted steps/outer iter (last execute_PGA)
+        self.j_soft_per_iter = None   # (n_iter_outer,) tensor: predicted steps per outer iter
+        self.total_j_soft = 0.0       # scalar mean of j_soft_per_iter (backward compat)
         self.total_inner_steps = 0
         self.w_update_slots = []      # slot index of each W-update; set during execute_PGA
 
@@ -320,7 +321,7 @@ class PGA_Unfold_J_decay(nn.Module):
         power_over_iters = torch.zeros(total_slots_max, B, device=H.device)
 
         slot = 0
-        total_j_soft = torch.tensor(0.0, device=H.device)
+        j_soft_list = []   # collect per-outer-iter j_soft values
         total_inner_steps = 0
         w_update_slots = []
 
@@ -373,7 +374,7 @@ class PGA_Unfold_J_decay(nn.Module):
                 # Task-loss gradient flows: loss → F_final → gate_jj → j_soft → controller.
                 # Efficiency loss: lambda * total_j_soft encourages using fewer steps.
                 j_soft = self.controller(ctrl_state)
-                total_j_soft = total_j_soft + j_soft
+                j_soft_list.append(j_soft)
 
                 for jj in range(max_inner):
                     grad_F_com = get_grad_F_com(H, F, W)
@@ -420,8 +421,13 @@ class PGA_Unfold_J_decay(nn.Module):
                 cur_rate = get_sum_rate(H, F, W, Pt).item()
                 cur_crb  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).mean().item()
 
-        # Store step count and W-update positions for external use
-        self.total_j_soft = total_j_soft / max(n_iter_outer, 1)  # avg predicted steps/outer
+        # Store per-iter step counts and W-update positions for external use
+        if j_soft_list:
+            self.j_soft_per_iter = torch.stack(j_soft_list)      # (n_iter_outer,) differentiable
+            self.total_j_soft = self.j_soft_per_iter.mean()       # scalar mean (backward compat)
+        else:
+            self.j_soft_per_iter = None
+            self.total_j_soft = torch.tensor(0.0, device=H.device)
         self.total_inner_steps = total_inner_steps
         self.w_update_slots = np.array(w_update_slots)
 

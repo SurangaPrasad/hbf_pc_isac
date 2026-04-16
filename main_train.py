@@ -287,8 +287,12 @@ if run_UPGA_J_decay == 1:
             # So the controller learns to halt when F quality is already good.
             task_loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             loss = task_loss + HALT_LAMBDA * model_UPGA_J_decay.total_j_soft
+
+            # Per-iter stats: show step distribution across outer iterations
+            j_arr = model_UPGA_J_decay.j_soft_per_iter.detach()
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], "
-                  f"Loss: {loss.item():.4f}, Avg steps: {model_UPGA_J_decay.total_j_soft.item():.2f}")
+                  f"Loss: {loss.item():.4f}, "
+                  f"Steps min/mean/max: {j_arr.min().item():.1f}/{j_arr.mean().item():.1f}/{j_arr.max().item():.1f}")
 
             optimizer.zero_grad()
             loss.backward()
