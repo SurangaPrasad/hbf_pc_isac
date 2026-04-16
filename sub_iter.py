@@ -28,22 +28,22 @@ if run_program == 1:
         rate_conv_PGA_J10, tau_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, R, snr,
                                                                                            n_iter_outer,
                                                                                            n_iter_inner_J10)
-        rate_iter_conv_PGA_J10 = [r.detach().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
-        tau_iter_conv_PGA_J10 = [e.detach().numpy() for e in (sum(tau_conv_PGA_J10) / (len(H_test[0])))]
+        rate_iter_conv_PGA_J10 = [r.detach().cpu().numpy() for r in (sum(rate_conv_PGA_J10) / len(H_test[0]))]
+        tau_iter_conv_PGA_J10 = [e.detach().cpu().numpy() for e in (sum(tau_conv_PGA_J10) / (len(H_test[0])))]
 
     # ====================================================== Proposed Unfolded PGA light ====================================
     if run_UPGA_J10 == 1:
         print('Running unfolded PGA with J = 10...')
         # Create new model and load states
         model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
-        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10))
+        model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
 
         sum_rate_UPGA_J10, tau_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, R,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
-        rate_iter_UPGA_J10 = [r.detach().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
-        tau_iter_UPGA_J10 = [e.detach().numpy() for e in (sum(tau_UPGA_J10) / (len(H_test[0])))]
+        rate_iter_UPGA_J10 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J10) / len(H_test[0]))]
+        tau_iter_UPGA_J10 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J10) / (len(H_test[0])))]
 
 print('Finished running algorithms for all omega values.')
 
