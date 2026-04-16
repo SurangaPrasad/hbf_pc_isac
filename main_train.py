@@ -294,7 +294,7 @@ if run_UPGA_J_decay == 1:
             # This breaks the flat-4-everywhere local minimum.
             j_per_iter = model_UPGA_J_decay.j_soft_per_iter   # (n_iter_outer,) differentiable
             n_outer_actual = j_per_iter.shape[0]
-            iter_weights = torch.linspace(0.1, 1.9, n_outer_actual,
+            iter_weights = torch.linspace(0.1, 3.9, n_outer_actual,
                                           dtype=REAL_DTYPE, device=j_per_iter.device)
             weighted_penalty = (iter_weights * j_per_iter).mean()
             loss = task_loss + HALT_LAMBDA * weighted_penalty
