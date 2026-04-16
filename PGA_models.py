@@ -206,18 +206,21 @@ class PGA_Unfold_J10(nn.Module):
 
 # ============================================== Step Controller ==============================
 class StepController(nn.Module):
-    """Predicts the number of inner F-steps for a given outer iteration.
+    """Predicts the number of inner F-steps based on the current optimization state.
 
-    Input : ii / n_iter_outer  (outer-iteration progress, scalar in [0, 1])
+    Input features (5-dim, computed before each outer iteration's F-loop):
+        0 : ii / n_iter_outer     – outer-iteration progress  [0, 1]
+        1 : current_rate          – sum-rate after last W-update
+        2 : delta_rate            – rate change from previous outer iter
+        3 : current_crb           – CRB after last W-update
+        4 : delta_crb             – CRB change from previous outer iter
+
     Output: j_soft ∈ (0, max_inner]  (soft continuous step count)
 
     **Training (soft gate):**  A differentiable sigmoid gate
         gate_jj = sigmoid(TEMPERATURE * (j_soft - jj))
-    is applied to each inner F-step delta, approximating:
-        gate_jj ≈ 1  for jj < j_soft  (step is included)
-        gate_jj ≈ 0  for jj > j_soft  (step is excluded)
-    Task-loss gradients flow through gate → j_soft → controller weights,
-    so the controller learns to halt when F quality is already good.
+    is applied to each inner F-step delta.  Task-loss gradients flow:
+        loss → F_final → gate_jj → j_soft → controller weights.
     An efficiency penalty  lambda * j_soft  discourages unnecessary steps.
 
     **Inference (hard round):**
@@ -225,23 +228,22 @@ class StepController(nn.Module):
     Exactly j_hard steps are executed at full magnitude — no gates.
     """
 
+    STATE_DIM = 5
     TEMPERATURE = 5.0  # gate sharpness: higher → more step-function-like
 
     def __init__(self, max_inner, hidden=16):
         super().__init__()
         self.max_inner = max_inner
         self.net = nn.Sequential(
-            nn.Linear(1, hidden),
+            nn.Linear(self.STATE_DIM, hidden),
             nn.Tanh(),
             nn.Linear(hidden, 1),
             nn.Sigmoid(),
         )
 
-    def forward(self, ii, n_iter_outer):
-        """Returns j_soft: soft step count ∈ (0, max_inner]."""
-        dev = next(self.parameters()).device
-        x = torch.tensor([[ii / max(n_iter_outer, 1)]], dtype=REAL_DTYPE, device=dev)
-        return self.net(x).squeeze() * self.max_inner
+    def forward(self, state):
+        """state: (STATE_DIM,) tensor → j_soft scalar ∈ (0, max_inner]."""
+        return self.net(state.unsqueeze(0)).squeeze() * self.max_inner
 
     def gate(self, j_soft, jj):
         """Soft on/off gate for inner step jj given soft step count j_soft."""
@@ -322,11 +324,28 @@ class PGA_Unfold_J_decay(nn.Module):
         total_inner_steps = 0
         w_update_slots = []
 
+        # Track metrics across outer iterations for controller input
+        prev_rate = 0.0
+        prev_crb  = 0.0
+        # Compute initial metrics (before any optimization step)
+        with torch.no_grad():
+            cur_rate = get_sum_rate(H, F, W, Pt).item()
+            cur_crb  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).mean().item()
+
         for ii in range(n_iter_outer):
+            # Build state for controller: [progress, rate, delta_rate, crb, delta_crb]
+            ctrl_state = torch.tensor([
+                ii / max(n_iter_outer, 1),
+                cur_rate,
+                cur_rate - prev_rate,
+                cur_crb,
+                cur_crb - prev_crb,
+            ], dtype=REAL_DTYPE, device=H.device)
+
             if hard_halt:
                 # ---- Hard halting (inference): controller predicts j_hard steps ----
                 with torch.no_grad():
-                    j_soft = self.controller(ii, n_iter_outer).to(H.device)
+                    j_soft = self.controller(ctrl_state)
                     j_hard = int(j_soft.round().clamp(min=1, max=max_inner).item())
 
                 for jj in range(j_hard):
@@ -348,12 +367,12 @@ class PGA_Unfold_J_decay(nn.Module):
 
             else:
                 # ---- Soft gating (training): differentiable step-count prediction ----
-                # controller(ii) outputs j_soft ∈ (0, max_inner]; a sigmoid gate
+                # controller(state) outputs j_soft ∈ (0, max_inner]; a sigmoid gate
                 #   gate_jj = sigmoid(T * (j_soft - jj))
                 # smoothly includes (≈1) or excludes (≈0) each F-update delta.
                 # Task-loss gradient flows: loss → F_final → gate_jj → j_soft → controller.
                 # Efficiency loss: lambda * total_j_soft encourages using fewer steps.
-                j_soft = self.controller(ii, n_iter_outer).to(H.device)
+                j_soft = self.controller(ctrl_state)
                 total_j_soft = total_j_soft + j_soft
 
                 for jj in range(max_inner):
@@ -393,6 +412,13 @@ class PGA_Unfold_J_decay(nn.Module):
                 crb_over_iters[slot]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                 power_over_iters[slot] = get_power(F, W).detach()
             slot += 1
+
+            # Update tracked metrics for next outer iteration's controller input
+            prev_rate = cur_rate
+            prev_crb  = cur_crb
+            with torch.no_grad():
+                cur_rate = get_sum_rate(H, F, W, Pt).item()
+                cur_crb  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).mean().item()
 
         # Store step count and W-update positions for external use
         self.total_j_soft = total_j_soft / max(n_iter_outer, 1)  # avg predicted steps/outer
