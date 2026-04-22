@@ -15,7 +15,7 @@ def randn_complex(shape, device=None):
 
 
 # ==================================== initialize F and W ===========================
-def initialize(H, R, Pt, normalization, pc=False):
+def initialize(H, Pt, normalization, pc=False):
     if init_scheme == 'conv':
         # randomizing F
         F = randn_complex((len(H[0]), Nt, Nrf), device=H.device)
@@ -61,7 +61,7 @@ def initialize(H, R, Pt, normalization, pc=False):
             F = torch.cat(((F[None, :, :, :],) * K), 0)
         else:
             sys.stderr.write('Error: Wrong RF chain configuration....\n')
-        F = F * generage_partial_connection_mask(Nt, Nrf) if pc else F
+        F = F * generage_partial_connection_mask(Nt, Nrf, device=F.device) if pc else F
     elif init_scheme == 'svd':
         U, S, V_H = torch.linalg.svd(H)
         V = V_H
@@ -94,15 +94,20 @@ def initialize(H, R, Pt, normalization, pc=False):
         F, W = normalize(F, W, H, Pt)
     else:
         # only normalize W for power constraint
-        norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
-        W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
+        B = len(H[0])
+        norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
+        if torch.is_tensor(Pt) and Pt.dim() >= 1:
+            Pt_vec = Pt.to(dtype=norm2_FW.dtype, device=F.device)
+        else:
+            Pt_vec = torch.full((B,), float(Pt), dtype=norm2_FW.dtype, device=F.device)
+        W = torch.sqrt(Pt_vec / norm2_FW).view(B, 1, 1) * W
     # rate_0 = get_sum_rate(H, F, W)
-    rate_init = torch.zeros(1, len(H[0]))
-    beam_error_init = torch.zeros(1, len(H[0]))
+    rate_init = torch.zeros(1, len(H[0]), device=H.device)
+    # beam_error_init = torch.zeros(1, len(H[0]))
     rate_init[0, :] = get_sum_rate(H, F, W, Pt)
-    beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
+    # beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
 
-    return rate_init, beam_error_init, F, W
+    return rate_init, F, W
 
 
 # ==================================== initialize F and W with different methods for comparison ===========================
@@ -189,12 +194,17 @@ def initialize_schemes(H, R, Pt, init_method):
         W = FQ / (torch.linalg.matrix_norm(FQ, ord='fro').reshape(len(H[0]), 1, 1))
 
     # only normalize W for power constraint
+    B = len(H[0])
     norm2_FW = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
-    W = (torch.sqrt(Pt / norm2_FW.reshape(len(H[0]), 1, 1))) * W
+    if torch.is_tensor(Pt) and Pt.dim() >= 1:
+        Pt_vec = Pt.to(dtype=norm2_FW.dtype, device=F.device)
+    else:
+        Pt_vec = torch.full((B,), float(Pt), dtype=norm2_FW.dtype, device=F.device)
+    W = torch.sqrt(Pt_vec / norm2_FW).view(B, 1, 1) * W
 
     # rate_0 = get_sum_rate(H, F, W)
-    rate_init = torch.zeros(1, len(H[0]))
-    beam_error_init = torch.zeros(1, len(H[0]))
+    rate_init = torch.zeros(1, len(H[0]), device=H.device)
+    beam_error_init = torch.zeros(1, len(H[0]), device=H.device)
     rate_init[0, :] = get_sum_rate(H, F, W, Pt)
     beam_error_init[0, :] = get_beam_error(H, F, W, R, Pt)
 
@@ -250,33 +260,31 @@ def get_sum_rate(H, F, W, Pt):
     # if torch.any(power_all > power_high_threshold):
     #     sys.stderr.write('Error: power constraint violated\n')
 
-    F_H = torch.transpose(F, 2, 3).conj()
-    W_H = torch.transpose(W, 2, 3).conj()
-    V = W @ W_H  # K x train_size x Nrf x Nrf
-    rate = torch.zeros(len(H[0]), )
-    for m in range(M):
-        # mask_m = torch.ones(len(H), Nrf, M)
-        # mask_m[:, :, m] = torch.zeros(len(H), Nrf)
-        # W_m = W * mask_m
+    F_H = F.conj().transpose(-2, -1)              # (K, B, Nrf, Nt)
+    V = W @ W.conj().transpose(-2, -1)             # (K, B, Nrf, Nrf)
 
-        W_m = W.clone()  # Create a copy of the original matrix W
-        W_m[:, :, :, m] = 0.0  # Set the m-th column to zeros in the new matrix
+    # Build V_m for all m simultaneously: W_m = W with column m zeroed
+    Mval = W.shape[-1]
+    col_mask = (1.0 - torch.eye(Mval, device=W.device, dtype=W.real.dtype)).to(W.dtype)
+    W_m_all = W.unsqueeze(0) * col_mask.view(Mval, 1, 1, 1, Mval)  # (M, K, B, Nrf, M)
+    V_m_all = W_m_all @ W_m_all.conj().transpose(-1, -2)            # (M, K, B, Nrf, Nrf)
+    V_m_perm = V_m_all.permute(1, 2, 0, 3, 4)                       # (K, B, M, Nrf, Nrf)
 
-        # print(W_m[0][0])
-        # W_m = W[:, :, :, torch.arange(W.size(3)) != m]
-        V_m = W_m @ torch.transpose(W_m, 2, 3).conj()  # need to change to remove 1 column
-        h_mk0 = torch.unsqueeze(H[:, :, m, :], dim=2)
-        h_mk = torch.transpose(h_mk0, 2, 3)
-        h_mk_H = torch.transpose(h_mk, 2, 3).conj()
-        Htilde_mk = h_mk @ h_mk_H
-        trace_1 = get_trace(F @ V @ F_H @ Htilde_mk)
-        trace_2 = get_trace(F @ V_m @ F_H @ Htilde_mk)
-        rate = rate + (torch.log2(trace_1 + sigma2) - torch.log2(trace_2 + sigma2)).real
-        # print(rate)
-        # print((torch.log2(trace_1)).real)
-        # print((torch.log2(trace_2)).real)
-        # print('-------------------------------------')
-    sum_rate = torch.mean(rate)  # sum over all frequencies
+    # Channel outer products for all users: Htilde[k,b,m] = h_m h_m^H
+    h_all = H.unsqueeze(-1)                                           # (K, B, M, Nt, 1)
+    Htilde_all = h_all @ h_all.conj().transpose(-1, -2)               # (K, B, M, Nt, Nt)
+
+    # FVF_H: (K, B, Nt, Nt)
+    FVF_H = F @ V @ F_H
+    # trace_1[k,b,m] = trace(FVF_H[k,b] @ Htilde_all[k,b,m])
+    trace_1 = (FVF_H.unsqueeze(2) @ Htilde_all).diagonal(dim1=-1, dim2=-2).sum(-1)  # (K, B, M)
+
+    # trace_2[k,b,m] = trace(F[k,b] @ V_m[k,b,m] @ F_H[k,b] @ Htilde_all[k,b,m])
+    FVm_FH = F.unsqueeze(2) @ V_m_perm @ F_H.unsqueeze(2)            # (K, B, M, Nt, Nt)
+    trace_2 = (FVm_FH @ Htilde_all).diagonal(dim1=-1, dim2=-2).sum(-1)  # (K, B, M)
+
+    rate = (torch.log2(trace_1 + sigma2) - torch.log2(trace_2 + sigma2)).real.sum(-1)  # (K, B)
+    sum_rate = torch.mean(rate)
     return sum_rate
 
 
@@ -292,7 +300,33 @@ def get_beam_error(H, F, W, R, Pt):
     sum_error = torch.mean(error)
     return sum_error
 
+# ==================================== compute CRB  fishery equation function ===========================
+def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt):
+    F, W = normalize(F, W, H, Pt)
+    
+    A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
+    R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
 
+    A_dot_H = A_dot.conj().transpose(-2, -1)
+    W_H = W.conj().transpose(-2, -1)
+    F_H = F.conj().transpose(-2, -1)
+    
+    M = A_dot_H @ R_N_inv @ A_dot
+    inner_mat = W_H @ F_H @ M @ F @ W
+    batch_trace = (torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1))  # [K, batch_size]
+
+    fim = batch_trace.sum(0).real  # sum over K users -> [batch_size]
+
+    crb = torch.log(fim)  # [batch_size]
+
+    return crb
+
+# ====================================compute power of F and W ==========================
+
+def get_power(F, W):
+    # power = frobinus_norm(F * W)^2
+    power = torch.linalg.matrix_norm(F @ W, ord='fro') ** 2
+    return power
 # ==================================== compute MSE ===========================
 def get_MSE(F, W, at, R, Pt):
     X = F @ W
@@ -317,28 +351,50 @@ def get_trace(A):
 
 # ======== normalization to meet constant modulus and power constraint ===========================
 def normalize(F, W, H, Pt):
+    """Normalize F (constant-modulus) and W (power constraint).
+
+    Pt can be:
+      - a Python scalar / 0-dim tensor  → applied uniformly to all samples
+      - a 1-D tensor of shape (B,)      → per-sample power budget
+    """
+    B = len(H[0])
     F = F / (torch.abs(F) + 1e-12)
-    sum_norm_BB = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
+    sum_norm_BB = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
     sum_norm_BB = torch.clamp(sum_norm_BB, min=1e-6)
-    normalize_factor = torch.sqrt(K * Pt / sum_norm_BB).reshape(len(H[0]), 1, 1)
+    # Unify Pt to a (B,) tensor on the correct device
+    if torch.is_tensor(Pt) and Pt.dim() >= 1:
+        Pt_vec = Pt.to(dtype=sum_norm_BB.real.dtype if sum_norm_BB.is_complex() else sum_norm_BB.dtype,
+                       device=F.device)
+    else:
+        Pt_vec = torch.full((B,), float(Pt), dtype=sum_norm_BB.real.dtype if sum_norm_BB.is_complex() else sum_norm_BB.dtype,
+                            device=F.device)
+    normalize_factor = torch.sqrt(K * Pt_vec / sum_norm_BB).view(B, 1, 1)
     W = normalize_factor * W
-    # sum_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)/K
-    # print(sum_power)
-    # print(Pt)
     return F, W
 
 
 # ========================= normalize F based on power constraint =====================
 def normalize_power(F, W, H, Pt):
-    sum_norm_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)
+    """Normalize F to meet the per-sample power constraint.
+
+    Pt can be a scalar or a 1-D tensor of shape (B,).
+    """
+    B = len(H[0])
+    sum_norm_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
     sum_norm_power = torch.clamp(sum_norm_power, min=1e-6)
-    normalize_factor = torch.sqrt(Pt / sum_norm_power).reshape(len(H[0]), 1, 1)
+    if torch.is_tensor(Pt) and Pt.dim() >= 1:
+        Pt_vec = Pt.to(dtype=sum_norm_power.real.dtype if sum_norm_power.is_complex() else sum_norm_power.dtype,
+                       device=F.device)
+    else:
+        Pt_vec = torch.full((B,), float(Pt), dtype=sum_norm_power.real.dtype if sum_norm_power.is_complex() else sum_norm_power.dtype,
+                            device=F.device)
+    normalize_factor = torch.sqrt(Pt_vec / sum_norm_power).view(B, 1, 1)
     F = normalize_factor * F
     return F
 
 # ========================= generate PC mask =====================
-def generage_partial_connection_mask(N, M):
-    mask = torch.zeros((N, M), dtype=COMPLEX_DTYPE)
+def generage_partial_connection_mask(N, M, device=None):
+    mask = torch.zeros((N, M), dtype=COMPLEX_DTYPE, device=device)
     antennas_per_rf = N // M
     for rf in range(M):
         start_idx = rf * antennas_per_rf
@@ -438,45 +494,84 @@ def get_data_tensor(data_source):
     train_slice = np.ascontiguousarray(data_train_array[:, :max_train, :, :])
     test_slice = np.ascontiguousarray(data_test_array[:, :max_test, :, :])
 
-    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous()
-    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous()
+    H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous().to(device)
+    H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous().to(device)
     return H_train_tensor, H_test_tensor
 
 
 # =================================== load radar data generated in Matlab ==================================================
 def get_radar_data(snr_dB, H):
-    # radar info does not depend on channel
+    """Load pre-computed radar covariance matrix R and array-steering vectors.
+
+    snr_dB can be:
+      - a scalar (float / int / 0-d array) — same R replicated over the batch (original behaviour)
+      - a 1-D array of shape (B,)          — per-sample R assembled from the lookup table
+
+    Returns
+    -------
+    R          : torch tensor  (K, B, Nt, Nt)
+    at         : torch tensor  (K, B, Nt, n_angles)
+    theta      : np.ndarray    angle grid
+    ideal_beam : np.ndarray    ideal beampattern
+    """
     radar_data_file_name = directory_data + 'radar_data.mat'
     radar_data = scipy.io.loadmat(radar_data_file_name)
-    # R0_2D = radar_data['Cbar']
-    idx_snr = np.where(snr_dB_list == snr_dB)
+    R0_4D = radar_data['J']          # shape: (Nt, Nt, K_freq, n_snr)  or (Nt, Nt, n_snr) when K==1
 
-    if K == 1:
-        R0_4D = radar_data['J']
-        R0_2D = np.squeeze(R0_4D[:, :, 0, idx_snr])
-        R_array = np.tile(R0_2D, [1, len(H[0]), 1, 1])
-
-        at_2D = radar_data['a']
-        at_array_true = np.tile(at_2D, (1, train_size, 1, 1))
-        at0 = np.expand_dims(at_2D, axis=0)
-        at_array1 = np.tile(at0, (train_size, 1, 1, 1))
-        at_array = np.transpose(at_array1, (1, 0, 2, 3))  # test
-    else:
-        R0_4D = radar_data['J']
-        R0_2D = np.squeeze(R0_4D[:, :, :, idx_snr])
-        R_array0 = np.transpose(R0_2D, (2, 0, 1))
-        R_array1 = np.tile(R_array0, [len(H[0]), 1, 1, 1])
-        R_array = np.transpose(R_array1, (1, 0, 2, 3))
-
-        at_2D = radar_data['a']
-        at0 = np.transpose(at_2D, (2, 0, 1))
-        at_array1 = np.tile(at0, (train_size, 1, 1, 1))
-        at_array = np.transpose(at_array1, (1, 0, 2, 3))
-
-    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous()
-    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous()
+    at_2D = radar_data['a']
     theta = radar_data['theta']
     ideal_beam = radar_data['Pd_theta']
+
+    B = len(H[0])
+
+    # ------------------------------------------------------------------ #
+    # Determine whether snr_dB is a scalar or per-sample array
+    # ------------------------------------------------------------------ #
+    snr_dB_arr = np.atleast_1d(np.asarray(snr_dB, dtype=float)).ravel()
+    per_sample = snr_dB_arr.size > 1   # True  → per-sample path
+                                        # False → replicate-scalar path
+
+    if K == 1:
+        if per_sample:
+            # Build R per sample: shape (1, B, Nt, Nt)
+            R_list = []
+            for s in snr_dB_arr:
+                idx = np.where(snr_dB_list == s)[0]
+                R_s = np.squeeze(R0_4D[:, :, 0, idx])   # (Nt, Nt)
+                R_list.append(R_s[None, :, :])           # (1, Nt, Nt)
+            R_stack = np.stack(R_list, axis=0)           # (B, Nt, Nt)
+            R_array = R_stack[None, :, :, :]             # (1, B, Nt, Nt)
+        else:
+            idx_snr = np.where(snr_dB_list == snr_dB_arr[0])
+            R0_2D = np.squeeze(R0_4D[:, :, 0, idx_snr])
+            R_array = np.tile(R0_2D, [1, B, 1, 1])
+
+        at0 = np.expand_dims(at_2D, axis=0)
+        at_array1 = np.tile(at0, (B, 1, 1, 1))
+        at_array = np.transpose(at_array1, (1, 0, 2, 3))
+    else:
+        if per_sample:
+            R_list = []
+            for s in snr_dB_arr:
+                idx = np.where(snr_dB_list == s)[0]
+                R_s = np.squeeze(R0_4D[:, :, :, idx])   # (Nt, Nt, K)
+                R_s_k = np.transpose(R_s, (2, 0, 1))    # (K, Nt, Nt)
+                R_list.append(R_s_k[:, None, :, :])     # (K, 1, Nt, Nt)
+            R_stack = np.concatenate(R_list, axis=1)    # (K, B, Nt, Nt)
+            R_array = R_stack
+        else:
+            idx_snr = np.where(snr_dB_list == snr_dB_arr[0])
+            R0_2D = np.squeeze(R0_4D[:, :, :, idx_snr])
+            R_array0 = np.transpose(R0_2D, (2, 0, 1))
+            R_array1 = np.tile(R_array0, [B, 1, 1, 1])
+            R_array = np.transpose(R_array1, (1, 0, 2, 3))
+
+        at0 = np.transpose(at_2D, (2, 0, 1))
+        at_array1 = np.tile(at0, (B, 1, 1, 1))
+        at_array = np.transpose(at_array1, (1, 0, 2, 3))
+
+    R = torch.from_numpy(R_array).to(COMPLEX_DTYPE).contiguous().to(device)
+    at = torch.from_numpy(at_array).to(COMPLEX_DTYPE).contiguous().to(device)
 
     return R, at, theta, ideal_beam[0, :]
 
@@ -491,7 +586,7 @@ def get_beampattern(F, W, at, Pt):
     Bdiag = torch.diagonal(B, offset=0, dim1=-1, dim2=-2) / Pt
     # Bmean = 10 * torch.log10(torch.real(torch.mean(Bdiag, 1)))
     Bmean = torch.real(torch.mean(torch.mean(Bdiag, 1), 0))
-    B_array = Bmean.detach().numpy()
+    B_array = Bmean.detach().cpu().numpy()
     return B_array
 
 # if __name__ == '__main__':
@@ -519,20 +614,10 @@ def extract_active_elements(F):
         F_active: (B, Nt, 1) complex
     """
     B, _, Nt, Nrf = F.shape
-    antennas_per_rf = Nt // Nrf
-
-    F_active = torch.zeros(
-        (B, Nt, 1),
-        dtype=F.dtype,
-        device=F.device
-    )
-
-    for rf in range(Nrf):
-        start = rf * antennas_per_rf
-        end = (rf + 1) * antennas_per_rf
-
-        # Correct indexing: keep batch + freq dim
-        F_active[:, start:end, 0] = F[:, 0, start:end, rf]
-
+    aprf = Nt // Nrf
+    F_2d = F[:, 0, :, :]                               # (B, Nt, Nrf)
+    F_blocks = F_2d.reshape(B, Nrf, aprf, Nrf)          # (B, Nrf, aprf, Nrf)
+    F_diag = torch.diagonal(F_blocks, dim1=1, dim2=3)   # (B, aprf, Nrf)
+    F_active = F_diag.permute(0, 2, 1).reshape(B, Nt, 1)
     return F_active
     
