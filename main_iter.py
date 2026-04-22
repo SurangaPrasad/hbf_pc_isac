@@ -9,8 +9,8 @@ save_result = 0
 # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
 # Load training data
 H_train, H_test0 = get_data_tensor(data_source)
-# H_test = H_train[:, :test_size, :, :]
-H_test = H_train[:, 100:1+100, :, :]
+H_test = H_train[:, :test_size, :, :]
+# H_test = H_train[:, 100:1+100, :, :]
 
 R, at0, theta, ideal_beam = get_radar_data(snr_dB, H_test)
 at = at0[:, : test_size, :, :]

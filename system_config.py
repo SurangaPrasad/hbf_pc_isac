@@ -24,7 +24,7 @@ run_UPGA_J10_PRCDN = 0
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
 run_UPGA_J_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
-run_UPGA_J_GradReuse = 1   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
+run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
@@ -53,7 +53,7 @@ if normalize_tau == 0:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
     else:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_LoS"
-    OMEGA = 1
+    OMEGA = 4
     n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
 else:
     system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_normalize"
@@ -67,7 +67,7 @@ print(system_info)
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 476    # size of training set
-test_size = 1      # size of testing set
+test_size = 20      # size of testing set
 batch_size = len(snr_dB_list) * 4
 n_epoch = 30         # number of training epochs
 learning_rate = 0.0001 # learning rate
@@ -140,7 +140,7 @@ data_path_train = directory_data + train_data_file_name
 data_path_test = directory_data + test_data_file_name
 
 # To save trained model
-directory_model = "./model/" + system_config  + "_001/"
+directory_model = "./model/" + system_config + "/"
 directory_model03 = "./model/" + system_config  + "/"
 if not os.path.exists(directory_model):
     os.makedirs(directory_model)
