@@ -164,49 +164,6 @@ if run_UPGA_J10 == 1:
     # Save the plot of training loss
     plt.savefig(directory_data + "training_loss_UPGA_J10.png")
 
-    
-
-    # # test proposed model
-    # model_test = PGA_Unfold_J10(step_size_UPGA_J10)
-    # model_test.load_state_dict(torch.load(model_file_name_UPGA_J10))
-    # Rtest, at, theta, ideal_beam = get_radar_data(snr_dB, H_test)
-    # rate_iter_UPGA_J10, beam_crb_iter_UPGA_J10, F_prop_UPGA_J10, W_prop_UPGA_J10 = model_test.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
-    #                                                                                                         n_iter_outer,
-    #                                                                                                         n_iter_inner_J10)
-    # rate_UPGA_J10 = [r.detach().numpy() for r in (sum(rate_iter_UPGA_J10) / len(H_test[0]))]
-    # beam_error_UPGA_J10 = [r.detach().numpy() for r in (sum(beam_crb_iter_UPGA_J10) / (len(H_test[0])))]
-    # iter_number_UPGA_J10 = np.array(list(range(n_iter_outer + 1)))
-
-
-
-    # Object defining
-    # model_UPGA_J10_PC_AP = PGA_Unfold_J10_PC_AP(step_size_UPGA_J10_PC)
-
-    # # training procedure
-    # optimizer = torch.optim.Adam(model_UPGA_J10_PC_AP.parameters(), lr=learning_rate)
-
-    # train_losses, valid_losses = [], []
-
-    # for i_epoch in range(n_epoch):
-    #     print(i_epoch)
-    #     H_shuffeld = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
-    #     for i_batch in range(0, len(H_train), batch_size):
-    #         H = torch.transpose(H_shuffeld[i_batch:i_batch + batch_size], 0, 1)
-    #         cur_bs = H.shape[1]
-    #         snr_dB_train = np.random.choice(snr_dB_list, size=cur_bs)
-    #         snr_train = torch.tensor(10 ** (snr_dB_train / 10),
-    #                                  dtype=torch.float32, device=device)
-    #         Rtrain, _, _, _ = get_radar_data(snr_dB_train, H)
-    #         __ , __, F, W = model_UPGA_J10_PC_AP.execute_PGA(H, Rtrain, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
-    #         loss = get_sum_loss(F, W, H, Rtrain, snr_train, batch_size)
-
-
-    #         optimizer.zero_grad()  # zero the gradient buffers
-    #         loss.backward()
-    #         optimizer.step()  # Does the update
-
-    # # Save trained model
-    # torch.save(model_UPGA_J10_PC_AP.state_dict(), model_file_name_UPGA_J10_PC)
 
 
 if run_UPGA_J10_PRCDN == 1:

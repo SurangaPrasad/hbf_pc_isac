@@ -154,7 +154,7 @@ class PGA_Unfold_J10(nn.Module):
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
-            for jj in range(10):
+            for jj in range(n_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                 if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
@@ -174,7 +174,7 @@ class PGA_Unfold_J10(nn.Module):
                     delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                     delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
                     F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
-                    F = normalize_power(F, W, H, Pt)
+                    F = normalize_power(F, W, H, Pt)  # scale F only, consistent with training path
                     rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
                     crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                     power_over_iters[ii, jj] = get_power(F, W).detach()
@@ -769,95 +769,6 @@ def get_grad_F_com(H, F, W):
     # Sum over M users, average over K frequencies
     grad_F = (grad1 - grad2).sum(dim=2) / K_d             # (K, B, Nt, Nrf)
     return grad_F
-
-# def get_grad_F_com(H, F, W, M_sub=2):
-#     """
-#     Optimized gradient of sum-rate w.r.t. F
-#     - Top-k users based on channel strength
-#     - Avoids explicit V_mk construction
-#     """
-
-#     F_H = F.conj().transpose(-2, -1)          # (K, B, Nrf, Nt)
-#     W_H = W.conj().transpose(-2, -1)          # (K, B, M, Nrf)
-#     V   = W @ W_H                             # (K, B, Nrf, Nrf)
-#     K_d = W.shape[0]
-
-#     # --------------------------------------------------
-#     # 1) Select dominant users via channel strength
-#     # --------------------------------------------------
-#     power = (H.abs()**2).sum(dim=-1)          # (K, B, M)
-#     print(power)
-#     top_idx = power.topk(k=M_sub, dim=2).indices  # (K, B, M_sub)
-
-#     # Select H
-#     idx_H = top_idx.unsqueeze(-1).expand(-1, -1, -1, H.size(-1))
-#     H_sel = torch.gather(H, 2, idx_H)         # (K, B, M_sub, Nt)
-#     h = H_sel.unsqueeze(-1)                   # (K, B, M_sub, Nt, 1)
-
-#     # Select W columns (w_m)
-#     W_perm = W.permute(0, 1, 3, 2)            # (K, B, M, Nrf)
-#     idx_W = top_idx.unsqueeze(-1).expand(-1, -1, -1, W_perm.size(-1))
-#     W_sel = torch.gather(W_perm, 2, idx_W)    # (K, B, M_sub, Nrf)
-#     w = W_sel.unsqueeze(-1)                   # (K, B, M_sub, Nrf, 1)
-
-#     # --------------------------------------------------
-#     # 2) Precompute shared terms
-#     # --------------------------------------------------
-#     FVF_H = F @ V @ F_H                       # (K, B, Nt, Nt)
-
-#     # --------------------------------------------------
-#     # 3) First quadratic form (same as before)
-#     # --------------------------------------------------
-#     qf1 = (
-#         h.conj().transpose(-2, -1)
-#         @ FVF_H.unsqueeze(2)
-#         @ h
-#     ).squeeze(-1).squeeze(-1)                 # (K, B, M_sub)
-
-#     denom1 = np.log(2) * (qf1 + sigma2)
-
-#     # --------------------------------------------------
-#     # 4) Efficient computation of second term
-#     #    FVmk = FV - (F w)(w^H)
-#     # --------------------------------------------------
-#     FV = F @ V                                # (K, B, Nt, Nrf)
-
-#     Fw = (F.unsqueeze(2) @ w)                 # (K, B, M_sub, Nt, 1)
-#     wH = w.conj().transpose(-2, -1)           # (K, B, M_sub, 1, Nrf)
-
-#     FVmk = FV.unsqueeze(2) - (Fw @ wH)        # (K, B, M_sub, Nt, Nrf)
-#     FVmkF_H = FVmk @ F_H.unsqueeze(2)         # (K, B, M_sub, Nt, Nt)
-
-#     qf2 = (
-#         h.conj().transpose(-2, -1)
-#         @ FVmkF_H
-#         @ h
-#     ).squeeze(-1).squeeze(-1)                 # (K, B, M_sub)
-
-#     denom2 = np.log(2) * (qf2 + sigma2)
-
-#     # --------------------------------------------------
-#     # 5) Gradient terms
-#     # --------------------------------------------------
-#     Htilde = h @ h.conj().transpose(-2, -1)   # (K, B, M_sub, Nt, Nt)
-#     HtF = Htilde @ F.unsqueeze(2)             # (K, B, M_sub, Nt, Nrf)
-
-#     grad1 = HtF @ V.unsqueeze(2) / (
-#         denom1.unsqueeze(-1).unsqueeze(-1) + 1e-4
-#     )
-
-#     grad2 = HtF @ (
-#         V.unsqueeze(2) - (w @ wH)
-#     ) / (
-#         denom2.unsqueeze(-1).unsqueeze(-1) + 1e-4
-#     )
-
-#     # --------------------------------------------------
-#     # 6) Final aggregation
-#     # --------------------------------------------------
-#     grad_F = (grad1 - grad2).sum(dim=2) / K_d   # (K, B, Nt, Nrf)
-
-#     return grad_F
 
 def get_grad_W_com(H, F, W):
     F_H = torch.transpose(F, 2, 3).conj()
