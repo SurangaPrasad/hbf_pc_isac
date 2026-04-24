@@ -138,7 +138,7 @@ class PGA_Conv(nn.Module):
 # ============================================== Proposed PGA model light=============================
 class PGA_Unfold_J10(nn.Module):
 
-    def __init__(self, step_size, alpha=1e-2):
+    def __init__(self, step_size, alpha=1e-3):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
 
@@ -171,6 +171,8 @@ class PGA_Unfold_J10(nn.Module):
                 torch.abs(curr_obj - prev_obj) /
                 (torch.abs(prev_obj) + eps)
             )
+            print(f'current_obj: {curr_obj.mean().item()}, prev_obj: {prev_obj.mean().item()}, delta: {delta.item()}')
+            print(f"Delta: {delta.item()}")
 
             # Adaptive ratio
             ratio = delta / (delta + self.alpha)
@@ -199,11 +201,11 @@ class PGA_Unfold_J10(nn.Module):
             # ----------------------------------------------------
             # Adaptive inner iteration count
             # ----------------------------------------------------
-            if ii == 0:
+            if ii < 2:
                 prev_obj = None
                 curr_obj = None
             else:
-                prev_obj = curr_obj
+                prev_obj = (OMEGA * rate_over_iters[ii-2, -1] + crb_over_iters[ii-2, -1]).detach()
                 curr_obj = (OMEGA * rate_over_iters[ii-1, -1] + crb_over_iters[ii-1, -1]).detach()
  
             n_inner = _n_inner(prev_obj, curr_obj)
@@ -224,7 +226,7 @@ class PGA_Unfold_J10(nn.Module):
                     crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                     power_over_iters[ii, jj] = get_power(F, W).detach()
             else:
-                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, use_reentrant=False)
+                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, use_reentrant=False)
             F = project_unit_modulus(F)
 
             # update W  (K == 1 always, unroll the k-loop)
@@ -242,12 +244,6 @@ class PGA_Unfold_J10(nn.Module):
                 rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
                 crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                 power_over_iters[ii, -1] = get_power(F, W).detach()
-
-            # ----------------------------------------------------
-            # Update objective for next outer iteration
-            # ----------------------------------------------------
-            prev_obj = curr_obj
-            curr_obj = (OMEGA * rate_over_iters[ii, -1] + crb_over_iters[ii, -1]).detach()
 
         # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
