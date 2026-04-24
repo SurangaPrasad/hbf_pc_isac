@@ -192,7 +192,7 @@ class PGA_Unfold_J10(nn.Module):
                 F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
                 F = normalize_power(F, W, H, Pt)
             return F
-
+        inner_iter_history = []
         for ii in range(n_iter_outer):
             
             # ----------------------------------------------------
@@ -204,13 +204,14 @@ class PGA_Unfold_J10(nn.Module):
             else:
                 prev_obj = prev_obj
                 curr_obj = curr_obj
-                
+
             if track_metrics:
 
                 n_inner = _n_inner(
                     prev_obj=prev_obj,
                     curr_obj=curr_obj
                 )
+                inner_iter_history.append(n_inner)
 
                 # Run inner loop without checkpoint so we can record per-inner metrics
                 for jj in range(n_inner):
@@ -254,6 +255,10 @@ class PGA_Unfold_J10(nn.Module):
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+
+        print("Adaptive inner iterations:", inner_iter_history)
+        print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
+
         return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
