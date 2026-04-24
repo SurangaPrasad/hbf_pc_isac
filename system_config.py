@@ -23,7 +23,7 @@ run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
-run_UPGA_J_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
+run_UPGA_J_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////

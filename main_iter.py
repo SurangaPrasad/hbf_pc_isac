@@ -108,13 +108,16 @@ if run_program == 1:
     if run_UPGA_J_decay == 1:
         print('Running unfolded PGA with decaying J...')
         model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay)
-        model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device))
+        # model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device))
 
-        sum_rate_UPGA_J_decay, crb_UPGA_J_decay, power_UPGA_J_decay, F_UPGA_J_decay, W_UPGA_J_decay = model_UPGA_J_decay.execute_PGA(
-            H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer)
+        sum_rate_UPGA_J_decay, crb_UPGA_J_decay, power_UPGA_J_decay, F_UPGA_J_decay, W_UPGA_J_decay = model_UPGA_J_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                            n_iter_inner_J10)
         rate_iter_UPGA_J_decay  = sum_rate_UPGA_J_decay.mean(0).cpu().numpy()
         crb_iter_UPGA_J_decay   = crb_UPGA_J_decay.mean(0).cpu().numpy()
         power_iter_UPGA_J_decay = power_UPGA_J_decay.mean(0).cpu().numpy()
+        inner_iter_history_UPGA_J_decay = list(model_UPGA_J_decay.inner_iter_history)
     # ====================================================== Proposed Unfolded PGA with gradient reuse ====================================
     if run_UPGA_J_GradReuse == 1:
         print('Running unfolded PGA with gradient reuse (J = 10)...')
@@ -194,16 +197,18 @@ if plot_figure == 1:
     frac_J10 = fractional_iters(n_iter_outer, n_iter_inner_J10)
     frac_J20 = fractional_iters(n_iter_outer, n_iter_inner_J20)
 
-    def fractional_iters_decay(n_outer, max_inner=10):
-        """Fractional x-axis for J_decay: block size varies as n_inner(ii)+1 per outer iter."""
+    def fractional_iters_variable(inner_iter_history):
+        """Fractional x-axis for variable inner-iteration schedules."""
         x = []
-        for ii in range(n_outer):
-            n_inner_ii = max(1, max_inner - ii // max_inner)
+        for ii, n_inner_ii in enumerate(inner_iter_history):
             x.append(float(ii))
             for jj in range(n_inner_ii):
                 x.append(ii + (jj + 1) / (n_inner_ii + 1))
         return np.array(x)
-    frac_J_decay = fractional_iters_decay(n_iter_outer)
+    if run_UPGA_J_decay == 1:
+        frac_J_decay = fractional_iters_variable(inner_iter_history_UPGA_J_decay)
+    else:
+        frac_J_decay = np.array([])
     # Indices of the last inner step of each outer iteration in the flattened arrays
     # J=10: indices 10, 21, 32, ...  (block size J+1=11, last slot = J=10)
     # J=20: indices 20, 41, 62, ...  (block size J+1=21, last slot = J=20)
@@ -213,15 +218,19 @@ if plot_figure == 1:
     outer_idx_J20 = np.arange(n_iter_inner_J20,
                               n_iter_outer * (n_iter_inner_J20 + 1),
                               n_iter_inner_J20 + 1)   # length = n_iter_outer
-    # outer_idx for J_decay: W-update is the LAST slot of each block (block sizes vary)
-    outer_idx_J_decay = []
-    _pos = 0
-    for _ii in range(n_iter_outer):
-        _ni = max(1, 10 - _ii // 10)
-        _pos += _ni         # skip inner F-update slots
-        outer_idx_J_decay.append(_pos)  # W-update position
-        _pos += 1
-    outer_idx_J_decay = np.array(outer_idx_J_decay)
+    # outer_idx for J_decay/adaptive schedule: W-update is the LAST slot of each block
+    if run_UPGA_J_decay == 1:
+        outer_idx_J_decay = []
+        _pos = 0
+        for _ni in inner_iter_history_UPGA_J_decay:
+            _pos += _ni
+            outer_idx_J_decay.append(_pos)
+            _pos += 1
+        outer_idx_J_decay = np.array(outer_idx_J_decay)
+        iter_outer_x_J_decay = np.arange(1, len(outer_idx_J_decay) + 1)
+    else:
+        outer_idx_J_decay = np.array([])
+        iter_outer_x_J_decay = np.array([])
     # J_GradReuse has the same fixed J=10 structure as J10
     outer_idx_J_GradReuse = outer_idx_J10
     frac_J_GradReuse = frac_J10
@@ -296,7 +305,7 @@ if plot_figure == 1:
     if run_UPGA_J10_PRCDN == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J_decay == 1:
-        plt.plot(iter_outer_x, rate_iter_UPGA_J_decay[outer_idx_J_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+        plt.plot(iter_outer_x_J_decay, rate_iter_UPGA_J_decay[outer_idx_J_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
@@ -321,7 +330,7 @@ if plot_figure == 1:
     if run_UPGA_J10_PRCDN == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J_decay == 1:
-        plt.plot(iter_outer_x, crb_iter_UPGA_J_decay[outer_idx_J_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+        plt.plot(iter_outer_x_J_decay, crb_iter_UPGA_J_decay[outer_idx_J_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
@@ -357,7 +366,7 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, obj_iter_UPGA_J10_PRCDN, ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J_decay == 1:
         obj_iter_UPGA_J_decay = OMEGA * rate_iter_UPGA_J_decay[outer_idx_J_decay] + crb_iter_UPGA_J_decay[outer_idx_J_decay]
-        plt.plot(iter_outer_x, obj_iter_UPGA_J_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+        plt.plot(iter_outer_x_J_decay, obj_iter_UPGA_J_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
     if run_UPGA_J_GradReuse == 1:
         obj_iter_UPGA_J_GradReuse = OMEGA * rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse] + crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
         plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
