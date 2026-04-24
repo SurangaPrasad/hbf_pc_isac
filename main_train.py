@@ -215,9 +215,9 @@ if run_UPGA_J10_PRCDN == 1:
     plt.savefig(directory_result + "training_loss_UPGA_J10.png")
 
 # ============================================================= proposed unfolding PGA with decaying inner iterations ====
-if run_UPGA_J_decay == 1:
-    model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay)
-    optimizer = torch.optim.Adam(model_UPGA_J_decay.parameters(), lr=learning_rate)
+if run_UPGA_J10_decay == 1:
+    model_UPGA_J10_decay = PGA_Unfold_J10_decay(step_size_UPGA_J10_decay)
+    optimizer = torch.optim.Adam(model_UPGA_J10_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
 
@@ -234,7 +234,7 @@ if run_UPGA_J_decay == 1:
                                      dtype=torch.float32, device=device)
 
             # J_decay does not take n_iter_inner; the schedule is encoded in the class
-            __, __, __, F, W = model_UPGA_J_decay.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, track_metrics=False)
+            __, __, __, F, W = model_UPGA_J10_decay.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, track_metrics=False)
 
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -249,7 +249,7 @@ if run_UPGA_J_decay == 1:
         epoch_losses.append(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
-    torch.save(model_UPGA_J_decay.state_dict(), model_file_name_UPGA_J_decay)
+    torch.save(model_UPGA_J10_decay.state_dict(), model_file_name_UPGA_J10_decay)
 
     # Plotting
     plt.figure(figsize=(10, 5))
@@ -259,6 +259,52 @@ if run_UPGA_J_decay == 1:
     plt.ylabel('Average Loss')
     plt.grid(True)
     plt.savefig(directory_result + "training_loss_UPGA_J_decay.png")
+
+# ============================================================= proposed unfolding PGA with decaying inner iterations (J_max=20) ====
+if run_UPGA_J20_decay == 1:
+    model_UPGA_J20_decay = PGA_Unfold_J20_decay(step_size_UPGA_J20_decay)
+    optimizer = torch.optim.Adam(model_UPGA_J20_decay.parameters(), lr=learning_rate)
+
+    epoch_losses = []  # store average loss per epoch
+
+    for i_epoch in range(n_epoch):
+        batch_losses = []  # loss of each batch in current epoch
+
+        H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+
+        for i_batch in range(0, len(H_train[0]), batch_size):
+            H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
+
+            # J_decay does not take n_iter_inner; the schedule is encoded in the class
+            __, __, __, F, W = model_UPGA_J20_decay.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, track_metrics=False)
+
+            loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
+            print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            batch_losses.append(loss.item())
+
+        avg_loss = sum(batch_losses) / len(batch_losses)
+        epoch_losses.append(avg_loss)
+        print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
+
+    torch.save(model_UPGA_J20_decay.state_dict(), model_file_name_UPGA_J20_decay)
+
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, n_epoch + 1), epoch_losses, marker='o', linestyle='-', color='b')
+    plt.title('Training Loss per Epoch (J20 decay)')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average Loss')
+    plt.grid(True)
+    plt.savefig(directory_result + "training_loss_UPGA_J20_decay.png")
 
 # =========================================================== Unfolded PGA with gradient reuse ====
 if run_UPGA_J_GradReuse == 1:

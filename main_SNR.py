@@ -33,6 +33,9 @@ if run_conv_PGA_J10 == 1:
 if run_UPGA_J_decay == 1:
     model_UPGA_J_decay = PGA_Unfold_J_decay(step_size_UPGA_J_decay)
     model_UPGA_J_decay.load_state_dict(torch.load(model_file_name_UPGA_J_decay, map_location=device))
+if run_UPGA_J20_decay == 1:
+    model_UPGA_J20_decay = PGA_Unfold_J20_decay(step_size_UPGA_J20_decay)
+    model_UPGA_J20_decay.load_state_dict(torch.load(model_file_name_UPGA_J20_decay, map_location=device))
 if run_UPGA_J_GradReuse == 1:
     model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)
     model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J_GradReuse, map_location=device))
@@ -46,6 +49,7 @@ rate_UPGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_conv_PGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J_decay = np.zeros([len(snr_dB_list), ], dtype=float)
+rate_UPGA_J20_decay = np.zeros([len(snr_dB_list), ], dtype=float)
 
 rate_UPGA_J_GradReuse = np.zeros([len(snr_dB_list), ], dtype=float)
 
@@ -58,6 +62,7 @@ CRB_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J_decay = np.zeros([len(snr_dB_list), ], dtype=float)
+CRB_UPGA_J20_decay = np.zeros([len(snr_dB_list), ], dtype=float)
 
 CRB_UPGA_J_GradReuse = np.zeros([len(snr_dB_list), ], dtype=float)
 
@@ -86,6 +91,8 @@ for ss in range(len(snr_dB_list)):
         rate_conv_PGA_J10[ss], CRB_conv_PGA_J10[ss] = execute_conv_PGA_J10(conv_PGA_J10, H_test, snr_ss)
     if run_UPGA_J_decay == 1:
         rate_UPGA_J_decay[ss], CRB_UPGA_J_decay[ss] = execute_UPGA_J_decay(model_UPGA_J_decay, H_test, snr_ss)
+    if run_UPGA_J20_decay == 1:
+        rate_UPGA_J20_decay[ss], CRB_UPGA_J20_decay[ss] = execute_UPGA_J20_decay(model_UPGA_J20_decay, H_test, snr_ss)
     if run_UPGA_J_GradReuse == 1:
         rate_UPGA_J_GradReuse[ss], CRB_UPGA_J_GradReuse[ss] = execute_UPGA_J_GradReuse(model_UPGA_J_GradReuse, H_test, snr_ss)
 
@@ -108,6 +115,8 @@ if run_conv_PGA_J10 == 1:
     plt.plot(CRB_conv_PGA_J10, rate_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
 if run_UPGA_J_decay == 1:
     plt.plot(CRB_UPGA_J_decay, rate_UPGA_J_decay, ':d', color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+if run_UPGA_J20_decay == 1:
+    plt.plot(CRB_UPGA_J20_decay, rate_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
 if run_UPGA_J_GradReuse == 1:
     plt.plot(CRB_UPGA_J_GradReuse, rate_UPGA_J_GradReuse, ':^', color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
 if benchmark == 1:
@@ -145,6 +154,8 @@ if run_conv_PGA_J10 == 1:
     plt.plot(snr_dB_list, rate_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
 if run_UPGA_J_decay == 1:
     plt.plot(snr_dB_list, rate_UPGA_J_decay, ':d', color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+if run_UPGA_J20_decay == 1:
+    plt.plot(snr_dB_list, rate_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
 if run_UPGA_J_GradReuse == 1:
     plt.plot(snr_dB_list, rate_UPGA_J_GradReuse, ':^', color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
 # if benchmark == 1:
@@ -179,6 +190,8 @@ if run_conv_PGA_J10 == 1:
     plt.plot(snr_dB_list, CRB_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
 if run_UPGA_J_decay == 1:
     plt.plot(snr_dB_list, CRB_UPGA_J_decay, ':d', color='purple', linewidth=3, markersize=7, label=label_UPGA_J_decay)
+if run_UPGA_J20_decay == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
 if run_UPGA_J_GradReuse == 1:
     plt.plot(snr_dB_list, CRB_UPGA_J_GradReuse, ':^', color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
 

@@ -63,6 +63,12 @@ def execute_UPGA_J_decay(model_UPGA_J_decay, H_test, Pt):
     crb_avr = [r.detach().item() for r in (sum(crbs) / len(H_test[0]))][-1]
     return rate_avr, crb_avr
 
+def execute_UPGA_J20_decay(model_UPGA_J20_decay, H_test, Pt):
+    rates, crbs, _, F, W = model_UPGA_J20_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv, Pt, n_iter_outer)
+    rate_avr = [r.detach().cpu().numpy() for r in (sum(rates) / len(H_test[0]))][-1]
+    crb_avr = [r.detach().item() for r in (sum(crbs) / len(H_test[0]))][-1]
+    return rate_avr, crb_avr
+
 def execute_UPGA_J_GradReuse(model_UPGA_J_GradReuse, H_test, Pt):
     rates, crbs, _, F, W = model_UPGA_J_GradReuse.execute_PGA(H_test, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner_J10)
     rate_avr = [r.detach().cpu().numpy() for r in (sum(rates) / len(H_test[0]))][-1]

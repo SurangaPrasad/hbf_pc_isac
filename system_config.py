@@ -23,7 +23,8 @@ run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
-run_UPGA_J_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
+run_UPGA_J10_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
+run_UPGA_J20_decay  = 1       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
@@ -114,7 +115,8 @@ step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_si
 step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # J_decay uses the same shape as J10 (max_inner=10) but the class uses fewer steps per outer iter dynamically
-step_size_UPGA_J_decay = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J10_decay = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J20_decay = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # J_GradReuse uses the same shape as J10; gradient reuse logic is handled inside execute_PGA
 step_size_UPGA_J_GradReuse = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 
@@ -150,7 +152,8 @@ model_file_name_UPGA_J10 = directory_model + 'UPGA_J10.pth'
 model_file_name_UPGA_J10_PRCDN = directory_model + 'UPGA_J10_PRCDN.pth'
 model_file_name_UPGA_J20 = directory_model + 'UPGA_J20.pth'
 model_file_name_UPGA_J10_PC = directory_model + 'UPGA_J10_PC.pth'
-model_file_name_UPGA_J_decay = directory_model + 'UPGA_J_decay.pth'
+model_file_name_UPGA_J10_decay = directory_model + 'UPGA_J10_decay.pth'
+model_file_name_UPGA_J20_decay = directory_model + 'UPGA_J20_decay.pth'
 model_file_name_UPGA_J_GradReuse = directory_model + 'UPGA_J_GradReuse.pth'
 model_file_name_UPGA_J10_PC_omega03 = directory_model03 + 'UPGA_J10_PC.pth'
 # To save result figures
@@ -166,7 +169,8 @@ label_UPGA_J10 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 label_UPGA_J20 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')$'
 label_UPGA_J10_PC = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
-label_UPGA_J_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J10) + r', \mathrm{decay})$'
+label_UPGA_J10_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J10) + r', \mathrm{decay})$'
+label_UPGA_J20_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J20) + r', \mathrm{decay})$'
 label_UPGA_J_GradReuse = r'Unfolded PGA ' + r'$(J=' + str(n_iter_inner_J10) + r', \mathrm{GradReuse})$'
 label_ZF = 'ZF (digital, comm. only)'
 label_SCA = 'SCA-ManOpt (converged)'
