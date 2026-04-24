@@ -127,7 +127,7 @@ if run_UPGA_J10 == 1:
         
         H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
         
-        for i_batch in range(0, len(H_train[0]), batch_size):
+        for i_batch in range(0, len(H_train), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]
             snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR

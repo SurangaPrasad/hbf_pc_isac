@@ -182,6 +182,7 @@ class PGA_Unfold_J10(nn.Module):
             return max(2, min(max_inner, n_inner))
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+
             for jj in range(n_inner):
                 grad_F_com = get_grad_F_com(H, F, W)
                 grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
@@ -202,16 +203,14 @@ class PGA_Unfold_J10(nn.Module):
                 prev_obj = None
                 curr_obj = None
             else:
-                prev_obj = prev_obj
-                curr_obj = curr_obj
+                prev_obj = curr_obj
+                curr_obj = (OMEGA * rate_over_iters[ii-1, -1] + crb_over_iters[ii-1, -1]).detach()
+ 
+            n_inner = _n_inner(prev_obj, curr_obj)
+            inner_iter_history.append(n_inner)
 
             if track_metrics:
-
-                n_inner = _n_inner(
-                    prev_obj=prev_obj,
-                    curr_obj=curr_obj
-                )
-                inner_iter_history.append(n_inner)
+                
 
                 # Run inner loop without checkpoint so we can record per-inner metrics
                 for jj in range(n_inner):
@@ -248,8 +247,7 @@ class PGA_Unfold_J10(nn.Module):
             # Update objective for next outer iteration
             # ----------------------------------------------------
             prev_obj = curr_obj
-            curr_obj = ( OMEGA * rate_over_iters[ii, -1] - crb_over_iters[ii, -1] ).detach()
-            
+            curr_obj = (OMEGA * rate_over_iters[ii, -1] + crb_over_iters[ii, -1]).detach()
 
         # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
