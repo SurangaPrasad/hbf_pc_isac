@@ -138,9 +138,12 @@ class PGA_Conv(nn.Module):
 # ============================================== Proposed PGA model light=============================
 class PGA_Unfold_J10(nn.Module):
 
-    def __init__(self, step_size):
+    def __init__(self, step_size, alpha=1e-2):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+
+        # Adaptive scheduling hyperparameter
+        self.alpha = alpha
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
@@ -152,6 +155,31 @@ class PGA_Unfold_J10(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+
+        def _n_inner(prev_obj=None, curr_obj=None):
+
+            max_inner = self.step_size.shape[0]
+
+            # First outer iteration
+            if prev_obj is None or curr_obj is None:
+                return max_inner
+
+            eps = 1e-8
+
+            # Relative objective improvement
+            delta = torch.mean(
+                torch.abs(curr_obj - prev_obj) /
+                (torch.abs(prev_obj) + eps)
+            )
+
+            # Adaptive ratio
+            ratio = delta / (delta + self.alpha)
+
+            # Adaptive inner iteration count
+            n_inner = int(torch.ceil(max_inner * ratio).item())
+
+            # Keep at least 2 iterations for stability
+            return max(2, min(max_inner, n_inner))
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -166,9 +194,26 @@ class PGA_Unfold_J10(nn.Module):
             return F
 
         for ii in range(n_iter_outer):
+            
+            # ----------------------------------------------------
+            # Adaptive inner iteration count
+            # ----------------------------------------------------
+            if ii == 0:
+                prev_obj = None
+                curr_obj = None
+            else:
+                prev_obj = prev_obj
+                curr_obj = curr_obj
+                
             if track_metrics:
+
+                n_inner = _n_inner(
+                    prev_obj=prev_obj,
+                    curr_obj=curr_obj
+                )
+
                 # Run inner loop without checkpoint so we can record per-inner metrics
-                for jj in range(n_iter_inner):
+                for jj in range(n_inner):
                     grad_F_com = get_grad_F_com(H, F, W)
                     grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                     delta_F_com = self.step_size[jj][ii][0] * grad_F_com
@@ -197,6 +242,13 @@ class PGA_Unfold_J10(nn.Module):
                 rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
                 crb_over_iters[ii, -1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                 power_over_iters[ii, -1] = get_power(F, W).detach()
+
+            # ----------------------------------------------------
+            # Update objective for next outer iteration
+            # ----------------------------------------------------
+            prev_obj = curr_obj
+            curr_obj = ( OMEGA * rate_over_iters[ii, -1] - crb_over_iters[ii, -1] ).detach()
+            
 
         # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
