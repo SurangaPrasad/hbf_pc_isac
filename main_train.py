@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import inspect
 from utility import *
 from PGA_models import *
 
@@ -14,13 +15,18 @@ TRAIN_GRAD_CLIP_MAX_NORM = 1.0
 
 def build_optimizer_and_scheduler(model):
     optimizer = torch.optim.Adam(model.parameters(), lr=TRAIN_LR)
+    scheduler_kwargs = {
+        'mode': 'min',
+        'factor': TRAIN_SCHEDULER_FACTOR,
+        'patience': TRAIN_SCHEDULER_PATIENCE,
+        'min_lr': TRAIN_MIN_LR,
+    }
+    if 'verbose' in inspect.signature(torch.optim.lr_scheduler.ReduceLROnPlateau.__init__).parameters:
+        scheduler_kwargs['verbose'] = True
+
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
-        mode='min',
-        factor=TRAIN_SCHEDULER_FACTOR,
-        patience=TRAIN_SCHEDULER_PATIENCE,
-        min_lr=TRAIN_MIN_LR,
-        verbose=True
+        **scheduler_kwargs
     )
     return optimizer, scheduler
 
