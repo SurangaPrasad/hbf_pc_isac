@@ -272,8 +272,8 @@ if run_UPGA_J10_decay == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
 
-            # J_decay does not take n_iter_inner; the schedule is encoded in the class
-            __, __, __, F, W = model_UPGA_J10_decay.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, track_metrics=False)
+            __, __, __, F, W = model_UPGA_J10_decay.execute_PGA(
+                H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
 
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -320,8 +320,8 @@ if run_UPGA_J20_decay == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
 
-            # J_decay does not take n_iter_inner; the schedule is encoded in the class
-            __, __, __, F, W = model_UPGA_J20_decay.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, track_metrics=False)
+            __, __, __, F, W = model_UPGA_J20_decay.execute_PGA(
+                H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20, track_metrics=False)
 
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
