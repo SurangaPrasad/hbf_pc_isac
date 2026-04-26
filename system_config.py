@@ -16,14 +16,14 @@ run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
+run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
-run_UPGA_J10_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
+run_UPGA_J10_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J20_decay  = 1       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
@@ -54,7 +54,7 @@ if normalize_tau == 0:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
     else:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_LoS"
-    OMEGA = 2
+    OMEGA = 1
     n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
 else:
     system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_normalize"
@@ -68,7 +68,7 @@ print(system_info)
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 476    # size of training set
-test_size = 20      # size of testing set
+test_size = 10      # size of testing set
 batch_size = len(snr_dB_list) * 4
 n_epoch = 30         # number of training epochs
 learning_rate = 0.0001 # learning rate
@@ -81,10 +81,10 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
-WEIGHT_F_COM = OMEGA
-WEIGHT_W_COM = OMEGA
-WEIGHT_F_CRB = 1
-WEIGHT_W_CRB = 1
+WEIGHT_F_COM = 1  
+WEIGHT_W_COM = 1 
+WEIGHT_F_CRB = OMEGA / Nt * K
+WEIGHT_W_CRB = OMEGA / Nt * K
 
 # ========================= CRB PARAMETERS =========================
 # xi_0 = 10 ** (-40 / 10) ## path loss at reference distance (1 m) in linear scale
@@ -170,7 +170,6 @@ label_UPGA_J20 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')$'
 label_UPGA_J10_PC = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_UPGA_J10_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J10) + r', \mathrm{decay})$'
-label_UPGA_J20_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J20) + r', \mathrm{decay})$'
 label_UPGA_J_GradReuse = r'Unfolded PGA ' + r'$(J=' + str(n_iter_inner_J10) + r', \mathrm{GradReuse})$'
 label_ZF = 'ZF (digital, comm. only)'
 label_SCA = 'SCA-ManOpt (converged)'
