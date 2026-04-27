@@ -343,6 +343,11 @@ class PGA_Unfold_J10_decay(nn.Module):
 
         return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
+# PGA_Unfold_J20_decay is identical to PGA_Unfold_J10_decay; the max inner-iteration
+# count is read dynamically from self.step_size.shape[0], so passing a step_size
+# tensor with n_iter_inner_J20 rows gives J20 behaviour automatically.
+PGA_Unfold_J20_decay = PGA_Unfold_J10_decay
+
 # ============================================ Proposed PGA model with gradient reuse ====================================
 class PGA_Unfold_J_GradReuse(nn.Module):
     """Unfolded PGA with lazy gradient reuse to reduce per-inner-iteration cost.
