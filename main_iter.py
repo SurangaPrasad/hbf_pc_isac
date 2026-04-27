@@ -224,6 +224,10 @@ if plot_figure == 1:
         frac_J10_decay = fractional_iters_variable(inner_iter_history_UPGA_J10_decay)
     else:
         frac_J10_decay = np.array([])
+    if run_UPGA_J20_decay == 1:
+        frac_J20_decay = fractional_iters_variable(inner_iter_history_UPGA_J20_decay)
+    else:
+        frac_J20_decay = np.array([])
     # Indices of the last inner step of each outer iteration in the flattened arrays
     # J=10: indices 10, 21, 32, ...  (block size J+1=11, last slot = J=10)
     # J=20: indices 20, 41, 62, ...  (block size J+1=21, last slot = J=20)
@@ -419,6 +423,7 @@ if plot_figure == 1:
     mask_J10 = frac_J10 < n_plot_outer
     mask_J20 = frac_J20 < n_plot_outer
     mask_J10_decay = frac_J10_decay < n_plot_outer
+    mask_J20_decay = frac_J20_decay < n_plot_outer
     fig_obj_inner = plt.figure(6)
     if run_conv_PGA_J10 == 1:
         obj = OMEGA * rate_iter_conv_PGA_J10 + crb_iter_conv_PGA_J10
@@ -443,7 +448,7 @@ if plot_figure == 1:
         plt.plot(frac_J10_decay[mask_J10_decay], obj[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J10_decay)
     if run_UPGA_J20_decay == 1:
         obj = OMEGA * rate_iter_UPGA_J20_decay + crb_iter_UPGA_J20_decay
-        plt.plot(frac_J10_decay[mask_J10_decay], obj[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J20_decay)
+        plt.plot(frac_J20_decay[mask_J20_decay], obj[mask_J20_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J20_decay)
     if run_UPGA_J_GradReuse == 1:
         mask_J_GradReuse = frac_J_GradReuse < n_plot_outer
         obj = OMEGA * rate_iter_UPGA_J_GradReuse + crb_iter_UPGA_J_GradReuse
@@ -477,7 +482,7 @@ if plot_figure == 1:
     if run_UPGA_J10_decay == 1:
         plt.plot(frac_J10_decay[mask_J10_decay], power_iter_UPGA_J10_decay[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J10_decay)
     if run_UPGA_J20_decay == 1:
-        plt.plot(frac_J10_decay[mask_J10_decay], power_iter_UPGA_J20_decay[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J20_decay)
+        plt.plot(frac_J20_decay[mask_J20_decay], power_iter_UPGA_J20_decay[mask_J20_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J20_decay)
     if run_UPGA_J_GradReuse == 1:
         mask_J10_GradReuse = frac_J_GradReuse < n_plot_outer
         plt.plot(frac_J_GradReuse[mask_J10_GradReuse], power_iter_UPGA_J_GradReuse[mask_J10_GradReuse], ':^', markevery=10, color='teal', linewidth=2, markersize=5, label=label_UPGA_J_GradReuse)
