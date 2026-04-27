@@ -118,6 +118,21 @@ if run_program == 1:
         crb_iter_UPGA_J10_decay   = crb_UPGA_J10_decay.mean(0).cpu().numpy()
         power_iter_UPGA_J10_decay = power_UPGA_J10_decay.mean(0).cpu().numpy()
         inner_iter_history_UPGA_J10_decay = list(model_UPGA_J10_decay.inner_iter_history)
+    
+    if run_UPGA_J20_decay == 1:
+        print('Running unfolded PGA with decaying J (max J=20)...')
+        model_UPGA_J20_decay = PGA_Unfold_J20_decay(step_size_UPGA_J20_decay)
+        model_UPGA_J20_decay.load_state_dict(torch.load(model_file_name_UPGA_J20_decay, map_location=device))
+
+        sum_rate_UPGA_J20_decay, crb_UPGA_J20_decay, power_UPGA_J20_decay, F_UPGA_J20_decay, W_UPGA_J20_decay = model_UPGA_J20_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                            n_iter_inner_J20)
+        rate_iter_UPGA_J20_decay  = sum_rate_UPGA_J20_decay.mean(0).cpu().numpy()
+        crb_iter_UPGA_J20_decay   = crb_UPGA_J20_decay.mean(0).cpu().numpy()
+        power_iter_UPGA_J20_decay = power_UPGA_J20_decay.mean(0).cpu().numpy()
+        inner_iter_history_UPGA_J20_decay = list(model_UPGA_J20_decay.inner_iter_history)
+    
     # ====================================================== Proposed Unfolded PGA with gradient reuse ====================================
     if run_UPGA_J_GradReuse == 1:
         print('Running unfolded PGA with gradient reuse (J = 10)...')
@@ -306,6 +321,8 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J10_decay == 1:
         plt.plot(iter_outer_x_J10_decay, rate_iter_UPGA_J10_decay[outer_idx_J10_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
+    if run_UPGA_J20_decay == 1:
+        plt.plot(iter_outer_x_J10_decay, rate_iter_UPGA_J20_decay[outer_idx_J10_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
@@ -331,6 +348,8 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J10_decay == 1:
         plt.plot(iter_outer_x_J10_decay, crb_iter_UPGA_J10_decay[outer_idx_J10_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
+    if run_UPGA_J20_decay == 1:
+        plt.plot(iter_outer_x_J10_decay, crb_iter_UPGA_J20_decay[outer_idx_J10_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
@@ -367,6 +386,9 @@ if plot_figure == 1:
     if run_UPGA_J10_decay == 1:
         obj_iter_UPGA_J10_decay = OMEGA * rate_iter_UPGA_J10_decay[outer_idx_J10_decay] + crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
         plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
+    if run_UPGA_J20_decay == 1:
+        obj_iter_UPGA_J20_decay = OMEGA * rate_iter_UPGA_J20_decay[outer_idx_J10_decay] + crb_iter_UPGA_J20_decay[outer_idx_J10_decay]
+        plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J20_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         obj_iter_UPGA_J_GradReuse = OMEGA * rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse] + crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
         plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
@@ -407,6 +429,9 @@ if plot_figure == 1:
     if run_UPGA_J10_decay == 1:
         obj = OMEGA * rate_iter_UPGA_J10_decay + crb_iter_UPGA_J10_decay
         plt.plot(frac_J10_decay[mask_J10_decay], obj[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J10_decay)
+    if run_UPGA_J20_decay == 1:
+        obj = OMEGA * rate_iter_UPGA_J20_decay + crb_iter_UPGA_J20_decay
+        plt.plot(frac_J10_decay[mask_J10_decay], obj[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J20_decay)
     if run_UPGA_J_GradReuse == 1:
         mask_J_GradReuse = frac_J_GradReuse < n_plot_outer
         obj = OMEGA * rate_iter_UPGA_J_GradReuse + crb_iter_UPGA_J_GradReuse
@@ -439,6 +464,8 @@ if plot_figure == 1:
         plt.plot(frac_J20[mask_J20], power_iter_UPGA_J20[mask_J20], ':s', markevery=10, color='black', linewidth=2, markersize=5, label=label_UPGA_J20)
     if run_UPGA_J10_decay == 1:
         plt.plot(frac_J10_decay[mask_J10_decay], power_iter_UPGA_J10_decay[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J10_decay)
+    if run_UPGA_J20_decay == 1:
+        plt.plot(frac_J10_decay[mask_J10_decay], power_iter_UPGA_J20_decay[mask_J10_decay], ':d', markevery=10, color='purple', linewidth=2, markersize=5, label=label_UPGA_J20_decay)
     if run_UPGA_J_GradReuse == 1:
         mask_J10_GradReuse = frac_J_GradReuse < n_plot_outer
         plt.plot(frac_J_GradReuse[mask_J10_GradReuse], power_iter_UPGA_J_GradReuse[mask_J10_GradReuse], ':^', markevery=10, color='teal', linewidth=2, markersize=5, label=label_UPGA_J_GradReuse)
