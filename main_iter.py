@@ -23,6 +23,19 @@ if run_program == 1:
         rate_conv, tau_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
         rate_iter_conv = [r.detach().cpu().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
         tau_iter_conv = [e.detach().cpu().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
+    
+    # ====================================================== Conv. PGA with J = 5 ====================================
+    if run_conv_PGA_J5 == 1:
+        print('Running conventional PGA with J = 5...')
+        model_conv_PGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)  # Reuse the same shape of step sizes as J5
+        rate_conv_PGA_J5, crb_conv_PGA_J5, power_conv_PGA_J5, F_conv_PGA_J5, W_conv_PGA_J5 = model_conv_PGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J5)  # Use n_iter_inner_J5 as J=5
+        rate_iter_conv_PGA_J5  = rate_conv_PGA_J5.mean(0).cpu().numpy()
+        crb_iter_conv_PGA_J5   = crb_conv_PGA_J5.mean(0).cpu().numpy()
+        power_iter_conv_PGA_J5 = power_conv_PGA_J5.mean(0).cpu().numpy()
+
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
@@ -59,6 +72,22 @@ if run_program == 1:
         rate_iter_UPGA_J1 = [r.detach().cpu().numpy() for r in (sum(sum_rate_UPGA_J1) / len(H_test[0]))]
         tau_iter_UPGA_J1 = [e.detach().cpu().numpy() for e in (sum(tau_UPGA_J1) / (len(H_test[0])))]
 
+    # ====================================================== Proposed Unfolded PGA light ====================================
+
+    if run_UPGA_J5 == 1:
+        print('Running unfolded PGA with J = 5...')
+        # Create new model and load states
+        model_UPGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)
+        model_UPGA_J5.load_state_dict(torch.load(model_file_name_UPGA_J5, map_location=device))
+
+        sum_rate_UPGA_J5, crb_UPGA_J5, power_UPGA_J5, F_UPGA_J5, W_UPGA_J5 = model_UPGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J5)
+        rate_iter_UPGA_J5  = sum_rate_UPGA_J5.mean(0).cpu().numpy()
+        crb_iter_UPGA_J5   = crb_UPGA_J5.mean(0).cpu().numpy()
+        power_iter_UPGA_J5 = power_UPGA_J5.mean(0).cpu().numpy()
+    
     # ====================================================== Proposed Unfolded PGA light ====================================
     if run_UPGA_J10 == 1:
         print('Running unfolded PGA with J = 10...')
@@ -231,6 +260,9 @@ if plot_figure == 1:
     # Indices of the last inner step of each outer iteration in the flattened arrays
     # J=10: indices 10, 21, 32, ...  (block size J+1=11, last slot = J=10)
     # J=20: indices 20, 41, 62, ...  (block size J+1=21, last slot = J=20)
+    outer_idx_J5 = np.arange(n_iter_inner_J5,
+                             n_iter_outer * (n_iter_inner_J5 + 1),
+                             n_iter_inner_J5 + 1)   # length = n_iter_outer
     outer_idx_J10 = np.arange(n_iter_inner_J10,
                               n_iter_outer * (n_iter_inner_J10 + 1),
                               n_iter_inner_J10 + 1)   # length = n_iter_outer
@@ -381,12 +413,18 @@ if plot_figure == 1:
     if run_UPGA_J1 == 1:
         obj_iter_UPGA_J1 = [rate - OMEGA * tau for rate, tau in zip(rate_iter_UPGA_J1, tau_iter_UPGA_J1)]
         plt.plot(iter_number_UPGA_J1, obj_iter_UPGA_J1, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
+    if run_conv_PGA_J5 == 1:
+        obj_iter_conv_PGA_J5 = OMEGA * rate_iter_conv_PGA_J5 + crb_iter_conv_PGA_J5
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=5)')
     if run_conv_PGA_J10 == 1:
         obj_iter_conv_PGA_J10 = OMEGA * rate_iter_conv_PGA_J10[outer_idx_J10] + crb_iter_conv_PGA_J10[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J10, ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_conv_PGA_J20 == 1:
         obj_iter_conv_PGA_J20 = OMEGA * rate_iter_conv_PGA_J20[outer_idx_J20] + crb_iter_conv_PGA_J20[outer_idx_J20]
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J20, '-', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
+    if run_UPGA_J5 == 1:
+        obj_iter_UPGA_J5 = OMEGA * rate_iter_UPGA_J5[outer_idx_J5] + crb_iter_UPGA_J5[outer_idx_J5]
+        plt.plot(iter_outer_x, obj_iter_UPGA_J5, ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J5)
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = OMEGA * rate_iter_UPGA_J10[outer_idx_J10] + crb_iter_UPGA_J10[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_J10, ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J10)

@@ -12,12 +12,14 @@ print(f"Using device: {device}")
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
+run_conv_PGA_J5 = 1        # Conventional PGA with setting J = 5
 run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
-run_conv_PGA_J20 = 1
+run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
+run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
 run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
-run_UPGA_J20 = 1           # Unfolded PGA with setting J = 20
+run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
@@ -111,6 +113,7 @@ R_N_inv = torch.linalg.inv(R_N).to(COMPLEX_DTYPE).to(device)  # pre-cast to comp
 step_size_fixed = 1e-2  # step size of conventional PGA
 step_size_conv_PGA = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J1 = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J5 = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
@@ -148,6 +151,7 @@ if not os.path.exists(directory_model):
     os.makedirs(directory_model)
 
 model_file_name_UPGA_J1 = directory_model + 'UPGA_J1.pth'
+model_file_name_UPGA_J5 = directory_model + 'UPGA_J5.pth'
 model_file_name_UPGA_J10 = directory_model + 'UPGA_J10.pth'
 model_file_name_UPGA_J10_PRCDN = directory_model + 'UPGA_J10_PRCDN.pth'
 model_file_name_UPGA_J20 = directory_model + 'UPGA_J20.pth'
