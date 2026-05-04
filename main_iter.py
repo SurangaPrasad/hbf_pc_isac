@@ -19,6 +19,29 @@ def safe_legend(**kwargs):
     kwargs.setdefault('framealpha', 1.0)
     ax.legend(valid_handles, valid_labels, **kwargs)
 
+
+step_size_snapshots = []
+
+
+def register_step_size(label, step_size_tensor):
+    """Store a detached CPU copy of step sizes for post-run diagnostics."""
+    if step_size_tensor is None:
+        return
+    if torch.is_tensor(step_size_tensor):
+        step_size_snapshots.append((label, step_size_tensor.detach().cpu()))
+
+
+def average_step_size_by_outer(step_size_tensor):
+    """Return shape (n_outer, n_channels) averaged over inner iterations if present."""
+    arr = step_size_tensor.numpy()
+    if arr.ndim == 3:
+        # [n_inner, n_outer, n_channels] -> [n_outer, n_channels]
+        return arr.mean(axis=0)
+    if arr.ndim == 2:
+        # [n_outer, n_channels]
+        return arr
+    return None
+
 # torch.manual_seed(3407)
 # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
 # Load training data
@@ -34,6 +57,7 @@ if run_program == 1:
     if run_conv_PGA == 1:
         print('Running conventional PGA...')
         model_conv_PGA = PGA_Conv(step_size_conv_PGA)
+        register_step_size('Conv PGA', model_conv_PGA.step_size)
         rate_conv, tau_conv, F_conv, W_conv = model_conv_PGA.execute_PGA(H_test, R, snr, n_iter_outer)
         rate_iter_conv = [r.detach().cpu().numpy() for r in (sum(rate_conv) / len(H_test[0]))]
         tau_iter_conv = [e.detach().cpu().numpy() for e in (sum(tau_conv) / (len(H_test[0])))]
@@ -42,6 +66,7 @@ if run_program == 1:
     if run_conv_PGA_J5 == 1:
         print('Running conventional PGA with J = 5...')
         model_conv_PGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)  # Reuse the same shape of step sizes as J5
+        register_step_size('Conv PGA (J=5)', model_conv_PGA_J5.step_size)
         rate_conv_PGA_J5, crb_conv_PGA_J5, power_conv_PGA_J5, F_conv_PGA_J5, W_conv_PGA_J5 = model_conv_PGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
@@ -54,6 +79,7 @@ if run_program == 1:
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
         model_conv_PGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
+        register_step_size('Conv PGA (J=10)', model_conv_PGA_J10.step_size)
         rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
@@ -67,6 +93,7 @@ if run_program == 1:
     if run_conv_PGA_J20 == 1:
         print('Running conventional PGA with J = 20...')
         model_conv_PGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
+        register_step_size('Conv PGA (J=20)', model_conv_PGA_J20.step_size)
         rate_conv_PGA_J20, crb_conv_PGA_J20, power_conv_PGA_J20, F_conv_PGA_J20, W_conv_PGA_J20 = model_conv_PGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
@@ -80,6 +107,7 @@ if run_program == 1:
         # Create new model and load states
         model_UPGA_J1 = PGA_Conv(step_size_UPGA_J1)
         model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
+        register_step_size('UPGA (J=1)', model_UPGA_J1.step_size)
 
         # executing unfolded PGA on the test set
         sum_rate_UPGA_J1, tau_UPGA_J1, F_UPGA_J1, W_UPGA_J1 = model_UPGA_J1.execute_PGA(H_test, R, snr, n_iter_outer)
@@ -93,6 +121,7 @@ if run_program == 1:
         # Create new model and load states
         model_UPGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)
         model_UPGA_J5.load_state_dict(torch.load(model_file_name_UPGA_J5, map_location=device))
+        register_step_size('UPGA (J=5)', model_UPGA_J5.step_size)
 
         sum_rate_UPGA_J5, crb_UPGA_J5, power_UPGA_J5, F_UPGA_J5, W_UPGA_J5 = model_UPGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
@@ -108,6 +137,7 @@ if run_program == 1:
         # Create new model and load states
         model_UPGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
         model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
+        register_step_size('UPGA (J=10)', model_UPGA_J10.step_size)
 
         sum_rate_UPGA_J10, crb_UPGA_J10, power_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
@@ -124,6 +154,7 @@ if run_program == 1:
         # Create new model and load states
         model_UPGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
         model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
+        register_step_size('UPGA (J=20)', model_UPGA_J20.step_size)
 
         sum_rate_UPGA_J20, crb_UPGA_J20,power_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
                                                                                              n_iter_outer,
@@ -152,6 +183,7 @@ if run_program == 1:
         print('Running unfolded PGA with decaying J (max J=5)...')
         model_UPGA_J5_decay = PGA_Unfold_JX_decay(step_size_UPGA_J5)
         model_UPGA_J5_decay.load_state_dict(torch.load(model_file_name_UPGA_J5_decay, map_location=device))
+        register_step_size('UPGA (J=5, decay)', model_UPGA_J5_decay.step_size)
 
         sum_rate_UPGA_J5_decay, crb_UPGA_J5_decay, power_UPGA_J5_decay, F_UPGA_J5_decay, W_UPGA_J5_decay = model_UPGA_J5_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
@@ -167,6 +199,7 @@ if run_program == 1:
         print('Running unfolded PGA with decaying J...')
         model_UPGA_J10_decay = PGA_Unfold_JX_decay(step_size_UPGA_J10_decay)
         model_UPGA_J10_decay.load_state_dict(torch.load(model_file_name_UPGA_J10_decay, map_location=device))
+        register_step_size('UPGA (J=10, decay)', model_UPGA_J10_decay.step_size)
 
         sum_rate_UPGA_J10_decay, crb_UPGA_J10_decay, power_UPGA_J10_decay, F_UPGA_J10_decay, W_UPGA_J10_decay = model_UPGA_J10_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
@@ -181,6 +214,7 @@ if run_program == 1:
         print('Running unfolded PGA with decaying J (max J=20)...')
         model_UPGA_J20_decay = PGA_Unfold_JX_decay(step_size_UPGA_J20_decay)
         model_UPGA_J20_decay.load_state_dict(torch.load(model_file_name_UPGA_J20_decay, map_location=device))
+        register_step_size('UPGA (J=20, decay)', model_UPGA_J20_decay.step_size)
 
         sum_rate_UPGA_J20_decay, crb_UPGA_J20_decay, power_UPGA_J20_decay, F_UPGA_J20_decay, W_UPGA_J20_decay = model_UPGA_J20_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
@@ -196,6 +230,7 @@ if run_program == 1:
         print('Running unfolded PGA with gradient reuse (J = 10)...')
         model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)
         # model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
+        register_step_size('UPGA (J=10, GradReuse)', model_UPGA_J_GradReuse.step_size)
 
         sum_rate_UPGA_J_GradReuse, crb_UPGA_J_GradReuse, power_UPGA_J_GradReuse, F_UPGA_J_GradReuse, W_UPGA_J_GradReuse = model_UPGA_J_GradReuse.execute_PGA(
             H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, n_iter_inner_J10)
@@ -521,7 +556,7 @@ if plot_figure == 1:
         plt.plot(frac_J20[mask_J20], obj[mask_J20], '-', markevery=10, color='black', linewidth=2, markersize=5, label='PGA (J=20)')
     if run_UPGA_J5 == 1:
         obj = OMEGA * rate_iter_UPGA_J5 + crb_iter_UPGA_J5
-        plt.plot(frac_J10[mask_J5], obj[mask_J10], ':*', markevery=10, color='orange', linewidth=2, markersize=5, label=label_UPGA_J5)
+        plt.plot(frac_J5[mask_J5], obj[mask_J5], ':*', markevery=10, color='orange', linewidth=2, markersize=5, label=label_UPGA_J5)
     if run_UPGA_J10 == 1:
         obj = OMEGA * rate_iter_UPGA_J10 + crb_iter_UPGA_J10
         plt.plot(frac_J10[mask_J10], obj[mask_J10], ':*', markevery=10, color='blue', linewidth=2, markersize=5, label=label_UPGA_J10)
@@ -590,6 +625,43 @@ if plot_figure == 1:
     plt.tight_layout()
     plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+
+    # ===================== AVERAGE STEP SIZES ==========================================
+    # Plot average over inner iterations for step_size[:,:,0] and step_size[:,:,1].
+    if len(step_size_snapshots) > 0:
+        # Index 0: analog/F update step size
+        plt.figure(8)
+        for model_label, step_tensor in step_size_snapshots:
+            avg_steps = average_step_size_by_outer(step_tensor)
+            if avg_steps is None or avg_steps.shape[1] <= 0:
+                continue
+            x_axis = np.arange(1, avg_steps.shape[0] + 1)
+            plt.plot(x_axis, avg_steps[:, 0], linewidth=2, label=model_label)
+        plt.xlabel(r'Outer iteration $I$', fontsize="13")
+        plt.ylabel(r'Average step size $[\cdot,\cdot,0]$', fontsize="13")
+        plt.title('Average Step Size Index 0 vs Outer Iteration', fontsize="13")
+        plt.grid()
+        safe_legend(loc='best', fontsize="11", labelspacing=0.15)
+        plt.tight_layout()
+        plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.png')
+        plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+
+        # Index 1: digital/W update step size (for K=1 this is channel 1 in last dim)
+        plt.figure(9)
+        for model_label, step_tensor in step_size_snapshots:
+            avg_steps = average_step_size_by_outer(step_tensor)
+            if avg_steps is None or avg_steps.shape[1] <= 1:
+                continue
+            x_axis = np.arange(1, avg_steps.shape[0] + 1)
+            plt.plot(x_axis, avg_steps[:, 1], linewidth=2, label=model_label)
+        plt.xlabel(r'Outer iteration $I$', fontsize="13")
+        plt.ylabel(r'Average step size $[\cdot,\cdot,1]$', fontsize="13")
+        plt.title('Average Step Size Index 1 vs Outer Iteration', fontsize="13")
+        plt.grid()
+        safe_legend(loc='best', fontsize="11", labelspacing=0.15)
+        plt.tight_layout()
+        plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.png')
+        plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
 
  
