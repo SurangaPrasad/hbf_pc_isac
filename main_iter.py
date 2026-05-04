@@ -26,7 +26,7 @@ if run_program == 1:
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
-        model_conv_PGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+        model_conv_PGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
         rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
@@ -39,7 +39,7 @@ if run_program == 1:
     # ====================================================== Conv. PGA with J = 20 ====================================
     if run_conv_PGA_J20 == 1:
         print('Running conventional PGA with J = 20...')
-        model_conv_PGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
+        model_conv_PGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
         rate_conv_PGA_J20, crb_conv_PGA_J20, power_conv_PGA_J20, F_conv_PGA_J20, W_conv_PGA_J20 = model_conv_PGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
@@ -63,7 +63,7 @@ if run_program == 1:
     if run_UPGA_J10 == 1:
         print('Running unfolded PGA with J = 10...')
         # Create new model and load states
-        model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+        model_UPGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
         model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
 
         sum_rate_UPGA_J10, crb_UPGA_J10, power_UPGA_J10, F_UPGA_J10, W_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
@@ -79,7 +79,7 @@ if run_program == 1:
     if run_UPGA_J20 == 1:
         print('Running unfolded PGA with J = 20...')
         # Create new model and load states
-        model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
+        model_UPGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
         model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
 
         sum_rate_UPGA_J20, crb_UPGA_J20,power_UPGA_J20, F_UPGA_J20, W_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,

@@ -100,7 +100,7 @@ if run_UPGA_J1 == 1:
 
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J20 == 1:
-    model_UPGA_J20 = PGA_Unfold_J20(step_size_UPGA_J20)
+    model_UPGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
     optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J20)
 
     epoch_losses = [] # To store average loss per epoch
@@ -151,7 +151,7 @@ if run_UPGA_J20 == 1:
 
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J10 == 1:
-    model_UPGA_J10 = PGA_Unfold_J10(step_size_UPGA_J10)
+    model_UPGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
     optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J10)
 
     epoch_losses = [] # To store average loss per epoch
