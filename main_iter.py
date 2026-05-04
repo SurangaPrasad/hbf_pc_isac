@@ -267,6 +267,7 @@ if plot_figure == 1:
             for jj in range(n_inner):
                 x.append(ii + (jj + 1) / (n_inner + 1))   # inner F-update slots
         return np.array(x)
+    frac_J5 = fractional_iters(n_iter_outer, n_iter_inner_J5)
     frac_J10 = fractional_iters(n_iter_outer, n_iter_inner_J10)
     frac_J20 = fractional_iters(n_iter_outer, n_iter_inner_J20)
 
@@ -429,8 +430,10 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, crb_iter_conv_PGA_J10[outer_idx_J10], ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_conv_PGA_J20 == 1:
         plt.plot(iter_outer_x, crb_iter_conv_PGA_J20[outer_idx_J20], ':s', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
+    if run_UPGA_J5 == 1:
+        plt.plot(iter_outer_x, crb_iter_UPGA_J5[outer_idx_J5], ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J5)
     if run_UPGA_J10 == 1:
-        plt.plot(iter_outer_x, crb_iter_UPGA_J10[outer_idx_J10], ':*', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J10)
+        plt.plot(iter_outer_x, crb_iter_UPGA_J10[outer_idx_J10], ':*', markevery=5, color='orange', linewidth=3, markersize=7, label=label_UPGA_J10)
     if run_UPGA_J20 == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J20[outer_idx_J20], ':s', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     if run_UPGA_J10_RMSProp == 1:
@@ -504,6 +507,7 @@ if plot_figure == 1:
     # ===================== OBJECTIVE INCLUDING ALL INNER ITERATIONS (first 20 outer iters) =========
     # x-axis: fractional outer iteration so inner steps are visible between integers
     n_plot_outer = 40   # number of outer iterations to display
+    mask_J5 = frac_J5 < n_plot_outer
     mask_J10 = frac_J10 < n_plot_outer
     mask_J20 = frac_J20 < n_plot_outer
     mask_J10_decay = frac_J10_decay < n_plot_outer
@@ -515,6 +519,9 @@ if plot_figure == 1:
     if run_conv_PGA_J20 == 1:
         obj = OMEGA * rate_iter_conv_PGA_J20 + crb_iter_conv_PGA_J20
         plt.plot(frac_J20[mask_J20], obj[mask_J20], '-', markevery=10, color='black', linewidth=2, markersize=5, label='PGA (J=20)')
+    if run_UPGA_J5 == 1:
+        obj = OMEGA * rate_iter_UPGA_J5 + crb_iter_UPGA_J5
+        plt.plot(frac_J10[mask_J5], obj[mask_J10], ':*', markevery=10, color='orange', linewidth=2, markersize=5, label=label_UPGA_J5)
     if run_UPGA_J10 == 1:
         obj = OMEGA * rate_iter_UPGA_J10 + crb_iter_UPGA_J10
         plt.plot(frac_J10[mask_J10], obj[mask_J10], ':*', markevery=10, color='blue', linewidth=2, markersize=5, label=label_UPGA_J10)

@@ -186,9 +186,9 @@ class PGA_Unfold_JX(nn.Module):
             # update W  (K == 1 always, unroll the k-loop)
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-            W_new = W.clone().detach()
-            W_new[0] = W[0].detach() + (self.step_size[0][ii][1] * grad_W_k_com[0]) * WEIGHT_W_COM \
-                                     + (self.step_size[0][ii][1] * grad_W_k_crb[0]) * WEIGHT_W_CRB
+            W_new = W
+            W_new = W + (self.step_size[0][ii][1] * grad_W_k_com) * WEIGHT_W_COM \
+                                     + (self.step_size[0][ii][1] * grad_W_k_crb) * WEIGHT_W_CRB
 
             # Projection
             F , W = normalize(F, W_new, H, Pt)
