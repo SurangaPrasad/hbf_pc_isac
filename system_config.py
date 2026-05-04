@@ -17,14 +17,15 @@ run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
-run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
+run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
+run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
+run_UPGA_J5_decay = 1        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
 run_UPGA_J10_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J20_decay  = 0       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
@@ -70,7 +71,7 @@ print(system_info)
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 476    # size of training set
-test_size = 20      # size of testing set
+test_size = 10      # size of testing set
 batch_size = len(snr_dB_list) * 4
 n_epoch = 30         # number of training epochs
 learning_rate = 0.0001 # learning rate
@@ -118,6 +119,7 @@ step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_si
 step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # J_decay uses the same shape as J10 (max_inner=10) but the class uses fewer steps per outer iter dynamically
+step_size_UPGA_J5_decay = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10_decay = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J20_decay = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # J_GradReuse uses the same shape as J10; gradient reuse logic is handled inside execute_PGA
@@ -156,6 +158,7 @@ model_file_name_UPGA_J10 = directory_model + 'UPGA_J10.pth'
 model_file_name_UPGA_J10_PRCDN = directory_model + 'UPGA_J10_PRCDN.pth'
 model_file_name_UPGA_J20 = directory_model + 'UPGA_J20.pth'
 model_file_name_UPGA_J10_PC = directory_model + 'UPGA_J10_PC.pth'
+model_file_name_UPGA_J5_decay = directory_model + 'UPGA_J5_decay.pth'
 model_file_name_UPGA_J10_decay = directory_model + 'UPGA_J10_decay.pth'
 model_file_name_UPGA_J20_decay = directory_model + 'UPGA_J20_decay.pth'
 model_file_name_UPGA_J_GradReuse = directory_model + 'UPGA_J_GradReuse.pth'
@@ -169,6 +172,7 @@ if not os.path.exists(directory_result):
 label_conv = 'Conventional PGA'
 label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 label_UPGA_J1 = r'Unfolded PGA ' + '$(J = 1)$'
+label_UPGA_J5 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J5) + ')$'
 label_UPGA_J10 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 label_UPGA_J20 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')$'
 label_UPGA_J10_PC = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'

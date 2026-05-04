@@ -248,43 +248,68 @@ def get_mat_G_SVD(H,fre_indx,snr_dB):
     return G
 # ==================================== compute sum rate of MU-MISO system for each subcarrier ===========================
 def get_sum_rate(H, F, W, Pt):
+
+    # Normalize
     F, W = normalize(F, W, H, Pt)
-    # check feasibility
-    power_high_threshold = Pt + 10 ** (-3)
-    sum_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2) / K
+
+    # ================= Power constraint check =================
+    power_high_threshold = Pt + 1e-3
+
+    power = torch.linalg.matrix_norm(F @ W, dim=(-2, -1)) ** 2  # (K, B)
+    sum_power = torch.mean(power)
+
     if torch.any(sum_power > power_high_threshold):
         sys.stderr.write('Error: power constraint violated\n')
-    # power_high_threshold = Pt + 10 ** (-0)
-    # power_low_threshold = Pt - 10 ** (-0)
-    # power_all = torch.linalg.matrix_norm(F @ W, ord='fro') ** 2
-    # if torch.any(power_all > power_high_threshold):
-    #     sys.stderr.write('Error: power constraint violated\n')
 
-    F_H = F.conj().transpose(-2, -1)              # (K, B, Nrf, Nt)
-    V = W @ W.conj().transpose(-2, -1)             # (K, B, Nrf, Nrf)
+    # ================= Precompute =================
+    F_H = F.conj().transpose(-2, -1)             # (K, B, Nrf, Nt)
+    W_H = W.conj().transpose(-2, -1)             # (K, B, M, Nrf)
 
-    # Build V_m for all m simultaneously: W_m = W with column m zeroed
+    V = W @ W_H                                  # (K, B, Nrf, Nrf)
+
+    # ================= Build V_m =================
     Mval = W.shape[-1]
-    col_mask = (1.0 - torch.eye(Mval, device=W.device, dtype=W.real.dtype)).to(W.dtype)
-    W_m_all = W.unsqueeze(0) * col_mask.view(Mval, 1, 1, 1, Mval)  # (M, K, B, Nrf, M)
-    V_m_all = W_m_all @ W_m_all.conj().transpose(-1, -2)            # (M, K, B, Nrf, Nrf)
-    V_m_perm = V_m_all.permute(1, 2, 0, 3, 4)                       # (K, B, M, Nrf, Nrf)
 
-    # Channel outer products for all users: Htilde[k,b,m] = h_m h_m^H
-    h_all = H.unsqueeze(-1)                                           # (K, B, M, Nt, 1)
-    Htilde_all = h_all @ h_all.conj().transpose(-1, -2)               # (K, B, M, Nt, Nt)
+    mask = (1 - torch.eye(Mval, device=W.device, dtype=W.dtype))  # (M, M)
 
-    # FVF_H: (K, B, Nt, Nt)
-    FVF_H = F @ V @ F_H
-    # trace_1[k,b,m] = trace(FVF_H[k,b] @ Htilde_all[k,b,m])
-    trace_1 = (FVF_H.unsqueeze(2) @ Htilde_all).diagonal(dim1=-1, dim2=-2).sum(-1)  # (K, B, M)
+    # Apply mask: zero each column m
+    W_m_all = W.unsqueeze(2) * mask.view(1, 1, Mval, 1, Mval)
+    # shape: (K, B, M, Nrf, M)
 
-    # trace_2[k,b,m] = trace(F[k,b] @ V_m[k,b,m] @ F_H[k,b] @ Htilde_all[k,b,m])
-    FVm_FH = F.unsqueeze(2) @ V_m_perm @ F_H.unsqueeze(2)            # (K, B, M, Nt, Nt)
-    trace_2 = (FVm_FH @ Htilde_all).diagonal(dim1=-1, dim2=-2).sum(-1)  # (K, B, M)
+    V_m_all = W_m_all @ W_m_all.conj().transpose(-1, -2)
+    # (K, B, M, Nrf, Nrf)
 
-    rate = (torch.log2(trace_1 + sigma2) - torch.log2(trace_2 + sigma2)).real.sum(-1)  # (K, B)
+    # ================= Channel outer products =================
+    # H: (K, B, M, Nt)
+    h = H.unsqueeze(-1)                          # (K, B, M, Nt, 1)
+    Htilde = h @ h.conj().transpose(-1, -2)      # (K, B, M, Nt, Nt)
+
+    # ================= Trace 1 =================
+    FVF_H = F @ V @ F_H                          # (K, B, Nt, Nt)
+
+    trace_1 = (
+        (FVF_H.unsqueeze(2) @ Htilde)
+        .diagonal(dim1=-1, dim2=-2)
+        .sum(-1)
+    )  # (K, B, M)
+
+    # ================= Trace 2 =================
+    FVmFH = F.unsqueeze(2) @ V_m_all @ F_H.unsqueeze(2)
+
+    trace_2 = (
+        (FVmFH @ Htilde)
+        .diagonal(dim1=-1, dim2=-2)
+        .sum(-1)
+    )  # (K, B, M)
+
+    # ================= Rate =================
+    rate = (
+        torch.log2(trace_1 + sigma2)
+        - torch.log2(trace_2 + sigma2)
+    ).real.sum(dim=-1)  # (K, B)
+
     sum_rate = torch.mean(rate)
+
     return sum_rate
 
 
@@ -351,25 +376,28 @@ def get_trace(A):
 
 # ======== normalization to meet constant modulus and power constraint ===========================
 def normalize(F, W, H, Pt):
-    """Normalize F (constant-modulus) and W (power constraint).
-
-    Pt can be:
-      - a Python scalar / 0-dim tensor  → applied uniformly to all samples
-      - a 1-D tensor of shape (B,)      → per-sample power budget
-    """
     B = len(H[0])
+
+    # ================= Constant modulus =================
     F = F / (torch.abs(F) + 1e-12)
-    sum_norm_BB = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
+
+    # ================= Power computation =================
+    power = torch.linalg.matrix_norm(F @ W, dim=(-2, -1)) ** 2  # (K, B)
+
+    # Total power per batch
+    sum_norm_BB = torch.sum(power, dim=0)  # (B,)
     sum_norm_BB = torch.clamp(sum_norm_BB, min=1e-6)
-    # Unify Pt to a (B,) tensor on the correct device
+
+    # ================= Handle Pt =================
     if torch.is_tensor(Pt) and Pt.dim() >= 1:
-        Pt_vec = Pt.to(dtype=sum_norm_BB.real.dtype if sum_norm_BB.is_complex() else sum_norm_BB.dtype,
-                       device=F.device)
+        Pt_vec = Pt.to(device=F.device, dtype=sum_norm_BB.dtype)
     else:
-        Pt_vec = torch.full((B,), float(Pt), dtype=sum_norm_BB.real.dtype if sum_norm_BB.is_complex() else sum_norm_BB.dtype,
-                            device=F.device)
+        Pt_vec = torch.full((B,), float(Pt), device=F.device, dtype=sum_norm_BB.dtype)
+
+    # ================= Normalize W =================
     normalize_factor = torch.sqrt(K * Pt_vec / sum_norm_BB).view(B, 1, 1)
     W = normalize_factor * W
+
     return F, W
 
 

@@ -5,6 +5,20 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 run_program = 1
 plot_figure = 1
 save_result = 0
+
+
+def safe_legend(**kwargs):
+    """Add legend only when labeled artists exist to avoid Matplotlib warnings."""
+    ax = plt.gca()
+    handles, labels = ax.get_legend_handles_labels()
+    valid = [(h, l) for h, l in zip(handles, labels) if l and not l.startswith('_')]
+    if not valid:
+        return
+    valid_handles, valid_labels = zip(*valid)
+    # Use opaque legend frame to keep EPS exports warning-free.
+    kwargs.setdefault('framealpha', 1.0)
+    ax.legend(valid_handles, valid_labels, **kwargs)
+
 # torch.manual_seed(3407)
 # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
 # Load training data
@@ -134,9 +148,24 @@ if run_program == 1:
         crb_iter_UPGA_J10_PRCDN   = crb_UPGA_J10_PRCDN.mean(0).cpu().numpy()
         power_iter_UPGA_J10_PRCDN = power_UPGA_J10_PRCDN.mean(0).cpu().numpy()
     # ====================================================== Proposed Unfolded PGA with decaying J ====================================
+    if run_UPGA_J5_decay == 1:
+        print('Running unfolded PGA with decaying J (max J=5)...')
+        model_UPGA_J5_decay = PGA_Unfold_JX_decay(step_size_UPGA_J5)
+        model_UPGA_J5_decay.load_state_dict(torch.load(model_file_name_UPGA_J5_decay, map_location=device))
+
+        sum_rate_UPGA_J5_decay, crb_UPGA_J5_decay, power_UPGA_J5_decay, F_UPGA_J5_decay, W_UPGA_J5_decay = model_UPGA_J5_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                            n_iter_inner_J5)
+        rate_iter_UPGA_J5_decay  = sum_rate_UPGA_J5_decay.mean(0).cpu().numpy()
+        crb_iter_UPGA_J5_decay   = crb_UPGA_J5_decay.mean(0).cpu().numpy()
+        power_iter_UPGA_J5_decay = power_UPGA_J5_decay.mean(0).cpu().numpy()
+        inner_iter_history_UPGA_J5_decay = list(model_UPGA_J5_decay.inner_iter_history)
+    
+    
     if run_UPGA_J10_decay == 1:
         print('Running unfolded PGA with decaying J...')
-        model_UPGA_J10_decay = PGA_Unfold_J10_decay(step_size_UPGA_J10_decay)
+        model_UPGA_J10_decay = PGA_Unfold_JX_decay(step_size_UPGA_J10_decay)
         model_UPGA_J10_decay.load_state_dict(torch.load(model_file_name_UPGA_J10_decay, map_location=device))
 
         sum_rate_UPGA_J10_decay, crb_UPGA_J10_decay, power_UPGA_J10_decay, F_UPGA_J10_decay, W_UPGA_J10_decay = model_UPGA_J10_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
@@ -150,7 +179,7 @@ if run_program == 1:
     
     if run_UPGA_J20_decay == 1:
         print('Running unfolded PGA with decaying J (max J=20)...')
-        model_UPGA_J20_decay = PGA_Unfold_J20_decay(step_size_UPGA_J20_decay)
+        model_UPGA_J20_decay = PGA_Unfold_JX_decay(step_size_UPGA_J20_decay)
         model_UPGA_J20_decay.load_state_dict(torch.load(model_file_name_UPGA_J20_decay, map_location=device))
 
         sum_rate_UPGA_J20_decay, crb_UPGA_J20_decay, power_UPGA_J20_decay, F_UPGA_J20_decay, W_UPGA_J20_decay = model_UPGA_J20_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
@@ -249,6 +278,8 @@ if plot_figure == 1:
             for jj in range(n_inner_ii):
                 x.append(ii + (jj + 1) / (n_inner_ii + 1))
         return np.array(x)
+    if run_UPGA_J5_decay == 1:
+        frac_J5_decay = fractional_iters_variable(inner_iter_history_UPGA_J5_decay)
     if run_UPGA_J10_decay == 1:
         frac_J10_decay = fractional_iters_variable(inner_iter_history_UPGA_J10_decay)
     else:
@@ -270,6 +301,18 @@ if plot_figure == 1:
                               n_iter_outer * (n_iter_inner_J20 + 1),
                               n_iter_inner_J20 + 1)   # length = n_iter_outer
     # outer_idx for J_decay/adaptive schedule: W-update is the LAST slot of each block
+    if run_UPGA_J5_decay == 1:
+        outer_idx_J5_decay = []
+        _pos = 0
+        for _ni in inner_iter_history_UPGA_J5_decay:
+            _pos += _ni
+            outer_idx_J5_decay.append(_pos)
+            _pos += 1
+        outer_idx_J5_decay = np.array(outer_idx_J5_decay)
+        iter_outer_x_J5_decay = np.arange(1, len(outer_idx_J5_decay) + 1)
+    else:
+        outer_idx_J5_decay = np.array([], dtype=int)
+        iter_outer_x_J5_decay = np.array([])
     if run_UPGA_J10_decay == 1:
         outer_idx_J10_decay = []
         _pos = 0
@@ -376,7 +419,7 @@ if plot_figure == 1:
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel('$R$ [bits/s/Hz]', fontsize="14")
     plt.grid()
-    plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)
+    safe_legend(loc='best', fontsize="14", labelspacing=0.15)
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -403,7 +446,7 @@ if plot_figure == 1:
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
     plt.ylabel(r'$1/\text{crb}$', fontsize="14")
     plt.grid()
-    plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)
+    safe_legend(loc='best', fontsize="14", labelspacing=0.15)
     plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -437,6 +480,9 @@ if plot_figure == 1:
     if run_UPGA_J10_PRCDN == 1:
         obj_iter_UPGA_J10_PRCDN = OMEGA * rate_iter_UPGA_J10_PRCDN[outer_idx_J10] + crb_iter_UPGA_J10_PRCDN[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_J10_PRCDN, ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
+    if run_UPGA_J5_decay == 1:
+        obj_iter_UPGA_J5_decay = OMEGA * rate_iter_UPGA_J5_decay[outer_idx_J5_decay] + crb_iter_UPGA_J5_decay[outer_idx_J5_decay]
+        plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_J5_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=5, decay)')
     if run_UPGA_J10_decay == 1:
         obj_iter_UPGA_J10_decay = OMEGA * rate_iter_UPGA_J10_decay[outer_idx_J10_decay] + crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
         plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
@@ -450,7 +496,7 @@ if plot_figure == 1:
     plt.ylabel(r'$\omega R + 1/\text{crb}$', fontsize="14")
     plt.title("Objective function vs Iterations", fontsize="14")
     plt.grid()
-    plt.legend(loc='best', fontsize="14", labelspacing  = 0.15)
+    safe_legend(loc='best', fontsize="14", labelspacing=0.15)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -493,12 +539,12 @@ if plot_figure == 1:
         plt.plot(frac_J_GradReuse[mask_J_GradReuse], obj[mask_J_GradReuse], ':^', markevery=10, color='teal', linewidth=2, markersize=5, label='PGA (J=10, GradReuse)')
     # Mark outer-iteration boundaries with vertical grid lines
     for ii in range(1, n_plot_outer):
-        plt.axvline(x=ii, color='grey', linestyle='--', linewidth=0.6, alpha=0.5)
+        plt.axvline(x=ii, color='0.75', linestyle='--', linewidth=0.6)
     plt.xlabel(r'Outer iteration $I$ (inner steps shown as fractions)', fontsize="13")
     plt.ylabel(r'$\omega R + 1/\mathrm{CRB}$', fontsize="13")
     plt.title(f"Objective function — first {n_plot_outer} outer iterations (incl. inner)", fontsize="13")
     plt.grid(axis='y')
-    plt.legend(loc='best', fontsize="12", labelspacing=0.15)
+    safe_legend(loc='best', fontsize="12", labelspacing=0.15)
     plt.tight_layout()
     plt.savefig(directory_result + 'objective_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'objective_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.eps')
@@ -528,12 +574,12 @@ if plot_figure == 1:
     plt.plot(frac_J10[mask_J10], snr * np.ones_like(frac_J10[mask_J10]), '--', color='red', linewidth=2, label='Maximum Power (Pt)')
     # Mark outer-iteration boundaries with vertical grid lines
     for ii in range(1, n_plot_outer):
-        plt.axvline(x=ii, color='grey', linestyle='--', linewidth=0.6, alpha=0.5)
+        plt.axvline(x=ii, color='0.75', linestyle='--', linewidth=0.6)
     plt.xlabel(r'Outer iteration $I$ (inner steps shown as fractions)', fontsize="13")
     plt.ylabel(r'F x W', fontsize="13")
     plt.title(f"F x W — first {n_plot_outer} outer iterations (incl. inner)", fontsize="13")
     plt.grid(axis='y')
-    plt.legend(loc='best', fontsize="12", labelspacing=0.15)
+    safe_legend(loc='best', fontsize="12", labelspacing=0.15)
     plt.tight_layout()
     plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.eps')
