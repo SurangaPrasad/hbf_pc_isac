@@ -162,7 +162,7 @@ if run_UPGA_J10 == 1:
         H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
         print(f'size of the H_train: {H_train.shape}, size of the shuffled H: {H_shuffled.shape}')
         
-        for i_batch in range(0, len(H_train), batch_size):
+        for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]
             snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
@@ -201,7 +201,54 @@ if run_UPGA_J10 == 1:
     # Save the plot of training loss
     plt.savefig(directory_data + "training_loss_UPGA_J10.png")
 
+# ============================================================= proposed unfolding PGA =================================
 
+if run_UPGA_J5 == 1:
+    model_UPGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)
+    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5)
+
+    epoch_losses = [] # To store average loss per epoch
+
+    for i_epoch in range(n_epoch):
+        batch_losses = [] # To store loss of each batch in current epoch
+        
+        H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+        
+        for i_batch in range(0, len(H_train[0]), batch_size):
+            H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
+                                     dtype=torch.float32, device=device)
+            
+            rate, __, __, F, W = model_UPGA_J5.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J5, track_metrics=False)
+            
+            loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
+            print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
+            
+            optimizer.zero_grad()
+            loss.backward()
+            clip_gradients(model_UPGA_J5)
+            optimizer.step()
+            
+            # .item() is critical to keep memory usage low!
+            batch_losses.append(loss.item())
+
+        avg_loss = sum(batch_losses) / len(batch_losses)
+        epoch_losses.append(avg_loss)
+        scheduler.step(avg_loss)
+        print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
+
+    torch.save(model_UPGA_J5.state_dict(), model_file_name_UPGA_J5)
+    
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, n_epoch + 1), epoch_losses, marker='o', linestyle='-', color='b')
+    plt.title('Training Loss per Epoch')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average Loss')
+    plt.grid(True)
+    plt.savefig(directory_data + "training_loss_UPGA_J5.png")
 
 if run_UPGA_J10_PRCDN == 1:
     model_UPGA_J10_PRCDN = PGA_Unfold_J10_PRCDN(n_iter_inner_J10, n_iter_outer, dim_F=64, dim_W=4).to(device)
