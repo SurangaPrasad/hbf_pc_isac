@@ -17,15 +17,15 @@ run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
-run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
+run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
+run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
-run_UPGA_J5_decay = 1        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
+run_UPGA_J5_decay = 0        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
 run_UPGA_J10_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J20_decay  = 0       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
@@ -57,7 +57,7 @@ if normalize_tau == 0:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
     else:
         system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_LoS"
-    OMEGA = 1
+    OMEGA = 3
     n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
 else:
     system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_normalize"
@@ -70,11 +70,11 @@ system_info = str(Nt) + " Tx antennas, " + str(M) + " users, " + str(Nrf) + " RF
 print(system_info)
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
-train_size = 476    # size of training set
-test_size = 10      # size of testing set
-batch_size = len(snr_dB_list) * 4
+train_size = 112 * 4     # size of training set
+test_size = 60      # size of testing set
+batch_size = len(snr_dB_list) * 8
 n_epoch = 30         # number of training epochs
-learning_rate = 0.0001 # learning rate
+learning_rate = 0.00003 # learning rate
 
 n_iter_outer = 120      # Number of outer iterations (I)
 n_iter_inner_J5 = 5     # Number of inner iterations (J = 5)
@@ -84,8 +84,8 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
-WEIGHT_F_COM = 1  
-WEIGHT_W_COM = 1 
+WEIGHT_F_COM = OMEGA  
+WEIGHT_W_COM = OMEGA 
 WEIGHT_F_CRB = OMEGA / Nt * K
 WEIGHT_W_CRB = OMEGA / Nt * K
 
