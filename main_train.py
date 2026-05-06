@@ -309,7 +309,8 @@ if run_UPGA_J10_PRCDN == 1:
 # ============================================================= proposed unfolding PGA with decaying inner iterations ====
 if run_UPGA_J5_decay == 1:
     model_UPGA_J5_decay = PGA_Unfold_JX_decay(step_size_UPGA_J5_decay)
-    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5_decay)
+    # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5_decay)
+    optimizer = torch.optim.Adam(model_UPGA_J5_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
 
@@ -333,14 +334,14 @@ if run_UPGA_J5_decay == 1:
 
             optimizer.zero_grad()
             loss.backward()
-            clip_gradients(model_UPGA_J5_decay)
+            # clip_gradients(model_UPGA_J5_decay)
             optimizer.step()
 
             batch_losses.append(loss.item())
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        scheduler.step(avg_loss)
+        # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J5_decay.state_dict(), model_file_name_UPGA_J5_decay)
@@ -356,7 +357,8 @@ if run_UPGA_J5_decay == 1:
 
 if run_UPGA_J10_decay == 1:
     model_UPGA_J10_decay = PGA_Unfold_JX_decay(step_size_UPGA_J10_decay)
-    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J10_decay)
+    # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J10_decay)
+    optimizer = torch.optim.Adam(model_UPGA_J10_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
 
@@ -380,14 +382,14 @@ if run_UPGA_J10_decay == 1:
 
             optimizer.zero_grad()
             loss.backward()
-            clip_gradients(model_UPGA_J10_decay)
+            # clip_gradients(model_UPGA_J10_decay)
             optimizer.step()
 
             batch_losses.append(loss.item())
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        scheduler.step(avg_loss)
+        # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J10_decay.state_dict(), model_file_name_UPGA_J10_decay)
@@ -404,7 +406,8 @@ if run_UPGA_J10_decay == 1:
 # ============================================================= proposed unfolding PGA with decaying inner iterations (J_max=20) ====
 if run_UPGA_J20_decay == 1:
     model_UPGA_J20_decay = PGA_Unfold_JX_decay(step_size_UPGA_J20_decay)
-    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J20_decay)
+    # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J20_decay)
+    optimizer = torch.optim.Adam(model_UPGA_J20_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
 
@@ -428,14 +431,14 @@ if run_UPGA_J20_decay == 1:
 
             optimizer.zero_grad()
             loss.backward()
-            clip_gradients(model_UPGA_J20_decay)
+            # clip_gradients(model_UPGA_J20_decay)
             optimizer.step()
 
             batch_losses.append(loss.item())
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        scheduler.step(avg_loss)
+        # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J20_decay.state_dict(), model_file_name_UPGA_J20_decay)
