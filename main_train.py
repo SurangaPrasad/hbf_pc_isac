@@ -6,8 +6,8 @@ from PGA_models import *
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-TRAIN_LR = 5e-5
-TRAIN_SCHEDULER_FACTOR = 0.5
+TRAIN_LR = learning_rate
+TRAIN_SCHEDULER_FACTOR = 0.1
 TRAIN_SCHEDULER_PATIENCE = 3
 TRAIN_MIN_LR = 1e-7
 TRAIN_GRAD_CLIP_MAX_NORM = 1.0
@@ -19,7 +19,7 @@ def build_optimizer_and_scheduler(model):
         'mode': 'min',
         'factor': TRAIN_SCHEDULER_FACTOR,
         'patience': TRAIN_SCHEDULER_PATIENCE,
-        'min_lr': TRAIN_MIN_LR,
+        # 'min_lr': TRAIN_MIN_LR,
     }
     if 'verbose' in inspect.signature(torch.optim.lr_scheduler.ReduceLROnPlateau.__init__).parameters:
         scheduler_kwargs['verbose'] = True
@@ -356,8 +356,8 @@ if run_UPGA_J5_decay == 1:
 
 if run_UPGA_J10_decay == 1:
     model_UPGA_J10_decay = PGA_Unfold_JX_decay(step_size_UPGA_J10_decay)
-    # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J10_decay)
-    optimizer = torch.optim.Adam(model_UPGA_J10_decay.parameters(), lr=learning_rate)
+    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J10_decay)
+    #optimizer = torch.optim.Adam(model_UPGA_J10_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
 
@@ -376,7 +376,7 @@ if run_UPGA_J10_decay == 1:
             __, __, __, F, W, F_over_iters, W_over_iters = model_UPGA_J10_decay.execute_PGA(
                 H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
 
-            print(f'Length of the F_over_iters: {len(F_over_iters.shape)}')
+            # print(f'Length of the F_over_iters: {len(F_over_iters.shape)}')
 
             loss = get_sum_loss(F_over_iters, W_over_iters, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -390,7 +390,7 @@ if run_UPGA_J10_decay == 1:
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        # scheduler.step(avg_loss)
+        scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J10_decay.state_dict(), model_file_name_UPGA_J10_decay)

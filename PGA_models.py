@@ -1181,8 +1181,8 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97):
         )
 
 
-        print("Losses per iteration:", losses.detach().cpu().numpy())
-        print("Weights per iteration:", weights.detach().cpu().numpy())
+        # print("Losses per iteration:", losses.detach().cpu().numpy())
+        # print("Weights per iteration:", weights.detach().cpu().numpy())
 
         # Normalize weights
         weights = weights / weights.sum()
