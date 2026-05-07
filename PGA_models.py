@@ -153,6 +153,9 @@ class PGA_Unfold_JX(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        F_over_iters = torch.zeros((1, n_iter_outer + 1, *F.shape), device=H.device, dtype=F.dtype)
+        W_over_iters = torch.zeros((1, n_iter_inner + 1, *W.shape), device=H.device, dtype=W.dtype)  
+
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
             for jj in range(n_inner):
@@ -192,6 +195,8 @@ class PGA_Unfold_JX(nn.Module):
 
             # Projection
             F , W = normalize(F, W_new, H, Pt)
+            F_over_iters[0, ii] = F
+            W_over_iters[0, ii] = W
 
             # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
@@ -203,7 +208,7 @@ class PGA_Unfold_JX(nn.Module):
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W , F_over_iters, W_over_iters
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
@@ -226,6 +231,9 @@ class PGA_Unfold_JX_decay(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        
+        F_over_iters = torch.zeros((n_iter_outer, *F.shape), device=H.device, dtype=F.dtype)
+        W_over_iters = torch.zeros((n_iter_outer, *W.shape), device=H.device, dtype=W.dtype)
 
         def _n_inner(prev_obj=None, curr_obj=None):
 
@@ -252,7 +260,7 @@ class PGA_Unfold_JX_decay(nn.Module):
             n_inner = int(torch.ceil(max_inner * ratio).item())
 
             # Keep at least 2 iterations for stability
-            return max(2, min(max_inner, n_inner))
+            return max(4, min(max_inner, n_inner))
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
 
@@ -303,12 +311,15 @@ class PGA_Unfold_JX_decay(nn.Module):
             # update W  (K == 1 always, unroll the k-loop)
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-            W_new = W
-            W_new = W + (self.step_size[0][ii][1] * grad_W_k_com) * WEIGHT_W_COM \
-                                     + (self.step_size[0][ii][1] * grad_W_k_crb) * WEIGHT_W_CRB
+            W_new = W.clone().detach()
+            W_new[0] = W[0].detach() + (self.step_size[0][ii][1] * grad_W_k_com[0]) * WEIGHT_W_COM \
+                                     + (self.step_size[0][ii][1] * grad_W_k_crb[0]) * WEIGHT_W_CRB
 
             # Projection
             F, W = normalize(F, W_new, H, Pt)
+
+            F_over_iters[ii] = F
+            W_over_iters[ii] = W
 
             # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
@@ -342,7 +353,7 @@ class PGA_Unfold_JX_decay(nn.Module):
         # print("Adaptive inner iterations:", inner_iter_history)
         # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
 
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W, F_over_iters, W_over_iters
 
 # PGA_Unfold_J20_decay is identical to PGA_Unfold_J10_decay; the max inner-iteration
 # count is read dynamically from self.step_size.shape[0], so passing a step_size
@@ -1122,16 +1133,83 @@ def get_grad_W_rad(F, W, R):
     grad_W = grad_W / K
     return grad_W
 
-# ==================compute los based on (15)
-def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt):
-    sum_rate = get_sum_rate(H, F, W, Pt)
-    # loss = -(sum_rate - OMEGA * sum_error)# / (K * batch_size)
+# ================== Compute exponentially weighted deep-supervision loss
+def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97):
 
-    # For CRB-based loss, we can directly use the CRB value as the loss, since we want to minimize it.
-    crb = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
-    mean_crb = torch.mean(crb)
-    loss = -(OMEGA * sum_rate + mean_crb)
-    return loss
+    # ---------------------------------------------------------
+    # Case 1:
+    # F/W contain full outer-iteration trajectories
+    # Shape:
+    #   F : [n_outer, B, Nt, Nrf]
+    #   W : [n_outer, B, Nrf, K]
+    # ---------------------------------------------------------
+    if len(F.shape) == 5:
+
+        n_outer = F.shape[0]
+
+        losses = []
+
+        for ii in range(n_outer):
+
+            F_ii = F[ii]
+            W_ii = W[ii]
+
+            sum_rate = get_sum_rate(H, F_ii, W_ii, Pt)
+
+            crb = get_crb_fe(
+                H, F_ii, W_ii,
+                xi_0, A_dot, R_N_inv, Pt
+            )
+
+            mean_crb = torch.mean(crb)
+
+            loss_ii = -(OMEGA * sum_rate + mean_crb)
+
+            losses.append(loss_ii)
+
+        # Stack losses
+        losses = torch.stack(losses)   # [n_outer]
+
+        # ---------------------------------------------------------
+        # Inverse exponential weights
+        # Earlier iterations get larger weights
+        # ---------------------------------------------------------
+        weights = beta ** torch.arange(
+            0, n_outer,
+            device=F.device,
+            dtype=losses.dtype
+        )
+
+
+        print("Losses per iteration:", losses.detach().cpu().numpy())
+        print("Weights per iteration:", weights.detach().cpu().numpy())
+
+        # Normalize weights
+        weights = weights / weights.sum()
+
+        # Final weighted loss
+        loss = torch.sum(weights * losses)
+
+        return loss
+
+    # ---------------------------------------------------------
+    # Case 2:
+    # Original single final-state loss
+    # ---------------------------------------------------------
+    else:
+
+        sum_rate = get_sum_rate(H, F, W, Pt)
+
+        crb = get_crb_fe(
+            H, F, W,
+            xi_0, A_dot, R_N_inv, Pt
+        )
+
+        mean_crb = torch.mean(crb)
+
+        loss = -(OMEGA * sum_rate + mean_crb)
+
+        return loss
 
 
 # ================== compute CRLB gradients =========================

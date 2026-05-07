@@ -258,8 +258,8 @@ def get_sum_rate(H, F, W, Pt):
     power = torch.linalg.matrix_norm(F @ W, dim=(-2, -1)) ** 2  # (K, B)
     sum_power = torch.mean(power)
 
-    if torch.any(sum_power > power_high_threshold):
-        sys.stderr.write('Error: power constraint violated\n')
+    # if torch.any(sum_power > power_high_threshold):
+        # sys.stderr.write('Error: power constraint violated\n')
 
     # ================= Precompute =================
     F_H = F.conj().transpose(-2, -1)             # (K, B, Nrf, Nt)
