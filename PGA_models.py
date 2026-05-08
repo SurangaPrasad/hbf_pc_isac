@@ -153,8 +153,8 @@ class PGA_Unfold_JX(nn.Module):
         rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        F_over_iters = torch.zeros((1, n_iter_outer + 1, *F.shape), device=H.device, dtype=F.dtype)
-        W_over_iters = torch.zeros((1, n_iter_inner + 1, *W.shape), device=H.device, dtype=W.dtype)  
+        # F_over_iters = torch.zeros((n_iter_outer, *F.shape), device=H.device, dtype=F.dtype)
+        # W_over_iters = torch.zeros((n_iter_outer, *W.shape), device=H.device, dtype=W.dtype)  
 
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
@@ -195,8 +195,8 @@ class PGA_Unfold_JX(nn.Module):
 
             # Projection
             F , W = normalize(F, W_new, H, Pt)
-            F_over_iters[0, ii] = F
-            W_over_iters[0, ii] = W
+            # F_over_iters[ii] = F
+            # W_over_iters[ii] = W
 
             # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
@@ -208,7 +208,7 @@ class PGA_Unfold_JX(nn.Module):
         rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W , F_over_iters, W_over_iters
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
@@ -232,8 +232,8 @@ class PGA_Unfold_JX_decay(nn.Module):
         crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         
-        F_over_iters = torch.zeros((n_iter_outer, *F.shape), device=H.device, dtype=F.dtype)
-        W_over_iters = torch.zeros((n_iter_outer, *W.shape), device=H.device, dtype=W.dtype)
+        # F_over_iters = torch.zeros((n_iter_outer, *F.shape), device=H.device, dtype=F.dtype)
+        # W_over_iters = torch.zeros((n_iter_outer, *W.shape), device=H.device, dtype=W.dtype)
 
         def _n_inner(prev_obj=None, curr_obj=None):
 
@@ -318,8 +318,8 @@ class PGA_Unfold_JX_decay(nn.Module):
             # Projection
             F, W = normalize(F, W_new, H, Pt)
 
-            F_over_iters[ii] = F
-            W_over_iters[ii] = W
+            # F_over_iters[ii] = F
+            # W_over_iters[ii] = W
 
             # Record metrics after W-update (slot 0 of this outer iter)
             if track_metrics:
@@ -353,7 +353,7 @@ class PGA_Unfold_JX_decay(nn.Module):
         # print("Adaptive inner iterations:", inner_iter_history)
         # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
 
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W, F_over_iters, W_over_iters
+        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
 # PGA_Unfold_J20_decay is identical to PGA_Unfold_J10_decay; the max inner-iteration
 # count is read dynamically from self.step_size.shape[0], so passing a step_size
