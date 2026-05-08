@@ -333,7 +333,7 @@ if run_UPGA_J5_decay == 1:
 
             optimizer.zero_grad()
             loss.backward()
-            clip_gradients(model_UPGA_J5_decay)
+            # clip_gradients(model_UPGA_J5_decay)
             optimizer.step()
 
             batch_losses.append(loss.item())
@@ -373,12 +373,12 @@ if run_UPGA_J10_decay == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
 
-            __, __, __, F, W, F_over_iters, W_over_iters = model_UPGA_J10_decay.execute_PGA(
+            __, __, __, F, W = model_UPGA_J10_decay.execute_PGA(
                 H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
 
             # print(f'Length of the F_over_iters: {len(F_over_iters.shape)}')
 
-            loss = get_sum_loss(F_over_iters, W_over_iters, H, xi_0, A_dot, R_N_inv, snr_train)
+            loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
 
             optimizer.zero_grad()

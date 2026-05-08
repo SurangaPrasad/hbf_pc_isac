@@ -213,7 +213,7 @@ class PGA_Unfold_JX(nn.Module):
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
 
-    def __init__(self, step_size, alpha=1e-4):
+    def __init__(self, step_size, alpha = 0.0008):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
         self.inner_iter_history = []
@@ -235,32 +235,15 @@ class PGA_Unfold_JX_decay(nn.Module):
         # F_over_iters = torch.zeros((n_iter_outer, *F.shape), device=H.device, dtype=F.dtype)
         # W_over_iters = torch.zeros((n_iter_outer, *W.shape), device=H.device, dtype=W.dtype)
 
-        def _n_inner(prev_obj=None, curr_obj=None):
-
+        def _n_inner(grad_norm):
             max_inner = self.step_size.shape[0]
-
-            # First outer iteration
-            if prev_obj is None or curr_obj is None:
-                return max_inner
-
             eps = 1e-8
-
-            # Relative objective improvement
-            delta = torch.mean(
-                torch.abs(curr_obj - prev_obj) /
-                (torch.abs(prev_obj) + eps)
-            )
-            # print(f'current_obj: {curr_obj.mean().item()}, prev_obj: {prev_obj.mean().item()}, delta: {delta.item()}')
-            # print(f"Delta: {delta.item()}")
-
-            # Adaptive ratio
-            ratio = delta / (delta + self.alpha)
-
-            # Adaptive inner iteration count
+            # Normalize gradient magnitude
+            ratio = grad_norm / (grad_norm + self.alpha + eps)
+            # Adaptive number of inner iterations
             n_inner = int(torch.ceil(max_inner * ratio).item())
-
-            # Keep at least 2 iterations for stability
-            return max(4, min(max_inner, n_inner))
+            # Keep minimum iterations for stability
+            return max(2, min(max_inner, n_inner))
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
 
@@ -278,17 +261,26 @@ class PGA_Unfold_JX_decay(nn.Module):
         for ii in range(n_iter_outer):
             
             # ----------------------------------------------------
-            # Adaptive inner iteration count
+            # Gradient-norm-based adaptive inner iterations
             # ----------------------------------------------------
-            if ii < 2:
-                prev_obj = None
-                curr_obj = None
-            else:
-                prev_obj = (OMEGA * rate_over_iters[ii-2, -1] + crb_over_iters[ii-2, -1]).detach()
-                curr_obj = (OMEGA * rate_over_iters[ii-1, -1] + crb_over_iters[ii-1, -1]).detach()
- 
-            n_inner = _n_inner(prev_obj, curr_obj)
-            
+
+            grad_F_com = get_grad_F_com(H, F, W)
+            grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+
+            # Total gradient norm
+            grad_norm = (
+                torch.norm(grad_F_com) / grad_F_com.numel()
+                +
+                torch.norm(grad_F_crb) / grad_F_crb.numel()
+            ).detach()
+
+            # Adaptive inner iteration count
+            n_inner = _n_inner(grad_norm)
+            # print(
+            #     f"Outer {ii:3d} | "
+            #     f"grad_norm={grad_norm.item():.4e} | "
+            #     f"n_inner={n_inner}"
+            # )
 
             if track_metrics:
                 inner_iter_history.append(n_inner)
@@ -311,9 +303,9 @@ class PGA_Unfold_JX_decay(nn.Module):
             # update W  (K == 1 always, unroll the k-loop)
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-            W_new = W.clone().detach()
-            W_new[0] = W[0].detach() + (self.step_size[0][ii][1] * grad_W_k_com[0]) * WEIGHT_W_COM \
-                                     + (self.step_size[0][ii][1] * grad_W_k_crb[0]) * WEIGHT_W_CRB
+            W_new = W
+            W_new = W + (self.step_size[0][ii][1] * grad_W_k_com) * WEIGHT_W_COM \
+                                     + (self.step_size[0][ii][1] * grad_W_k_crb) * WEIGHT_W_CRB
 
             # Projection
             F, W = normalize(F, W_new, H, Pt)
@@ -1136,80 +1128,14 @@ def get_grad_W_rad(F, W, R):
 # ================== Compute exponentially weighted deep-supervision loss
 def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97):
 
-    # ---------------------------------------------------------
-    # Case 1:
-    # F/W contain full outer-iteration trajectories
-    # Shape:
-    #   F : [n_outer, B, Nt, Nrf]
-    #   W : [n_outer, B, Nrf, K]
-    # ---------------------------------------------------------
-    if len(F.shape) == 5:
+    sum_rate = get_sum_rate(H, F, W, Pt)
+    crb = get_crb_fe(H, F, W,xi_0, A_dot, R_N_inv, Pt)
 
-        n_outer = F.shape[0]
+    mean_crb = torch.mean(crb)
 
-        losses = []
+    loss = -(OMEGA * sum_rate + mean_crb)
 
-        for ii in range(n_outer):
-
-            F_ii = F[ii]
-            W_ii = W[ii]
-
-            sum_rate = get_sum_rate(H, F_ii, W_ii, Pt)
-
-            crb = get_crb_fe(
-                H, F_ii, W_ii,
-                xi_0, A_dot, R_N_inv, Pt
-            )
-
-            mean_crb = torch.mean(crb)
-
-            loss_ii = -(OMEGA * sum_rate + mean_crb)
-
-            losses.append(loss_ii)
-
-        # Stack losses
-        losses = torch.stack(losses)   # [n_outer]
-
-        # ---------------------------------------------------------
-        # Inverse exponential weights
-        # Earlier iterations get larger weights
-        # ---------------------------------------------------------
-        weights = beta ** torch.arange(
-            0, n_outer,
-            device=F.device,
-            dtype=losses.dtype
-        )
-
-
-        # print("Losses per iteration:", losses.detach().cpu().numpy())
-        # print("Weights per iteration:", weights.detach().cpu().numpy())
-
-        # Normalize weights
-        weights = weights / weights.sum()
-
-        # Final weighted loss
-        loss = torch.sum(weights * losses)
-
-        return loss
-
-    # ---------------------------------------------------------
-    # Case 2:
-    # Original single final-state loss
-    # ---------------------------------------------------------
-    else:
-
-        sum_rate = get_sum_rate(H, F, W, Pt)
-
-        crb = get_crb_fe(
-            H, F, W,
-            xi_0, A_dot, R_N_inv, Pt
-        )
-
-        mean_crb = torch.mean(crb)
-
-        loss = -(OMEGA * sum_rate + mean_crb)
-
-        return loss
+    return loss
 
 
 # ================== compute CRLB gradients =========================

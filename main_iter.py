@@ -80,7 +80,7 @@ if run_program == 1:
         print('Running conventional PGA with J = 10...')
         model_conv_PGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
         register_step_size('Conv PGA (J=10)', model_conv_PGA_J10.step_size)
-        rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10, _, _ = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
@@ -201,7 +201,7 @@ if run_program == 1:
         model_UPGA_J10_decay.load_state_dict(torch.load(model_file_name_UPGA_J10_decay, map_location=device))
         register_step_size('UPGA (J=10, decay)', model_UPGA_J10_decay.step_size)
 
-        sum_rate_UPGA_J10_decay, crb_UPGA_J10_decay, power_UPGA_J10_decay, F_UPGA_J10_decay, W_UPGA_J10_decay, _, _ = model_UPGA_J10_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J10_decay, crb_UPGA_J10_decay, power_UPGA_J10_decay, F_UPGA_J10_decay, W_UPGA_J10_decay = model_UPGA_J10_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J10)
@@ -449,7 +449,7 @@ if plot_figure == 1:
     if run_UPGA_J10_decay == 1:
         plt.plot(iter_outer_x_J10_decay, rate_iter_UPGA_J10_decay[outer_idx_J10_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
     if run_UPGA_J20_decay == 1:
-        plt.plot(iter_outer_x_J20_decay, rate_iter_UPGA_J20_decay[outer_idx_J20_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
+        plt.plot(iter_outer_x_J20_decay, rate_iter_UPGA_J20_decay[outer_idx_J20_decay], '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
@@ -478,7 +478,7 @@ if plot_figure == 1:
     if run_UPGA_J10_decay == 1:
         plt.plot(iter_outer_x_J10_decay, crb_iter_UPGA_J10_decay[outer_idx_J10_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
     if run_UPGA_J20_decay == 1:
-        plt.plot(iter_outer_x_J20_decay, crb_iter_UPGA_J20_decay[outer_idx_J20_decay], ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
+        plt.plot(iter_outer_x_J20_decay, crb_iter_UPGA_J20_decay[outer_idx_J20_decay], '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
