@@ -72,9 +72,9 @@ print(system_info)
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 112 * 4     # size of training set
 test_size = 40      # size of testing set
-batch_size = len(snr_dB_list) * 8
+batch_size = len(snr_dB_list) * 4
 n_epoch = 30         # number of training epochs
-learning_rate = 0.00003 # learning 
+learning_rate = 0.00006 # learning 
 # learning_rate = 0.00002
 
 n_iter_outer = 120      # Number of outer iterations (I)
@@ -85,9 +85,9 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
-WEIGHT_F_COM = OMEGA  
-WEIGHT_W_COM = OMEGA 
-WEIGHT_F_CRB = OMEGA / Nt * K
+WEIGHT_F_COM = 1  
+WEIGHT_W_COM = 1 
+WEIGHT_F_CRB = OMEGA
 WEIGHT_W_CRB = OMEGA / Nt * K
 
 # ========================= CRB PARAMETERS =========================
