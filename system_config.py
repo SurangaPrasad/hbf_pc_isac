@@ -13,11 +13,11 @@ print(f"Using device: {device}")
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
 run_conv_PGA_J5 = 0        # Conventional PGA with setting J = 5
-run_conv_PGA_J10 = 0       # Conventional PGA with setting J = 10
+run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
+run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
 run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
@@ -25,7 +25,7 @@ run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
-run_UPGA_J5_decay = 1        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
+run_UPGA_J5_decay = 0        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
 run_UPGA_J10_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J20_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
@@ -48,26 +48,12 @@ initial_normalization = 0  # normalization for initialization
 data_source = 'matlab'  # data generate by matlab or python
 init_scheme = 'prop'  # proposed initialization for best convergence
 
-# ////////////////////////////////////////////// TESTING SETUPS //////////////////////////////////////////////
-normalize_tau = 0   # 0: non-normalize, 1: tau is normalized as tau/(||Psi||_F^2)
-LoS_user = 0        # 0: no LoS channel, 1: 1 user has LoS channel, the other has NLoS channel
-# For the figures in the paper, just set normalize_tau = 0 and LoS_user = 0.
-if normalize_tau == 0:
-    if LoS_user == 0:
-        system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
-    else:
-        system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_LoS"
-    OMEGA = 2
-    n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
-else:
-    system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF_normalize"
-    OMEGA = 10
-    n_iter_inner_J10 = 5  # Number of inner iterations (J = 5)
-    run_UPGA_J20 = 0
-    LoS_user = 0  # no LoS for normalized case
 
-system_info = str(Nt) + " Tx antennas, " + str(M) + " users, " + str(Nrf) + " RF chains, " + str(K) + " frequency, " + str(LoS_user) + " LoS users, " + str(normalize_tau) + " normalize tau"
-print(system_info)
+system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
+
+OMEGA = 2
+
+
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 112 * 4     # size of training set
@@ -78,7 +64,9 @@ learning_rate = 0.00006 # learning
 # learning_rate = 0.00002
 
 n_iter_outer = 120      # Number of outer iterations (I)
+n_iter_inner_J1 = 1     # Number of inner iterations (J = 1)
 n_iter_inner_J5 = 5     # Number of inner iterations (J = 5)
+n_iter_inner_J10 = 10  # Number of inner iterations (J = 10)
 n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 
 
@@ -87,7 +75,7 @@ WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
 WEIGHT_F_COM = 1  
 WEIGHT_W_COM = 1 
-WEIGHT_F_CRB = OMEGA * 2 
+WEIGHT_F_CRB = OMEGA / 2 
 WEIGHT_W_CRB = OMEGA / Nt * K
 
 # ========================= CRB PARAMETERS =========================
@@ -114,7 +102,7 @@ R_N_inv = torch.linalg.inv(R_N).to(COMPLEX_DTYPE).to(device)  # pre-cast to comp
 # ========================== initiate step sizes as tensor for training ================
 step_size_fixed = 1e-2  # step size of conventional PGA
 step_size_conv_PGA = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
-step_size_UPGA_J1 = torch.full([n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J1 = torch.full([n_iter_inner_J1, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J5 = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
