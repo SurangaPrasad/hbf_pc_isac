@@ -460,10 +460,10 @@ if plot_figure == 1:
         plt.plot(iter_outer_x_J20_decay, rate_iter_UPGA_J20_decay[outer_idx_J20_decay], '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
-    plt.ylabel('$R$ [bits/s/Hz]', fontsize="14")
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
+    plt.ylabel('$R$ [bits/s/Hz]', fontsize=11)
     plt.grid()
-    safe_legend(loc='best', fontsize="14", labelspacing=0.15)
+    safe_legend(loc='best', fontsize=9, labelspacing=0.15)
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -493,10 +493,10 @@ if plot_figure == 1:
         plt.plot(iter_outer_x_J20_decay, crb_iter_UPGA_J20_decay[outer_idx_J20_decay], '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
-    plt.ylabel(r'$1/\text{crb}$', fontsize="14")
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
+    plt.ylabel(r'$1/\text{crb}$', fontsize=11)
     plt.grid()
-    safe_legend(loc='best', fontsize="14", labelspacing=0.15)
+    safe_legend(loc='best', fontsize=9, labelspacing=0.15)
     plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -511,19 +511,19 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_conv_PGA_J5 == 1:
         obj_iter_conv_PGA_J5 = OMEGA * rate_iter_conv_PGA_J5 + crb_iter_conv_PGA_J5
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], ':*', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=5)')
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], '-', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=5)')
     if run_conv_PGA_J10 == 1:
         obj_iter_conv_PGA_J10 = OMEGA * rate_iter_conv_PGA_J10[outer_idx_J10] + crb_iter_conv_PGA_J10[outer_idx_J10]
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10, ':*', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10)')
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10, '-*', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_conv_PGA_J20 == 1:
         obj_iter_conv_PGA_J20 = OMEGA * rate_iter_conv_PGA_J20[outer_idx_J20] + crb_iter_conv_PGA_J20[outer_idx_J20]
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J20, '-', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
     if run_UPGA_J5 == 1:
         obj_iter_UPGA_J5 = OMEGA * rate_iter_UPGA_J5[outer_idx_J5] + crb_iter_UPGA_J5[outer_idx_J5]
-        plt.plot(iter_outer_x, obj_iter_UPGA_J5, ':d', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
+        plt.plot(iter_outer_x, obj_iter_UPGA_J5, '--', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = OMEGA * rate_iter_UPGA_J10[outer_idx_J10] + crb_iter_UPGA_J10[outer_idx_J10]
-        plt.plot(iter_outer_x, obj_iter_UPGA_J10, ':*', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+        plt.plot(iter_outer_x, obj_iter_UPGA_J10, '-*', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
     if run_UPGA_J20 == 1:
         obj_iter_UPGA_J20 = OMEGA * rate_iter_UPGA_J20[outer_idx_J20] + crb_iter_UPGA_J20[outer_idx_J20]
         plt.plot(iter_outer_x, obj_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
@@ -535,21 +535,21 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, obj_iter_UPGA_J10_PRCDN, ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J5_decay == 1:
         obj_iter_UPGA_J5_decay = OMEGA * rate_iter_UPGA_J5_decay[outer_idx_J5_decay] + crb_iter_UPGA_J5_decay[outer_idx_J5_decay]
-        plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_J5_decay, ':d', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=5, decay)')
+        plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_J5_decay, '--', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=5, decay)')
     if run_UPGA_J10_decay == 1:
         obj_iter_UPGA_J10_decay = OMEGA * rate_iter_UPGA_J10_decay[outer_idx_J10_decay] + crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
-        plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, ':*', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
+        plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
     if run_UPGA_J20_decay == 1:
         obj_iter_UPGA_J20_decay = OMEGA * rate_iter_UPGA_J20_decay[outer_idx_J20_decay] + crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
         plt.plot(iter_outer_x_J20_decay, obj_iter_UPGA_J20_decay, '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         obj_iter_UPGA_J_GradReuse = OMEGA * rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse] + crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
         plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize="14")
-    plt.ylabel(r'$\omega R + 1/\text{crb}$', fontsize="14")
-    plt.title("Objective function vs Iterations", fontsize="14")
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
+    plt.ylabel(r'$\omega R + 1/\text{crb}$', fontsize=11)
+    plt.title("Objective function vs Iterations", fontsize=11)
     plt.grid()
-    safe_legend(loc='best', fontsize="14", labelspacing=0.15)
+    safe_legend(loc='best', fontsize=9, labelspacing=0.15)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
