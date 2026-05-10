@@ -16,8 +16,8 @@ run_conv_PGA_J5 = 0        # Conventional PGA with setting J = 5
 run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
-run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
+run_UPGA_J1 = 1            # Unfolded PGA without any modification (J = 1)
+run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
 run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
@@ -51,7 +51,7 @@ init_scheme = 'prop'  # proposed initialization for best convergence
 
 system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
 
-OMEGA = 2
+OMEGA = 0.05
 
 
 

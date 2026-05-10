@@ -14,6 +14,9 @@ H_test = H_test0[:, :test_size, :, :]
 # Create new model and load states
 if run_conv_PGA == 1:
     model_conv_PGA = PGA_Unfold_JX(step_size_UPGA_J1)
+if run_UPGA_J1 == 1:
+    model_UPGA_J1 = PGA_Unfold_JX(step_size_UPGA_J1)
+    model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
 if run_UPGA_J20 == 1:
     model_UPGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
     model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
@@ -47,6 +50,7 @@ rate_UPGA_J_GradReuse = np.zeros([len(snr_dB_list), ], dtype=float)
 
 # CRB-based sensing metrics for new models (PGA_Unfold_J10, PGA_Unfold_J20)
 CRB_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
+CRB_UPGA_J1 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
@@ -66,6 +70,8 @@ for ss in range(len(snr_dB_list)):
     # Conventional PGA ====================================
     if run_conv_PGA == 1:
         rate_conv_PGA[ss], CRB_conv_PGA[ss] = execute_conv_PGA(model_conv_PGA, H_test, snr_ss)
+    if run_UPGA_J1 == 1:
+        rate_UPGA_J1[ss], CRB_UPGA_J1[ss] = execute_UPGA_J1(model_UPGA_J1, H_test, snr_ss)
     if run_UPGA_J10 == 1:
         rate_UPGA_J10[ss], CRB_UPGA_J10[ss] = execute_UPGA_J10(model_UPGA_J10, H_test, snr_ss)
     if run_UPGA_J20 == 1:
@@ -85,6 +91,8 @@ fig_rate = plt.figure(1)
 plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_conv_PGA == 1:
     plt.plot(snr_dB_list, rate_conv_PGA, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
+if run_UPGA_J1 == 1:
+    plt.plot(snr_dB_list, rate_UPGA_J1, '-o', color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
 if run_UPGA_J10 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
@@ -115,6 +123,48 @@ plt.grid()
 plt.legend(loc='upper left', labelspacing  = 0.15)
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+
+
+
+plt.show()
+
+# plot CRB vs SNR ======================================================
+fig_CRB = plt.figure(2)
+plt.rcParams["figure.figsize"] = (6.4, 4.0)
+if run_conv_PGA == 1:
+    plt.plot(snr_dB_list, CRB_conv_PGA, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
+if run_UPGA_J1 == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J1, '-o', color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
+if run_UPGA_J10 == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J10, ':*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+if run_UPGA_J20 == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+if run_conv_PGA == 1:
+    plt.plot(snr_dB_list, CRB_conv_PGA, ':', color='black', linewidth=3, markersize=7, label=label_conv)
+if run_UPGA_J10_PC == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J10_PC, ':', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_PC)
+if run_conv_PGA_J10_PC == 1:
+    plt.plot(snr_dB_list, CRB_conv_PGA_J10_PC, ':', color='orange', linewidth=3, markersize=7, label=label_conv_PGA_J10_PC)
+if run_conv_PGA_J10 == 1:
+    plt.plot(snr_dB_list, CRB_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_PGA_J10)
+if run_UPGA_J10_decay == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J10_decay, ':d', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+if run_UPGA_J20_decay == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+if run_UPGA_J_GradReuse == 1:
+    plt.plot(snr_dB_list, CRB_UPGA_J_GradReuse, ':^', color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
+# if benchmark == 1:
+#     plt.plot(snr_dB_list, CRB_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
+#     plt.plot(snr_dB_list, CRB_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
+
+system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
+# plt.title(system_params)
+plt.xlabel('SNR [dB]')
+plt.ylabel(r'$\mathrm{CRB}$')
+plt.grid()
+plt.legend(loc='upper right', labelspacing  = 0.15)
+plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
+plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
 
 
