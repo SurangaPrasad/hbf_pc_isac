@@ -344,6 +344,9 @@ def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt):
 
     crb = torch.log(fim)  # [batch_size]
 
+    # crb_real = 1 / (2 * (xi_0 ** 2) * fim)
+    # print(f"CRB (real): {crb_real}")
+
     return crb
 
 # ====================================compute power of F and W ==========================

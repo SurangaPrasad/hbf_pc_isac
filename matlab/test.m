@@ -1,57 +1,21 @@
-% Sample MATLAB Code
-% Basic operations and plotting
+%% Initiate the F and W
 
-clc;
-clear all;
-close all;
+%% Load H from dataset/64TX_4UE_4RF/train_data_matlab.mat
+load('../dataset/64TX_4UE_4RF/train_data_matlab.mat');
+disp('Loaded H from train_data_matlab.mat');
+disp('Size of H_train:');
+disp(size(H_train));
 
-%% Basic Math Operations
-a = 10;
-b = 5;
 
-fprintf('Addition: %d\n', a + b);
-fprintf('Subtraction: %d\n', a - b);
-fprintf('Multiplication: %d\n', a * b);
-fprintf('Division: %.2f\n', a / b);
+H_test_t = squeeze(H_train(1,1,:,:)); % Use the first sample for testing
+disp('Size of H_test:');
+disp(H_test);
 
-%% Array Operations
-x = 0:0.1:2*pi;
-y_sin = sin(x);
-y_cos = cos(x);
+H_test = H_test_t';
 
-%% Plotting
-figure;
-subplot(2,1,1);
-plot(x, y_sin, 'b-', 'LineWidth', 2);
-title('Sine Wave');
-xlabel('x');
-ylabel('sin(x)');
-grid on;
+%% Initialize F
 
-subplot(2,1,2);
-plot(x, y_cos, 'r-', 'LineWidth', 2);
-title('Cosine Wave');
-xlabel('x');
-ylabel('cos(x)');
-grid on;
-
-%% Matrix Operations
-A = [1 2 3; 4 5 6; 7 8 9];
-B = A';  % Transpose
-
-fprintf('\nMatrix A:\n');
-disp(A);
-
-fprintf('Transpose of A:\n');
-disp(B);
-
-fprintf('Determinant of A: %.2f\n', det(A));
-
-%% Simple Statistics
-data = randn(1, 100);  % Random data
-
-fprintf('\nStatistics:\n');
-fprintf('Mean: %.4f\n', mean(data));
-fprintf('Std Dev: %.4f\n', std(data));
-fprintf('Min: %.4f\n', min(data));
-fprintf('Max: %.4f\n', max(data));
+G = H_test; %%since K = M
+phi = angle(G);
+F_0 = exp(phi);
+disp(F_0)

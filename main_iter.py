@@ -553,6 +553,71 @@ if plot_figure == 1:
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
+    # ===================== SAVE OUTER-ITER RESULTS TO .mat FOR MATLAB =====================
+    print('Saving outer-iteration results to .mat file...')
+    mat_data = {'iter_outer_x': iter_outer_x}
+    if run_conv_PGA == 1:
+        mat_data['rate_conv_PGA_J1'] = rate_iter_conv_PGA_J1[outer_idx_J1]
+        mat_data['crb_conv_PGA_J1']  = crb_iter_conv_PGA_J1[outer_idx_J1]
+        mat_data['obj_conv_PGA_J1']  = obj_iter_conv_PGA_J1[outer_idx_J1]
+    if run_UPGA_J1 == 1:
+        mat_data['rate_UPGA_J1'] = rate_iter_UPGA_J1[outer_idx_J1]
+        mat_data['crb_UPGA_J1']  = crb_iter_UPGA_J1[outer_idx_J1]
+        mat_data['obj_UPGA_J1']  = obj_iter_UPGA_J1
+    if run_conv_PGA_J5 == 1:
+        mat_data['rate_conv_PGA_J5'] = rate_iter_conv_PGA_J5[outer_idx_J5]
+        mat_data['crb_conv_PGA_J5']  = crb_iter_conv_PGA_J5[outer_idx_J5]
+        mat_data['obj_conv_PGA_J5']  = obj_iter_conv_PGA_J5[outer_idx_J5]
+    if run_conv_PGA_J10 == 1:
+        mat_data['rate_conv_PGA_J10'] = rate_iter_conv_PGA_J10[outer_idx_J10]
+        mat_data['crb_conv_PGA_J10']  = crb_iter_conv_PGA_J10[outer_idx_J10]
+        mat_data['obj_conv_PGA_J10']  = obj_iter_conv_PGA_J10
+    if run_conv_PGA_J20 == 1:
+        mat_data['rate_conv_PGA_J20'] = rate_iter_conv_PGA_J20[outer_idx_J20]
+        mat_data['crb_conv_PGA_J20']  = crb_iter_conv_PGA_J20[outer_idx_J20]
+        mat_data['obj_conv_PGA_J20']  = obj_iter_conv_PGA_J20
+    if run_UPGA_J5 == 1:
+        mat_data['rate_UPGA_J5'] = rate_iter_UPGA_J5[outer_idx_J5]
+        mat_data['crb_UPGA_J5']  = crb_iter_UPGA_J5[outer_idx_J5]
+        mat_data['obj_UPGA_J5']  = obj_iter_UPGA_J5
+    if run_UPGA_J10 == 1:
+        mat_data['rate_UPGA_J10'] = rate_iter_UPGA_J10[outer_idx_J10]
+        mat_data['crb_UPGA_J10']  = crb_iter_UPGA_J10[outer_idx_J10]
+        mat_data['obj_UPGA_J10']  = obj_iter_UPGA_J10
+    if run_UPGA_J20 == 1:
+        mat_data['rate_UPGA_J20'] = rate_iter_UPGA_J20[outer_idx_J20]
+        mat_data['crb_UPGA_J20']  = crb_iter_UPGA_J20[outer_idx_J20]
+        mat_data['obj_UPGA_J20']  = obj_iter_UPGA_J20
+    if run_UPGA_J10_PRCDN == 1:
+        mat_data['rate_UPGA_J10_PRCDN'] = rate_iter_UPGA_J10_PRCDN[outer_idx_J10]
+        mat_data['crb_UPGA_J10_PRCDN']  = crb_iter_UPGA_J10_PRCDN[outer_idx_J10]
+        mat_data['obj_UPGA_J10_PRCDN']  = obj_iter_UPGA_J10_PRCDN
+    if run_UPGA_J10_RMSProp == 1:
+        mat_data['rate_UPGA_J10_RMSProp'] = rate_iter_UPGA_J10_RMSProp[outer_idx_J10]
+        mat_data['crb_UPGA_J10_RMSProp']  = crb_iter_UPGA_J10_RMSProp[outer_idx_J10]
+        mat_data['obj_UPGA_J10_RMSProp']  = obj_iter_UPGA_J10_RMSProp
+    if run_UPGA_J5_decay == 1:
+        mat_data['iter_outer_x_J5_decay'] = iter_outer_x_J5_decay
+        mat_data['rate_UPGA_J5_decay']    = rate_iter_UPGA_J5_decay[outer_idx_J5_decay]
+        mat_data['crb_UPGA_J5_decay']     = crb_iter_UPGA_J5_decay[outer_idx_J5_decay]
+        mat_data['obj_UPGA_J5_decay']     = obj_iter_UPGA_J5_decay
+    if run_UPGA_J10_decay == 1:
+        mat_data['iter_outer_x_J10_decay'] = iter_outer_x_J10_decay
+        mat_data['rate_UPGA_J10_decay']    = rate_iter_UPGA_J10_decay[outer_idx_J10_decay]
+        mat_data['crb_UPGA_J10_decay']     = crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
+        mat_data['obj_UPGA_J10_decay']     = obj_iter_UPGA_J10_decay
+    if run_UPGA_J20_decay == 1:
+        mat_data['iter_outer_x_J20_decay'] = iter_outer_x_J20_decay
+        mat_data['rate_UPGA_J20_decay']    = rate_iter_UPGA_J20_decay[outer_idx_J20_decay]
+        mat_data['crb_UPGA_J20_decay']     = crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
+        mat_data['obj_UPGA_J20_decay']     = obj_iter_UPGA_J20_decay
+    if run_UPGA_J_GradReuse == 1:
+        mat_data['rate_UPGA_J_GradReuse'] = rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
+        mat_data['crb_UPGA_J_GradReuse']  = crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
+        mat_data['obj_UPGA_J_GradReuse']  = obj_iter_UPGA_J_GradReuse
+    mat_file_name = directory_result + 'iter_results_' + str(Nt) + '_' + str(OMEGA) + '.mat'
+    scipy.io.savemat(mat_file_name, mat_data)
+    print(f'  Saved to {mat_file_name}')
 
     # ===================== OBJECTIVE INCLUDING ALL INNER ITERATIONS (first 20 outer iters) =========
     # x-axis: fractional outer iteration so inner steps are visible between integers
