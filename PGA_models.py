@@ -213,7 +213,7 @@ class PGA_Unfold_JX(nn.Module):
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
 
-    def __init__(self, step_size, alpha = 0.0008):
+    def __init__(self, step_size, alpha = 0.001):
         super().__init__()
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
         self.inner_iter_history = []
@@ -276,6 +276,7 @@ class PGA_Unfold_JX_decay(nn.Module):
 
             # Adaptive inner iteration count
             n_inner = _n_inner(grad_norm)
+            print(f'Number of inner iterations', n_inner)
             # print(
             #     f"Outer {ii:3d} | "
             #     f"grad_norm={grad_norm.item():.4e} | "
@@ -291,7 +292,7 @@ class PGA_Unfold_JX_decay(nn.Module):
                     grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                     delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                     delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
+                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB * n_iter_inner / n_inner
                     F = normalize_power(F, W, H, Pt)  # scale F only, consistent with training path
                     rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
                     crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
