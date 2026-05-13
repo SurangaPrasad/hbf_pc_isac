@@ -159,13 +159,22 @@ if not os.path.exists(directory_result):
 
 # define labels in figures
 label_conv = 'Conventional PGA'
+label_conv_PGA = 'Conventional PGA ' + '$(J = 1)$'
+label_conv_PGA_J5 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J5) + ')$'
+label_conv_PGA_J10 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
+label_conv_PGA_J20 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')$'
+
 label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
+
 label_UPGA_J1 = r'Unfolded PGA ' + '$(J = 1)$'
 label_UPGA_J5 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J5) + ')$'
 label_UPGA_J10 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 label_UPGA_J20 = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')$'
+
 label_UPGA_J10_PC = r'Unfolded PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
+
+label_UPGA_J5_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J5) + r', \mathrm{decay})$'
 label_UPGA_J10_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J10) + r', \mathrm{decay})$'
 label_UPGA_J20_decay = r'Unfolded PGA ' + r'$(J_\mathrm{max}=' + str(n_iter_inner_J20) + r', \mathrm{decay})$'
 label_UPGA_J_GradReuse = r'Unfolded PGA ' + r'$(J=' + str(n_iter_inner_J10) + r', \mathrm{GradReuse})$'
