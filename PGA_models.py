@@ -276,7 +276,7 @@ class PGA_Unfold_JX_decay(nn.Module):
 
             # Adaptive inner iteration count
             n_inner = _n_inner(grad_norm)
-            print(f'Number of inner iterations', n_inner)
+            # print(f'Number of inner iterations', n_inner)
             # print(
             #     f"Outer {ii:3d} | "
             #     f"grad_norm={grad_norm.item():.4e} | "
