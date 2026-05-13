@@ -1,4 +1,5 @@
 from algorithms import *
+import scipy.io
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -53,6 +54,8 @@ CRB_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J1 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
+CRB_UPGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
+CRB_conv_PGA_J10_PC = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J10_decay = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J20_decay = np.zeros([len(snr_dB_list), ], dtype=float)
@@ -165,6 +168,48 @@ plt.grid()
 plt.legend(loc='upper right', labelspacing  = 0.15)
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+
+
+# Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
+print('Saving SNR-curve results to .mat file...')
+mat_data = {'snr_dB_list': snr_dB_list}
+
+if run_conv_PGA == 1:
+    mat_data['rate_conv_PGA_J1'] = rate_conv_PGA
+    mat_data['crb_conv_PGA_J1'] = CRB_conv_PGA
+    mat_data['obj_conv_PGA_J1'] = OMEGA * rate_conv_PGA + CRB_conv_PGA
+if run_UPGA_J1 == 1:
+    mat_data['rate_UPGA_J1'] = rate_UPGA_J1
+    mat_data['crb_UPGA_J1'] = CRB_UPGA_J1
+    mat_data['obj_UPGA_J1'] = OMEGA * rate_UPGA_J1 + CRB_UPGA_J1
+if run_UPGA_J10 == 1:
+    mat_data['rate_UPGA_J10'] = rate_UPGA_J10
+    mat_data['crb_UPGA_J10'] = CRB_UPGA_J10
+    mat_data['obj_UPGA_J10'] = OMEGA * rate_UPGA_J10 + CRB_UPGA_J10
+if run_UPGA_J20 == 1:
+    mat_data['rate_UPGA_J20'] = rate_UPGA_J20
+    mat_data['crb_UPGA_J20'] = CRB_UPGA_J20
+    mat_data['obj_UPGA_J20'] = OMEGA * rate_UPGA_J20 + CRB_UPGA_J20
+if run_conv_PGA_J10 == 1:
+    mat_data['rate_conv_PGA_J10'] = rate_conv_PGA_J10
+    mat_data['crb_conv_PGA_J10'] = CRB_conv_PGA_J10
+    mat_data['obj_conv_PGA_J10'] = OMEGA * rate_conv_PGA_J10 + CRB_conv_PGA_J10
+if run_UPGA_J10_decay == 1:
+    mat_data['rate_UPGA_J10_decay'] = rate_UPGA_J10_decay
+    mat_data['crb_UPGA_J10_decay'] = CRB_UPGA_J10_decay
+    mat_data['obj_UPGA_J10_decay'] = OMEGA * rate_UPGA_J10_decay + CRB_UPGA_J10_decay
+if run_UPGA_J20_decay == 1:
+    mat_data['rate_UPGA_J20_decay'] = rate_UPGA_J20_decay
+    mat_data['crb_UPGA_J20_decay'] = CRB_UPGA_J20_decay
+    mat_data['obj_UPGA_J20_decay'] = OMEGA * rate_UPGA_J20_decay + CRB_UPGA_J20_decay
+if run_UPGA_J_GradReuse == 1:
+    mat_data['rate_UPGA_J_GradReuse'] = rate_UPGA_J_GradReuse
+    mat_data['crb_UPGA_J_GradReuse'] = CRB_UPGA_J_GradReuse
+    mat_data['obj_UPGA_J_GradReuse'] = OMEGA * rate_UPGA_J_GradReuse + CRB_UPGA_J_GradReuse
+
+mat_file_name = directory_result + 'snr_results_' + str(Nt) + '_' + str(OMEGA) + '.mat'
+scipy.io.savemat(mat_file_name, mat_data)
+print(f'  Saved to {mat_file_name}')
 
 
 
