@@ -2,7 +2,7 @@
 %  Loads SNR-curve results saved by main_SNR.py and produces a
 %  publication-quality two-panel figure:
 %    (a) Rate vs SNR
-%    (b) I(theta) vs SNR
+%    (b) CRLB vs SNR
 %
 %  Usage: run from the matlab/ folder, or adjust MAT_FILE accordingly.
 
@@ -51,34 +51,39 @@ x = d.snr_dB_list(:);
 get = @(name) getfield_safe(d, name);
 
 % -------------------------------------------------------------------------
-%  Build series table: {label, rate, itheta, color, linestyle, marker}
-%  Here I(theta) is read from crb_* fields saved in main_SNR.py.
+%  Build series table: {label, rate, itheta, color, linestyle, marker, is_decay}
+%  Here I(theta) is read from crb_* fields saved in main_SNR.py and then
+%  converted to CRLB = 1 / I(theta) before plotting.
+%  Keep the ordering aligned with the current Python plots.
 % -------------------------------------------------------------------------
 series = {};
 
 if isfield(d,'rate_conv_PGA_J1')
-    series{end+1} = {'PGA ($J\!=\!1$)',         get('rate_conv_PGA_J1'),      get('crb_conv_PGA_J1'),      COL.blue,   '--', 'none'};
+    series{end+1} = {'Conventional PGA ($J=1$)',  get('rate_conv_PGA_J1'),      get('crb_conv_PGA_J1'),      COL.blue,   '--', 'none', false};
+end
+if isfield(d,'rate_conv_PGA_J5')
+    series{end+1} = {'Conventional PGA ($J=5$)',  get('rate_conv_PGA_J5'),      get('crb_conv_PGA_J5'),      COL.cyan,   '--', 'none', false};
 end
 if isfield(d,'rate_conv_PGA_J10')
-    series{end+1} = {'PGA ($J\!=\!10$)',        get('rate_conv_PGA_J10'),     get('crb_conv_PGA_J10'),     COL.black,  '--', '*'};
+    series{end+1} = {'Conventional PGA ($J=10$)', get('rate_conv_PGA_J10'),     get('crb_conv_PGA_J10'),     COL.green,  '--', 'none', false};
 end
-if isfield(d,'rate_UPGA_J1')
-    series{end+1} = {'UPGA ($J\!=\!1$)',        get('rate_UPGA_J1'),          get('crb_UPGA_J1'),          COL.cyan,   '-',  'o'};
+if isfield(d,'rate_UPGA_J5')
+    series{end+1} = {'Unfolded PGA ($J=5$)',      get('rate_UPGA_J5'),          get('crb_UPGA_J5'),          COL.cyan,   '-',  '*', false};
 end
 if isfield(d,'rate_UPGA_J10')
-    series{end+1} = {'UPGA ($J\!=\!10$)',       get('rate_UPGA_J10'),         get('crb_UPGA_J10'),         COL.red,    ':',  '*'};
+    series{end+1} = {'Unfolded PGA ($J=10$)',     get('rate_UPGA_J10'),         get('crb_UPGA_J10'),         COL.red,    '-',  '*', false};
 end
 if isfield(d,'rate_UPGA_J20')
-    series{end+1} = {'UPGA ($J\!=\!20$)',       get('rate_UPGA_J20'),         get('crb_UPGA_J20'),         COL.red,    '-',  'none'};
+    series{end+1} = {'Unfolded PGA ($J=20$)',     get('rate_UPGA_J20'),         get('crb_UPGA_J20'),         COL.red,    '-',  'none', false};
+end
+if isfield(d,'rate_UPGA_J5_decay')
+    series{end+1} = {'\textbf{Unfolded PGA ($J_{\max}=5$, decay)}',  get('rate_UPGA_J5_decay'),   get('crb_UPGA_J5_decay'),   COL.cyan,   ':',  'd', true};
 end
 if isfield(d,'rate_UPGA_J10_decay')
-    series{end+1} = {'UPGA ($J\!=\!10$, decay)',get('rate_UPGA_J10_decay'),   get('crb_UPGA_J10_decay'),   COL.purple, ':',  'd'};
+    series{end+1} = {'\textbf{Unfolded PGA ($J_{\max}=10$, decay)}', get('rate_UPGA_J10_decay'),  get('crb_UPGA_J10_decay'),  COL.purple, ':',  'd', true};
 end
 if isfield(d,'rate_UPGA_J20_decay')
-    series{end+1} = {'UPGA ($J\!=\!20$, decay)',get('rate_UPGA_J20_decay'),   get('crb_UPGA_J20_decay'),   COL.brown,  '-.', 'p'};
-end
-if isfield(d,'rate_UPGA_J_GradReuse')
-    series{end+1} = {'UPGA GradReuse ($J\!=\!10$)', get('rate_UPGA_J_GradReuse'), get('crb_UPGA_J_GradReuse'), COL.teal, ':', '^'};
+    series{end+1} = {'\textbf{Unfolded PGA ($J_{\max}=20$, decay)}', get('rate_UPGA_J20_decay'),  get('crb_UPGA_J20_decay'),  COL.brown,  ':',  'p', true};
 end
 
 if isempty(series)
@@ -107,19 +112,28 @@ for k = 1:numel(series)
     s   = series{k};
     lbl = s{1};
     yr  = s{2};
-    yi  = s{3};
+    yi  = log_info_to_crlb(s{3});
     col = s{4};
     ls  = s{5};
     mk  = s{6};
+    is_decay = (numel(s) >= 7) && logical(s{7});
+    line_width_k = LINE_WIDTH;
+    marker_size_k = MARKER_SIZE;
+    marker_face_color_k = 'none';
+    if is_decay
+        line_width_k = LINE_WIDTH + 1.0;
+        marker_size_k = MARKER_SIZE + 1.0;
+        marker_face_color_k = col;
+    end
 
     if strcmp(mk,'none')
-        plot(ax1, x, yr, ls, 'Color', col, 'LineWidth', LINE_WIDTH, 'DisplayName', lbl);
-        plot(ax2, x, yi, ls, 'Color', col, 'LineWidth', LINE_WIDTH, 'DisplayName', lbl);
+        plot(ax1, x, yr, ls, 'Color', col, 'LineWidth', line_width_k, 'DisplayName', lbl);
+        plot(ax2, x, yi, ls, 'Color', col, 'LineWidth', line_width_k, 'DisplayName', lbl);
     else
-        plot(ax1, x, yr, [ls mk], 'Color', col, 'LineWidth', LINE_WIDTH, ...
-            'MarkerSize', MARKER_SIZE, 'MarkerFaceColor', 'none', 'DisplayName', lbl);
-        plot(ax2, x, yi, [ls mk], 'Color', col, 'LineWidth', LINE_WIDTH, ...
-            'MarkerSize', MARKER_SIZE, 'MarkerFaceColor', 'none', 'DisplayName', lbl);
+        plot(ax1, x, yr, [ls mk], 'Color', col, 'LineWidth', line_width_k, ...
+            'MarkerSize', marker_size_k, 'MarkerFaceColor', marker_face_color_k, 'DisplayName', lbl);
+        plot(ax2, x, yi, [ls mk], 'Color', col, 'LineWidth', line_width_k, ...
+            'MarkerSize', marker_size_k, 'MarkerFaceColor', marker_face_color_k, 'DisplayName', lbl);
     end
 end
 
@@ -128,8 +142,8 @@ ylabel(ax1, '$R$ [bits/s/Hz]');
 title(ax1, '(a) Rate vs SNR', 'FontWeight', 'normal');
 
 xlabel(ax2, 'SNR [dB]');
-ylabel(ax2, '$I(\theta)$');
-title(ax2, '(b) $I(\theta)$ vs SNR', 'FontWeight', 'normal');
+ylabel(ax2, '$\mathrm{CRLB}=1/I(\theta)$');
+title(ax2, '(b) CRLB vs SNR', 'FontWeight', 'normal');
 
 % Shared legend under both panels
 lgd = legend(ax1, 'Location','southoutside', 'Orientation','horizontal', ...
@@ -161,4 +175,11 @@ function v = getfield_safe(s, name)
     else
         v = [];
     end
+end
+
+function y = log_info_to_crlb(log_i_theta)
+    % get_crb_fe stores log(I(theta)); CRLB is exp(-log(I(theta))).
+    y = nan(size(log_i_theta));
+    mask = isfinite(log_i_theta);
+    y(mask) = exp(-log_i_theta(mask));
 end

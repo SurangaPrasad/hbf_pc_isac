@@ -112,10 +112,10 @@ set(fig,'defaultAxesFontName','Times New Roman', ...
         'defaultAxesTickLabelInterpreter','latex', ...
         'defaultLegendInterpreter','latex');
 
-subplot_titles  = {'(a) Objective Function', '(b) Sum Rate', '(c) I(\theta)$'};
+subplot_titles  = {'(a) Objective Function', '(b) Sum Rate', '(c) CRLB'};
 subplot_ylabels = {'$\omega R + I(\theta)$', ...
                    '$R$ [bits/s/Hz]',                  ...
-                   '$I(\theta)$'};
+                   '$\mathrm{CRLB}=1/I(\theta)$'};
 DATA_IDX = [5, 3, 4];   % column index in series cell: obj, rate, crb
 
 ax = gobjects(1,3);
@@ -137,6 +137,9 @@ for p = 1:3
         lbl  = s{1};
         xk   = s{2}(:);
         yk   = s{DATA_IDX(p)}(:);
+        if p == 3
+            yk = log_info_to_crlb(yk);
+        end
         col  = s{6};
         ls   = s{7};
         mk   = s{8};
@@ -199,4 +202,11 @@ function v = getfield_safe(s, name)
     else
         v = [];
     end
+end
+
+function y = log_info_to_crlb(log_i_theta)
+    % get_crb_fe stores log(I(theta)); CRLB is exp(-log(I(theta))).
+    y = nan(size(log_i_theta));
+    mask = isfinite(log_i_theta);
+    y(mask) = exp(-log_i_theta(mask));
 end

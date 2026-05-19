@@ -8,7 +8,6 @@ benchmark = 1
 
 # ///////////////////////////////////////// SHOW RATES VS. SNRs ///////////////////////////////////
 snr_dB_list = np.array([0,2,4,6,8,10,12], dtype='float64')
-run_UPGA_J20 = 1 
 # Load training data
 _, H_test0 = get_data_tensor(data_source)
 H_test = H_test0[:, :test_size, :, :]

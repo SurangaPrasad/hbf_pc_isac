@@ -287,6 +287,21 @@ if run_program == 1:
             result_UPGA_J20_file_name = directory_result + 'result_vs_iter_UPGA_J20.npz'
             np.savez(result_UPGA_J20_file_name, name1=rate_iter_UPGA_J20, name2=crb_iter_UPGA_J20, name3=beam_UPGA_J20)
 
+# Save decay inner-iteration counts in a compact MATLAB file for external plotting.
+if run_program == 1:
+    decay_inner_iter_data = {}
+    if run_UPGA_J5_decay == 1 and 'inner_iter_history_UPGA_J5_decay' in locals():
+        decay_inner_iter_data['outer_iter_J5_decay'] = np.arange(1, len(inner_iter_history_UPGA_J5_decay) + 1)
+        decay_inner_iter_data['inner_iter_count_J5_decay'] = np.array(inner_iter_history_UPGA_J5_decay, dtype=np.int32)
+    if run_UPGA_J10_decay == 1 and 'inner_iter_history_UPGA_J10_decay' in locals():
+        decay_inner_iter_data['outer_iter_J10_decay'] = np.arange(1, len(inner_iter_history_UPGA_J10_decay) + 1)
+        decay_inner_iter_data['inner_iter_count_J10_decay'] = np.array(inner_iter_history_UPGA_J10_decay, dtype=np.int32)
+
+    if decay_inner_iter_data:
+        decay_inner_iter_file_name = directory_result + 'inner_iter_count_vs_outer_' + str(Nt) + '_' + str(OMEGA) + '.mat'
+        scipy.io.savemat(decay_inner_iter_file_name, decay_inner_iter_data)
+        print(f'Saved inner-iteration count data to {decay_inner_iter_file_name}')
+
 if plot_figure == 1:
 
     # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
