@@ -17,22 +17,33 @@ fig = figure('Color', 'w');
 hold on; box on; grid on;
 
 plotted_any = false;
+printed_any_total = false;
 
 if isfield(d, 'outer_iter_J5_decay') && isfield(d, 'inner_iter_count_J5_decay')
     plot(d.outer_iter_J5_decay(:), d.inner_iter_count_J5_decay(:), '-o', ...
         'LineWidth', 1.8, 'MarkerSize', 5, 'DisplayName', 'UPGA J_{max}=5 (decay)');
     plotted_any = true;
+    total_inner_J5 = sum(d.inner_iter_count_J5_decay(:));
+    fprintf('Total inner iterations for J5 decay: %d\n', round(total_inner_J5));
+    printed_any_total = true;
 end
 
 if isfield(d, 'outer_iter_J10_decay') && isfield(d, 'inner_iter_count_J10_decay')
     plot(d.outer_iter_J10_decay(:), d.inner_iter_count_J10_decay(:), '-s', ...
         'LineWidth', 1.8, 'MarkerSize', 5, 'DisplayName', 'UPGA J_{max}=10 (decay)');
     plotted_any = true;
+    total_inner_J10 = sum(d.inner_iter_count_J10_decay(:));
+    fprintf('Total inner iterations for J10 decay: %d\n', round(total_inner_J10));
+    printed_any_total = true;
 end
 
 if ~plotted_any
     error(['No J5/J10 decay inner-iteration arrays found in %s. ' ...
            'Enable run_UPGA_J5_decay and/or run_UPGA_J10_decay in system_config.py.'], MAT_FILE);
+end
+
+if ~printed_any_total
+    fprintf('No total inner-iteration counts were printed (missing J5/J10 arrays).\n');
 end
 
 xlabel('Outer iteration number');

@@ -16,12 +16,12 @@ MAT_FILE = '../sim_results/64TX_4UE_4RF/snr_results_64_0.05.mat';
 % -------------------------------------------------------------------------
 %  Figure aesthetics
 % -------------------------------------------------------------------------
-FONT_SIZE   = 10;
-LEGEND_SIZE = 9;
-LINE_WIDTH  = 1.7;
-MARKER_SIZE = 5;
+FONT_SIZE   = 12;
+LEGEND_SIZE = 10;
+LINE_WIDTH  = 1.9;
+MARKER_SIZE = 6;
 FIG_WIDTH   = 14;   % cm
-FIG_HEIGHT  = 5.2;  % cm
+FIG_HEIGHT  = 5.6;  % cm
 
 COL = struct( ...
     'blue',   [0.00 0.45 0.70], ...
@@ -53,37 +53,37 @@ get = @(name) getfield_safe(d, name);
 % -------------------------------------------------------------------------
 %  Build series table: {label, rate, itheta, color, linestyle, marker, is_decay}
 %  Here I(theta) is read from crb_* fields saved in main_SNR.py and then
-%  converted to CRLB = 1 / I(theta) before plotting.
+%  converted back from log(I(theta)) before plotting.
 %  Keep the ordering aligned with the current Python plots.
 % -------------------------------------------------------------------------
 series = {};
 
 if isfield(d,'rate_conv_PGA_J1')
-    series{end+1} = {'Conventional PGA ($J=1$)',  get('rate_conv_PGA_J1'),      get('crb_conv_PGA_J1'),      COL.blue,   '--', 'none', false};
+    series{end+1} = {'PGA ($J=1$)',  get('rate_conv_PGA_J1'),      get('crb_conv_PGA_J1'),      COL.blue,   '--', 'none', false};
 end
 if isfield(d,'rate_conv_PGA_J5')
-    series{end+1} = {'Conventional PGA ($J=5$)',  get('rate_conv_PGA_J5'),      get('crb_conv_PGA_J5'),      COL.cyan,   '--', 'none', false};
+    series{end+1} = {'PGA ($J=5$)',  get('rate_conv_PGA_J5'),      get('crb_conv_PGA_J5'),      COL.orange, '--', 'none', false};
 end
 if isfield(d,'rate_conv_PGA_J10')
-    series{end+1} = {'Conventional PGA ($J=10$)', get('rate_conv_PGA_J10'),     get('crb_conv_PGA_J10'),     COL.green,  '--', 'none', false};
+    series{end+1} = {'PGA ($J=10$)', get('rate_conv_PGA_J10'),     get('crb_conv_PGA_J10'),     COL.black,  '--', 'none', false};
 end
 if isfield(d,'rate_UPGA_J5')
-    series{end+1} = {'Unfolded PGA ($J=5$)',      get('rate_UPGA_J5'),          get('crb_UPGA_J5'),          COL.cyan,   '-',  '*', false};
+    series{end+1} = {'UPGA ($J=5$)',      get('rate_UPGA_J5'),          get('crb_UPGA_J5'),          COL.orange, '-',  '*', false};
 end
 if isfield(d,'rate_UPGA_J10')
-    series{end+1} = {'Unfolded PGA ($J=10$)',     get('rate_UPGA_J10'),         get('crb_UPGA_J10'),         COL.red,    '-',  '*', false};
+    series{end+1} = {'UPGA ($J=10$)',     get('rate_UPGA_J10'),         get('crb_UPGA_J10'),         COL.red,    '-',  '*', false};
 end
 if isfield(d,'rate_UPGA_J20')
-    series{end+1} = {'Unfolded PGA ($J=20$)',     get('rate_UPGA_J20'),         get('crb_UPGA_J20'),         COL.red,    '-',  'none', false};
+    series{end+1} = {'UPGA ($J=20$)',     get('rate_UPGA_J20'),         get('crb_UPGA_J20'),         COL.red,    '-',  'none', false};
 end
 if isfield(d,'rate_UPGA_J5_decay')
-    series{end+1} = {'\textbf{Unfolded PGA ($J_{\max}=5$, decay)}',  get('rate_UPGA_J5_decay'),   get('crb_UPGA_J5_decay'),   COL.cyan,   ':',  'd', true};
+    series{end+1} = {'UPGA decay ($J_{\max}=5$)',  get('rate_UPGA_J5_decay'),   get('crb_UPGA_J5_decay'),   COL.purple, '-',  '-', true};
 end
 if isfield(d,'rate_UPGA_J10_decay')
-    series{end+1} = {'\textbf{Unfolded PGA ($J_{\max}=10$, decay)}', get('rate_UPGA_J10_decay'),  get('crb_UPGA_J10_decay'),  COL.purple, ':',  'd', true};
+    series{end+1} = {'UPGA decay ($J_{\max}=10$)', get('rate_UPGA_J10_decay'),  get('crb_UPGA_J10_decay'),  COL.purple, '-',  'd', true};
 end
 if isfield(d,'rate_UPGA_J20_decay')
-    series{end+1} = {'\textbf{Unfolded PGA ($J_{\max}=20$, decay)}', get('rate_UPGA_J20_decay'),  get('crb_UPGA_J20_decay'),  COL.brown,  ':',  'p', true};
+    series{end+1} = {'UPGA decay ($J_{\max}=20$)', get('rate_UPGA_J20_decay'),  get('crb_UPGA_J20_decay'),  COL.purple, '-',  'p', true};
 end
 
 if isempty(series)
@@ -147,14 +147,15 @@ title(ax2, '(b) CRLB vs SNR', 'FontWeight', 'normal');
 
 % Shared legend under both panels
 lgd = legend(ax1, 'Location','southoutside', 'Orientation','horizontal', ...
-    'NumColumns', min(numel(series), 4), 'FontSize', LEGEND_SIZE, 'Box', 'on');
+    'NumColumns', min(numel(series), 3), 'FontSize', LEGEND_SIZE, 'Box', 'off');
+lgd.ItemTokenSize = [12, 8];
 lgd.Position(1) = (1 - lgd.Position(3)) / 2;
 lgd.Position(2) = 0.01;
 
 % Leave room for legend
 set(fig, 'Units', 'normalized');
-ax1.Position(2) = 0.28; ax1.Position(4) = 0.62;
-ax2.Position(2) = 0.28; ax2.Position(4) = 0.62;
+ax1.Position(2) = 0.31; ax1.Position(4) = 0.59;
+ax2.Position(2) = 0.31; ax2.Position(4) = 0.59;
 
 % -------------------------------------------------------------------------
 %  Export

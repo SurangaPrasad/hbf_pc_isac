@@ -16,9 +16,9 @@ OMEGA    = 0.05;          % weighting factor (must match Python run)
 %  Figure aesthetics
 % -------------------------------------------------------------------------
 FONT_SIZE   = 10;         % axis tick / label font size
-LEGEND_SIZE = 9;
-LINE_WIDTH  = 1.6;
-MARKER_SIZE = 5;
+LEGEND_SIZE = 8;
+LINE_WIDTH  = 1.1;
+MARKER_SIZE = 6;
 FIG_WIDTH   = 18;         % cm
 FIG_HEIGHT  = 5.5;        % cm
 MARK_EVERY  = 5;          % plot a marker every N data points
@@ -53,49 +53,49 @@ get = @(name) getfield_safe(d, name);
 series = {};
 
 if isfield(d,'rate_conv_PGA_J1')
-    series{end+1} = {'PGA ($J\!=\!1$)',        x, get('rate_conv_PGA_J1'), get('crb_conv_PGA_J1'), get('obj_conv_PGA_J1'), COL.blue,   '--',  'none'};
+    series{end+1} = {'PGA ($J\!=\!1$)',        x, get('rate_conv_PGA_J1'), get('crb_conv_PGA_J1'), get('obj_conv_PGA_J1'), COL.blue,   '--',  'none', false};
 end
 if isfield(d,'rate_conv_PGA_J5')
-    series{end+1} = {'PGA ($J\!=\!5$)',        x, get('rate_conv_PGA_J5'), get('crb_conv_PGA_J5'), get('obj_conv_PGA_J5'), COL.orange, '-.',  'none'};
+    series{end+1} = {'PGA ($J\!=\!5$)',        x, get('rate_conv_PGA_J5'), get('crb_conv_PGA_J5'), get('obj_conv_PGA_J5'), COL.orange, '-.',  'none', false};
 end
 if isfield(d,'rate_conv_PGA_J10')
-    series{end+1} = {'PGA ($J\!=\!10$)',       x, get('rate_conv_PGA_J10'), get('crb_conv_PGA_J10'), get('obj_conv_PGA_J10'), COL.black, '--',  '*'};
+    series{end+1} = {'PGA ($J\!=\!10$)',       x, get('rate_conv_PGA_J10'), get('crb_conv_PGA_J10'), get('obj_conv_PGA_J10'), COL.black, '--',  '*', false};
 end
 if isfield(d,'rate_conv_PGA_J20')
-    series{end+1} = {'PGA ($J\!=\!20$)',       x, get('rate_conv_PGA_J20'), get('crb_conv_PGA_J20'), get('obj_conv_PGA_J20'), COL.black, '-.',  's'};
+    series{end+1} = {'PGA ($J\!=\!20$)',       x, get('rate_conv_PGA_J20'), get('crb_conv_PGA_J20'), get('obj_conv_PGA_J20'), COL.black, '-.',  's', false};
 end
 if isfield(d,'rate_UPGA_J1')
-    series{end+1} = {'UPGA ($J\!=\!1$)',       x, get('rate_UPGA_J1'), get('crb_UPGA_J1'), get('obj_UPGA_J1'), COL.cyan,   '-',   'o'};
+    series{end+1} = {'UPGA ($J\!=\!1$)',       x, get('rate_UPGA_J1'), get('crb_UPGA_J1'), get('obj_UPGA_J1'), COL.cyan,   '-',   'o', false};
 end
 if isfield(d,'rate_UPGA_J5')
-    series{end+1} = {'UPGA ($J\!=\!5$)',       x, get('rate_UPGA_J5'), get('crb_UPGA_J5'), get('obj_UPGA_J5'), COL.orange, '--',  'd'};
+    series{end+1} = {'UPGA ($J\!=\!5$)',       x, get('rate_UPGA_J5'), get('crb_UPGA_J5'), get('obj_UPGA_J5'), COL.orange, '--',  'd', false};
 end
 if isfield(d,'rate_UPGA_J10')
-    series{end+1} = {'UPGA ($J\!=\!10$)',      x, get('rate_UPGA_J10'), get('crb_UPGA_J10'), get('obj_UPGA_J10'), COL.red,    ':',   '*'};
+    series{end+1} = {'UPGA ($J\!=\!10$)',      x, get('rate_UPGA_J10'), get('crb_UPGA_J10'), get('obj_UPGA_J10'), COL.red,    ':',   '*', false};
 end
 if isfield(d,'rate_UPGA_J20')
-    series{end+1} = {'UPGA ($J\!=\!20$)',      x, get('rate_UPGA_J20'), get('crb_UPGA_J20'), get('obj_UPGA_J20'), COL.red,    '-',   'none'};
+    series{end+1} = {'UPGA ($J\!=\!20$)',      x, get('rate_UPGA_J20'), get('crb_UPGA_J20'), get('obj_UPGA_J20'), COL.red,    '-',   'none', false};
 end
 if isfield(d,'rate_UPGA_J10_PRCDN')
-    series{end+1} = {'UPGA PRCDN ($J\!=\!10$)',x, get('rate_UPGA_J10_PRCDN'), get('crb_UPGA_J10_PRCDN'), get('obj_UPGA_J10_PRCDN'), COL.green, ':',  '*'};
+    series{end+1} = {'UPGA PRCDN ($J\!=\!10$)',x, get('rate_UPGA_J10_PRCDN'), get('crb_UPGA_J10_PRCDN'), get('obj_UPGA_J10_PRCDN'), COL.green, ':',  '*', false};
 end
 if isfield(d,'rate_UPGA_J10_RMSProp')
-    series{end+1} = {'UPGA RMSProp ($J\!=\!10$)',x,get('rate_UPGA_J10_RMSProp'),get('crb_UPGA_J10_RMSProp'),get('obj_UPGA_J10_RMSProp'),COL.green,':','none'};
+    series{end+1} = {'UPGA RMSProp ($J\!=\!10$)',x,get('rate_UPGA_J10_RMSProp'),get('crb_UPGA_J10_RMSProp'),get('obj_UPGA_J10_RMSProp'),COL.green,':','none', false};
 end
 if isfield(d,'rate_UPGA_J5_decay')
     x5d = d.iter_outer_x_J5_decay;
-    series{end+1} = {'UPGA ($J\!=\!5$, decay)', x5d, get('rate_UPGA_J5_decay'), get('crb_UPGA_J5_decay'), get('obj_UPGA_J5_decay'), COL.purple,'--','none'};
+    series{end+1} = {'UPGA decay ($J_{\max}\!=\!5$)', x5d, get('rate_UPGA_J5_decay'), get('crb_UPGA_J5_decay'), get('obj_UPGA_J5_decay'), COL.purple,'-','none', true};
 end
 if isfield(d,'rate_UPGA_J10_decay')
     x10d = d.iter_outer_x_J10_decay;
-    series{end+1} = {'UPGA ($J\!=\!10$, decay)',x10d,get('rate_UPGA_J10_decay'),get('crb_UPGA_J10_decay'),get('obj_UPGA_J10_decay'),COL.purple,':','d'};
+    series{end+1} = {'UPGA decay ($J_{\max}\!=\!10$)',x10d,get('rate_UPGA_J10_decay'),get('crb_UPGA_J10_decay'),get('obj_UPGA_J10_decay'),COL.purple,'-','d', true};
 end
 if isfield(d,'rate_UPGA_J20_decay')
     x20d = d.iter_outer_x_J20_decay;
-    series{end+1} = {'UPGA ($J\!=\!20$, decay)',x20d,get('rate_UPGA_J20_decay'),get('crb_UPGA_J20_decay'),get('obj_UPGA_J20_decay'),COL.purple,'-','none'};
+    series{end+1} = {'UPGA decay ($J_{\max}\!=\!20$)',x20d,get('rate_UPGA_J20_decay'),get('crb_UPGA_J20_decay'),get('obj_UPGA_J20_decay'),COL.purple,'-','none', true};
 end
 if isfield(d,'rate_UPGA_J_GradReuse')
-    series{end+1} = {'UPGA GradReuse ($J\!=\!10$)',x,get('rate_UPGA_J_GradReuse'),get('crb_UPGA_J_GradReuse'),get('obj_UPGA_J_GradReuse'),COL.teal,':','^'};
+    series{end+1} = {'UPGA GradReuse ($J\!=\!10$)',x,get('rate_UPGA_J_GradReuse'),get('crb_UPGA_J_GradReuse'),get('obj_UPGA_J_GradReuse'),COL.teal,':','^', false};
 end
 
 if isempty(series)
@@ -112,10 +112,10 @@ set(fig,'defaultAxesFontName','Times New Roman', ...
         'defaultAxesTickLabelInterpreter','latex', ...
         'defaultLegendInterpreter','latex');
 
-subplot_titles  = {'(a) Objective Function', '(b) Sum Rate', '(c) CRLB'};
+subplot_titles  = {'(a) Objective Function', '(b) Sum Rate', '(c) $I(\theta)$'};
 subplot_ylabels = {'$\omega R + I(\theta)$', ...
                    '$R$ [bits/s/Hz]',                  ...
-                   '$\mathrm{CRLB}=1/I(\theta)$'};
+                   '$I(\theta)$'};
 DATA_IDX = [5, 3, 4];   % column index in series cell: obj, rate, crb
 
 ax = gobjects(1,3);
@@ -138,11 +138,20 @@ for p = 1:3
         xk   = s{2}(:);
         yk   = s{DATA_IDX(p)}(:);
         if p == 3
-            yk = log_info_to_crlb(yk);
+            yk = log_info_to_info(yk);
         end
         col  = s{6};
         ls   = s{7};
         mk   = s{8};
+        is_decay = (numel(s) >= 9) && logical(s{9});
+        line_width_k = LINE_WIDTH;
+        marker_size_k = MARKER_SIZE;
+        marker_face_color_k = 'none';
+        if is_decay
+            line_width_k = LINE_WIDTH + 0.9;
+            marker_size_k = MARKER_SIZE + 1.0;
+            marker_face_color_k = col;
+        end
 
         % Subsample markers for clarity
         mi   = false(size(xk));
@@ -150,14 +159,14 @@ for p = 1:3
 
         if strcmp(mk,'none')
             plot(ax(p), xk, yk, ls, ...
-                'Color', col, 'LineWidth', LINE_WIDTH, ...
+                'Color', col, 'LineWidth', line_width_k, ...
                 'DisplayName', lbl);
         else
             plot(ax(p), xk, yk, [ls mk], ...
-                'Color', col, 'LineWidth', LINE_WIDTH, ...
-                'MarkerSize', MARKER_SIZE, ...
+                'Color', col, 'LineWidth', line_width_k, ...
+                'MarkerSize', marker_size_k, ...
                 'MarkerIndices', find(mi), ...
-                'MarkerFaceColor', 'none', ...
+                'MarkerFaceColor', marker_face_color_k, ...
                 'DisplayName', lbl);
         end
     end
@@ -169,18 +178,19 @@ end
 
 % Shared legend below all panels
 lgd = legend(ax(1), 'Location','southoutside',       ...
-             'Orientation','vertical',                ...
+             'Orientation','horizontal',              ...
              'NumColumns', min(numel(series), 4),     ...
              'FontSize',   LEGEND_SIZE,               ...
-             'Box',        'on');
+             'Box',        'off');
+lgd.ItemTokenSize = [12, 8];
 lgd.Position(1) = (1 - lgd.Position(3)) / 2;  % centre horizontally
 lgd.Position(2) = 0.01;
 
 % Improve subplot spacing
 set(fig,'Units','normalized');
 for p = 1:3
-    ax(p).Position(2) = 0.28;   % leave room for legend at bottom
-    ax(p).Position(4) = 0.62;
+    ax(p).Position(2) = 0.30;   % leave room for legend at bottom
+    ax(p).Position(4) = 0.60;
 end
 
 % -------------------------------------------------------------------------
@@ -204,9 +214,9 @@ function v = getfield_safe(s, name)
     end
 end
 
-function y = log_info_to_crlb(log_i_theta)
-    % get_crb_fe stores log(I(theta)); CRLB is exp(-log(I(theta))).
+function y = log_info_to_info(log_i_theta)
+    % get_crb_fe stores log(I(theta)); convert back via exp(log(I(theta))).
     y = nan(size(log_i_theta));
     mask = isfinite(log_i_theta);
-    y(mask) = exp(-log_i_theta(mask));
+    y(mask) = exp(log_i_theta(mask));
 end
