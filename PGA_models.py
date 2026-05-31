@@ -292,7 +292,8 @@ class PGA_Unfold_JX_decay(nn.Module):
                     grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
                     delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                     delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB * n_iter_inner / n_inner
+                    # F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB * n_iter_inner / n_inner
+                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
                     F = normalize_power(F, W, H, Pt)  # scale F only, consistent with training path
                     rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
                     crb_over_iters[ii, jj]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()

@@ -17,8 +17,8 @@ run_conv_PGA_J10 = 0       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
-run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
+run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
+run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
@@ -26,7 +26,7 @@ run_UPGA_J10_PRCDN = 0
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
 run_UPGA_J5_decay = 1        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
-run_UPGA_J10_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
+run_UPGA_J10_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J20_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
@@ -73,10 +73,10 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
-WEIGHT_F_COM = 1  
-WEIGHT_W_COM = 1 
-WEIGHT_F_CRB = OMEGA * 2
-WEIGHT_W_CRB = OMEGA / Nt * K
+WEIGHT_F_COM = OMEGA  
+WEIGHT_W_COM = OMEGA 
+WEIGHT_F_CRB = 1
+WEIGHT_W_CRB = 1
 
 # ========================= CRB PARAMETERS =========================
 # xi_0 = 10 ** (-40 / 10) ## path loss at reference distance (1 m) in linear scale
