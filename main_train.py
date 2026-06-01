@@ -187,15 +187,12 @@ if run_UPGA_J10 == 1:
             loss.backward()
             optimizer.step()
             
-            # clip_gradients(model_UPGA_J10)
-            # optimizer.step()
-            
             # .item() is critical to keep memory usage low!
             batch_losses.append(loss.item())
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        # scheduler.step(avg_loss)
+        scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J10.state_dict(), model_file_name_UPGA_J10)
@@ -241,8 +238,6 @@ if run_UPGA_J5 == 1:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # clip_gradients(model_UPGA_J5)
-            # optimizer.step()
             
             # .item() is critical to keep memory usage low!
             batch_losses.append(loss.item())

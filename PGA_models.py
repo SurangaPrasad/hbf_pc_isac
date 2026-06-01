@@ -273,7 +273,7 @@ class PGA_Unfold_JX_decay(nn.Module):
                 +
                 torch.norm(grad_F_crb) / grad_F_crb.numel()
             ).detach()
-            print(f'Number of elements in grad_F_com: {grad_F_com.numel()}, grad_F_crb: {grad_F_crb.numel()}')
+            # print(f'Number of elements in grad_F_com: {grad_F_com.numel()}, grad_F_crb: {grad_F_crb.numel()}')
             # Adaptive inner iteration count
             n_inner = _n_inner(grad_norm)
             # print(f'Number of inner iterations', n_inner)

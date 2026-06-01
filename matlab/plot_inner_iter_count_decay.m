@@ -7,6 +7,9 @@ clearvars; close all; clc;
 % Update this path if your system config / OMEGA changes.
 MAT_FILE = '../sim_results/64TX_4UE_4RF/inner_iter_count_vs_outer_64_0.05.mat';
 
+FONT_SIZE   = 14;  % axis tick / label font size
+LEGEND_SIZE = 14;  % legend font size
+
 if ~isfile(MAT_FILE)
     error('File not found: %s\nRun main_iter.py first to generate it.', MAT_FILE);
 end
@@ -46,10 +49,11 @@ if ~printed_any_total
     fprintf('No total inner-iteration counts were printed (missing J5/J10 arrays).\n');
 end
 
-xlabel('Outer iteration number');
-ylabel('Inner iteration count');
-title('Decay schedule: inner iterations vs outer iteration');
-legend('Location', 'best');
+xlabel('Outer iteration number', 'FontSize', FONT_SIZE);
+ylabel('Inner iteration count', 'FontSize', FONT_SIZE);
+title('Decay schedule: inner iterations vs outer iteration', 'FontSize', FONT_SIZE);
+set(gca,'FontSize',FONT_SIZE,'TickLabelInterpreter','latex');
+legend('Location', 'best', 'FontSize', LEGEND_SIZE, 'Interpreter', 'latex');
 
 out_dir = fileparts(MAT_FILE);
 out_base = fullfile(out_dir, 'inner_iter_count_vs_outer_decay');
