@@ -527,46 +527,46 @@ if plot_figure == 1:
     plt.figure()
     fig_obj = plt.figure(5)
     if run_conv_PGA == 1:
-        obj_iter_conv_PGA_J1 = OMEGA * rate_iter_conv_PGA_J1 + crb_iter_conv_PGA_J1
+        obj_iter_conv_PGA_J1 = rate_iter_conv_PGA_J1 + OMEGA * crb_iter_conv_PGA_J1
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=1)')
     if run_UPGA_J1 == 1:
-        obj_iter_UPGA_J1 = OMEGA * rate_iter_UPGA_J1[outer_idx_J1] + crb_iter_UPGA_J1[outer_idx_J1]
+        obj_iter_UPGA_J1 = rate_iter_UPGA_J1[outer_idx_J1] + OMEGA * crb_iter_UPGA_J1[outer_idx_J1]
         plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_conv_PGA_J5 == 1:
-        obj_iter_conv_PGA_J5 = OMEGA * rate_iter_conv_PGA_J5 + crb_iter_conv_PGA_J5
+        obj_iter_conv_PGA_J5 = rate_iter_conv_PGA_J5 + OMEGA * crb_iter_conv_PGA_J5
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], '-', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=5)')
     if run_conv_PGA_J10 == 1:
-        obj_iter_conv_PGA_J10 = OMEGA * rate_iter_conv_PGA_J10[outer_idx_J10] + crb_iter_conv_PGA_J10[outer_idx_J10]
+        obj_iter_conv_PGA_J10 = rate_iter_conv_PGA_J10 + OMEGA * crb_iter_conv_PGA_J10[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J10, '-*', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_conv_PGA_J20 == 1:
-        obj_iter_conv_PGA_J20 = OMEGA * rate_iter_conv_PGA_J20[outer_idx_J20] + crb_iter_conv_PGA_J20[outer_idx_J20]
+        obj_iter_conv_PGA_J20 = rate_iter_conv_PGA_J20 + OMEGA * crb_iter_conv_PGA_J20[outer_idx_J20]
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J20, '-', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
     if run_UPGA_J5 == 1:
-        obj_iter_UPGA_J5 = OMEGA * rate_iter_UPGA_J5[outer_idx_J5] + crb_iter_UPGA_J5[outer_idx_J5]
+        obj_iter_UPGA_J5 = rate_iter_UPGA_J5[outer_idx_J5] + OMEGA * crb_iter_UPGA_J5[outer_idx_J5]
         plt.plot(iter_outer_x, obj_iter_UPGA_J5, '--', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
     if run_UPGA_J10 == 1:
-        obj_iter_UPGA_J10 = OMEGA * rate_iter_UPGA_J10[outer_idx_J10] + crb_iter_UPGA_J10[outer_idx_J10]
+        obj_iter_UPGA_J10 = rate_iter_UPGA_J10[outer_idx_J10] + OMEGA * crb_iter_UPGA_J10[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_J10, '-*', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
     if run_UPGA_J20 == 1:
-        obj_iter_UPGA_J20 = OMEGA * rate_iter_UPGA_J20[outer_idx_J20] + crb_iter_UPGA_J20[outer_idx_J20]
+        obj_iter_UPGA_J20 = rate_iter_UPGA_J20[outer_idx_J20] + OMEGA * crb_iter_UPGA_J20[outer_idx_J20]
         plt.plot(iter_outer_x, obj_iter_UPGA_J20, '-', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     if run_UPGA_J10_RMSProp == 1:
-        obj_iter_UPGA_J10_RMSProp = OMEGA * rate_iter_UPGA_J10_RMSProp[outer_idx_J10] + crb_iter_UPGA_J10_RMSProp[outer_idx_J10]
+        obj_iter_UPGA_J10_RMSProp = rate_iter_UPGA_J10_RMSProp[outer_idx_J10] + OMEGA * crb_iter_UPGA_J10_RMSProp[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_J10_RMSProp, ':', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, RMSProp)')
     if run_UPGA_J10_PRCDN == 1:
-        obj_iter_UPGA_J10_PRCDN = OMEGA * rate_iter_UPGA_J10_PRCDN[outer_idx_J10] + crb_iter_UPGA_J10_PRCDN[outer_idx_J10]
+        obj_iter_UPGA_J10_PRCDN = rate_iter_UPGA_J10_PRCDN[outer_idx_J10] + OMEGA * crb_iter_UPGA_J10_PRCDN[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_J10_PRCDN, ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J5_decay == 1:
-        obj_iter_UPGA_J5_decay = OMEGA * rate_iter_UPGA_J5_decay[outer_idx_J5_decay] + crb_iter_UPGA_J5_decay[outer_idx_J5_decay]
+        obj_iter_UPGA_J5_decay = rate_iter_UPGA_J5_decay[outer_idx_J5_decay] + OMEGA * crb_iter_UPGA_J5_decay[outer_idx_J5_decay]
         plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_J5_decay, '--', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=5, decay)')
     if run_UPGA_J10_decay == 1:
-        obj_iter_UPGA_J10_decay = OMEGA * rate_iter_UPGA_J10_decay[outer_idx_J10_decay] + crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
+        obj_iter_UPGA_J10_decay = rate_iter_UPGA_J10_decay[outer_idx_J10_decay] + OMEGA * crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
         plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
     if run_UPGA_J20_decay == 1:
-        obj_iter_UPGA_J20_decay = OMEGA * rate_iter_UPGA_J20_decay[outer_idx_J20_decay] + crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
+        obj_iter_UPGA_J20_decay = rate_iter_UPGA_J20_decay[outer_idx_J20_decay] + OMEGA * crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
         plt.plot(iter_outer_x_J20_decay, obj_iter_UPGA_J20_decay, '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
-        obj_iter_UPGA_J_GradReuse = OMEGA * rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse] + crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
+        obj_iter_UPGA_J_GradReuse = rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse] + OMEGA * crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
         plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
     plt.ylabel(r'$\omega R + \text{CRLB}^{-1}$', fontsize=11)
