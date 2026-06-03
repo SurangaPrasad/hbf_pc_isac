@@ -51,7 +51,7 @@ init_scheme = 'prop'  # proposed initialization for best convergence
 
 system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
 
-OMEGA = 0.05
+OMEGA = 10
 
 
 
@@ -59,7 +59,7 @@ OMEGA = 0.05
 train_size = 112 * 4     # size of training set
 test_size = 60      # size of testing set
 batch_size = len(snr_dB_list) * 4
-n_epoch = 30         # number of training epochs
+n_epoch = 20         # number of training epochs
 learning_rate = 0.00006 # learning 
 # learning_rate = 0.00002
 
@@ -73,10 +73,10 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
-WEIGHT_F_COM = OMEGA  
-WEIGHT_W_COM = OMEGA 
-WEIGHT_F_CRB = 1
-WEIGHT_W_CRB = 1
+WEIGHT_F_COM = 1  
+WEIGHT_W_COM = 1 
+WEIGHT_F_CRB = OMEGA
+WEIGHT_W_CRB = OMEGA
 
 # ========================= CRB PARAMETERS =========================
 # xi_0 = 10 ** (-40 / 10) ## path loss at reference distance (1 m) in linear scale

@@ -342,7 +342,7 @@ def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt):
 
     fim = batch_trace.sum(0).real  # sum over K users -> [batch_size]
 
-    crb = torch.log(fim)  # [batch_size]
+    crb = torch.log(fim) + torch.log(2*torch.tensor(xi_0) ** 2)  # [batch_size]
 
     # crb_real = 1 / (2 * (xi_0 ** 2) * fim)
     # print(f"CRB (real): {crb_real}")
