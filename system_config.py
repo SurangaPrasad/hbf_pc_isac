@@ -18,7 +18,7 @@ run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
-run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
+run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
@@ -46,21 +46,21 @@ snr_dB_list = np.array([0, 2, 4, 6, 8, 10, 12], dtype='float64') # SNR for showi
 init_W = 'ZF' # initialization scheme
 initial_normalization = 0  # normalization for initialization
 data_source = 'matlab'  # data generate by matlab or python
-init_scheme = 'prop'  # proposed initialization for best convergence
+init_scheme = 'svd'  # proposed initialization for best convergence
 
 
 system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
 
-OMEGA = 10
+OMEGA = 4
 
 
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
-train_size = 112 * 4     # size of training set
-test_size = 60      # size of testing set
+train_size = 112 * 2    # size of training set
+test_size = 10      # size of testing set
 batch_size = len(snr_dB_list) * 4
 n_epoch = 20         # number of training epochs
-learning_rate = 0.00006 # learning 
+learning_rate = 0.0005 # learning 
 # learning_rate = 0.00002
 
 n_iter_outer = 120      # Number of outer iterations (I)

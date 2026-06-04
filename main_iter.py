@@ -493,27 +493,27 @@ if plot_figure == 1:
     # ==================================== CRB (outer iters only) ================================================
     plt.figure()
     if run_conv_PGA == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_conv_PGA_J1[outer_idx_J1]), '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=1)')
+        plt.plot(iter_outer_x, crb_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=1)')
     if run_conv_PGA_J5 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_conv_PGA_J5[outer_idx_J5]), '-*', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=5)')
+        plt.plot(iter_outer_x, crb_iter_conv_PGA_J5[outer_idx_J5], '-*', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=5)')
     if run_conv_PGA_J10 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_conv_PGA_J10[outer_idx_J10]), '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=10)')
+        plt.plot(iter_outer_x, crb_iter_conv_PGA_J10[outer_idx_J10] , '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_UPGA_J5 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J5[outer_idx_J5]), '-*', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_J5)
+        plt.plot(iter_outer_x, crb_iter_UPGA_J5[outer_idx_J5], '-*', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_J5)
     if run_UPGA_J10 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J10[outer_idx_J10]), '--', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_J10)
+        plt.plot(iter_outer_x, crb_iter_UPGA_J10[outer_idx_J10], '--', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_J10)
     if run_UPGA_J20 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J20[outer_idx_J20]), ':s', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+        plt.plot(iter_outer_x, crb_iter_UPGA_J20[outer_idx_J20], ':s', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     if run_UPGA_J10_RMSProp == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J10_RMSProp[outer_idx_J10]), ':', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, RMSProp)')
+        plt.plot(iter_outer_x, crb_iter_UPGA_J10_RMSProp[outer_idx_J10], ':', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, RMSProp)')
     if run_UPGA_J10_PRCDN == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J10_PRCDN[outer_idx_J10]), ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
+        plt.plot(iter_outer_x, crb_iter_UPGA_J10_PRCDN[outer_idx_J10], ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
     if run_UPGA_J5_decay == 1:
-        plt.plot(iter_outer_x_J5_decay, 1/ np.exp(crb_iter_UPGA_J5_decay[outer_idx_J5_decay]), '-*', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=5, decay)')
+        plt.plot(iter_outer_x_J5_decay, crb_iter_UPGA_J5_decay[outer_idx_J5_decay], '-*', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=5, decay)')
     if run_UPGA_J10_decay == 1:
-        plt.plot(iter_outer_x_J10_decay, 1/ np.exp(crb_iter_UPGA_J10_decay[outer_idx_J10_decay]), '--', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
+        plt.plot(iter_outer_x_J10_decay, crb_iter_UPGA_J10_decay[outer_idx_J10_decay], '--', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=10, decay)')
     if run_UPGA_J20_decay == 1:
-        plt.plot(iter_outer_x_J20_decay, 1/ np.exp(crb_iter_UPGA_J20_decay[outer_idx_J20_decay]), '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
+        plt.plot(iter_outer_x_J20_decay, crb_iter_UPGA_J20_decay[outer_idx_J20_decay], '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]), ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
@@ -530,17 +530,17 @@ if plot_figure == 1:
         obj_iter_conv_PGA_J1 = rate_iter_conv_PGA_J1 + OMEGA * crb_iter_conv_PGA_J1
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=1)')
     if run_UPGA_J1 == 1:
-        obj_iter_UPGA_J1 = rate_iter_UPGA_J1[outer_idx_J1] + OMEGA * crb_iter_UPGA_J1[outer_idx_J1]
+        obj_iter_UPGA_J1 = rate_iter_UPGA_J1[outer_idx_J1] + OMEGA * crb_iter_UPGA_J1
         plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_conv_PGA_J5 == 1:
         obj_iter_conv_PGA_J5 = rate_iter_conv_PGA_J5 + OMEGA * crb_iter_conv_PGA_J5
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], '-', markevery=5, color='orange', linewidth=3, markersize=7, label='PGA (J=5)')
     if run_conv_PGA_J10 == 1:
-        obj_iter_conv_PGA_J10 = rate_iter_conv_PGA_J10 + OMEGA * crb_iter_conv_PGA_J10[outer_idx_J10]
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10, '-*', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10)')
+        obj_iter_conv_PGA_J10 = rate_iter_conv_PGA_J10 + OMEGA * crb_iter_conv_PGA_J10
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10[outer_idx_J10], '-*', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=10)')
     if run_conv_PGA_J20 == 1:
         obj_iter_conv_PGA_J20 = rate_iter_conv_PGA_J20 + OMEGA * crb_iter_conv_PGA_J20[outer_idx_J20]
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J20, '-', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J20[outer_idx_J20], '-', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=20)')
     if run_UPGA_J5 == 1:
         obj_iter_UPGA_J5 = rate_iter_UPGA_J5[outer_idx_J5] + OMEGA * crb_iter_UPGA_J5[outer_idx_J5]
         plt.plot(iter_outer_x, obj_iter_UPGA_J5, '--', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
@@ -736,42 +736,42 @@ if plot_figure == 1:
     # plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.png')
     # plt.savefig(directory_result + 'power_vs_all_iters_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
-    # # ===================== AVERAGE STEP SIZES ==========================================
-    # # Plot average over inner iterations for step_size[:,:,0] and step_size[:,:,1].
-    # if len(step_size_snapshots) > 0:
-    #     # Index 0: analog/F update step size
-    #     plt.figure(8)
-    #     for model_label, step_tensor in step_size_snapshots:
-    #         avg_steps = average_step_size_by_outer(step_tensor)
-    #         if avg_steps is None or avg_steps.shape[1] <= 0:
-    #             continue
-    #         x_axis = np.arange(1, avg_steps.shape[0] + 1)
-    #         plt.plot(x_axis, avg_steps[:, 0], linewidth=2, label=model_label)
-    #     plt.xlabel(r'Outer iteration $I$', fontsize="13")
-    #     plt.ylabel(r'Average step size $[\cdot,\cdot,0]$', fontsize="13")
-    #     plt.title('Average Step Size Index 0 vs Outer Iteration', fontsize="13")
-    #     plt.grid()
-    #     safe_legend(loc='best', fontsize="11", labelspacing=0.15)
-    #     plt.tight_layout()
-    #     plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    #     plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+    # ===================== AVERAGE STEP SIZES ==========================================
+    # Plot average over inner iterations for step_size[:,:,0] and step_size[:,:,1].
+    if len(step_size_snapshots) > 0:
+        # Index 0: analog/F update step size
+        plt.figure(8)
+        for model_label, step_tensor in step_size_snapshots:
+            avg_steps = average_step_size_by_outer(step_tensor)
+            if avg_steps is None or avg_steps.shape[1] <= 0:
+                continue
+            x_axis = np.arange(1, avg_steps.shape[0] + 1)
+            plt.plot(x_axis, avg_steps[:, 0], linewidth=2, label=model_label)
+        plt.xlabel(r'Outer iteration $I$', fontsize="13")
+        plt.ylabel(r'Average step size $[\cdot,\cdot,0]$', fontsize="13")
+        plt.title('Average Step Size Index 0 vs Outer Iteration', fontsize="13")
+        plt.grid()
+        safe_legend(loc='best', fontsize="11", labelspacing=0.15)
+        plt.tight_layout()
+        plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.png')
+        plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
-    #     # Index 1: digital/W update step size (for K=1 this is channel 1 in last dim)
-    #     plt.figure(9)
-    #     for model_label, step_tensor in step_size_snapshots:
-    #         avg_steps = average_step_size_by_outer(step_tensor)
-    #         if avg_steps is None or avg_steps.shape[1] <= 1:
-    #             continue
-    #         x_axis = np.arange(1, avg_steps.shape[0] + 1)
-    #         plt.plot(x_axis, avg_steps[:, 1], linewidth=2, label=model_label)
-    #     plt.xlabel(r'Outer iteration $I$', fontsize="13")
-    #     plt.ylabel(r'Average step size $[\cdot,\cdot,1]$', fontsize="13")
-    #     plt.title('Average Step Size Index 1 vs Outer Iteration', fontsize="13")
-    #     plt.grid()
-    #     safe_legend(loc='best', fontsize="11", labelspacing=0.15)
-    #     plt.tight_layout()
-    #     plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    #     plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+        # Index 1: digital/W update step size (for K=1 this is channel 1 in last dim)
+        plt.figure(9)
+        for model_label, step_tensor in step_size_snapshots:
+            avg_steps = average_step_size_by_outer(step_tensor)
+            if avg_steps is None or avg_steps.shape[1] <= 1:
+                continue
+            x_axis = np.arange(1, avg_steps.shape[0] + 1)
+            plt.plot(x_axis, avg_steps[:, 1], linewidth=2, label=model_label)
+        plt.xlabel(r'Outer iteration $I$', fontsize="13")
+        plt.ylabel(r'Average step size $[\cdot,\cdot,1]$', fontsize="13")
+        plt.title('Average Step Size Index 1 vs Outer Iteration', fontsize="13")
+        plt.grid()
+        safe_legend(loc='best', fontsize="11", labelspacing=0.15)
+        plt.tight_layout()
+        plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.png')
+        plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
 
  

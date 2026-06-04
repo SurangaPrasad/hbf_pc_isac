@@ -192,7 +192,7 @@ if run_UPGA_J10 == 1:
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        scheduler.step(avg_loss)
+        # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J10.state_dict(), model_file_name_UPGA_J10)
@@ -213,8 +213,8 @@ if run_UPGA_J10 == 1:
 
 if run_UPGA_J5 == 1:
     model_UPGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)
-    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5)
-    # optimizer = torch.optim.Adam(model_UPGA_J5.parameters(), lr=learning_rate)
+    # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5)
+    optimizer = torch.optim.Adam(model_UPGA_J5.parameters(), lr=learning_rate)
 
     epoch_losses = [] # To store average loss per epoch
 
@@ -244,7 +244,7 @@ if run_UPGA_J5 == 1:
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        scheduler.step(avg_loss)
+        # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J5.state_dict(), model_file_name_UPGA_J5)
@@ -311,7 +311,8 @@ if run_UPGA_J10_PRCDN == 1:
 # ============================================================= proposed unfolding PGA with decaying inner iterations ====
 if run_UPGA_J5_decay == 1:
     model_UPGA_J5_decay = PGA_Unfold_JX_decay(step_size_UPGA_J5_decay)
-    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5_decay)
+    # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5_decay)
+    optimizer = torch.optim.Adam(model_UPGA_J5_decay.parameters(), lr=learning_rate)
 
     epoch_losses = []  # store average loss per epoch
 
@@ -342,7 +343,7 @@ if run_UPGA_J5_decay == 1:
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        scheduler.step(avg_loss)
+        # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J5_decay.state_dict(), model_file_name_UPGA_J5_decay)
