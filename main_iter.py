@@ -478,10 +478,10 @@ if plot_figure == 1:
         plt.plot(iter_outer_x_J20_decay, rate_iter_UPGA_J20_decay[outer_idx_J20_decay], '-', markevery=5, color='purple', linewidth=3, markersize=7, label='PGA (J=20, decay)')
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse], ':^', markevery=5, color='teal', linewidth=3, markersize=7, label='PGA (J=10, GradReuse)')
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
-    plt.ylabel('$R$ [bits/s/Hz]', fontsize=11)
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
+    plt.ylabel('$R$ [bits/s/Hz]', fontsize=14)
     plt.grid()
-    safe_legend(loc='best', fontsize=9, labelspacing=0.15)
+    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -545,10 +545,10 @@ if plot_figure == 1:
         plt.plot(iter_outer_x_J20_decay, 1/ np.exp(crb_iter_UPGA_J20_decay[outer_idx_J20_decay]), '-', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
     if run_UPGA_J_GradReuse == 1:
         plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]), ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
-    plt.ylabel('CRLB', fontsize=11)
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
+    plt.ylabel('CRLB', fontsize=14)
     plt.grid()
-    safe_legend(loc='best', fontsize=9, labelspacing=0.15)
+    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
     plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -597,11 +597,11 @@ if plot_figure == 1:
     if run_UPGA_J_GradReuse == 1:
         obj_iter_UPGA_J_GradReuse = rate_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse] + OMEGA * crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]
         plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=11)
-    plt.ylabel(r'$\omega R + \text{CRLB}^{-1}$', fontsize=11)
-    plt.title("Objective function vs Iterations", fontsize=11)
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
+    plt.ylabel(r'$\omega R + \text{CRLB}^{-1}$', fontsize=14)
+    plt.title("Objective function vs Iterations", fontsize=14)
     plt.grid()
-    safe_legend(loc='best', fontsize=9, labelspacing=0.15)
+    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
@@ -611,10 +611,17 @@ if plot_figure == 1:
     fig_grad = plt.figure(6)
     if run_UPGA_J5_decay == 1:
         grad_norms_J5_decay = np.array(gradient_norm_history_UPGA_J5_decay)
-        plt.plot(frac_J5_decay, grad_norms_J5_decay, '--', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+        plt.plot(iter_outer_x_J5_decay, grad_norms_J5_decay, '--', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
     if run_UPGA_J10_decay == 1:
         grad_norms_J10_decay = np.array(gradient_norm_history_UPGA_J10_decay)
-        plt.plot(frac_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+        plt.plot(iter_outer_x_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
+    plt.ylabel(r'Gradient norm', fontsize=14)
+    plt.title("Gradient Norm vs Iterations", fontsize=14)
+    plt.grid()
+    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
+    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
+    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
     # # ===================== SAVE OUTER-ITER RESULTS TO .mat FOR MATLAB =====================
     # print('Saving outer-iteration results to .mat file...')
     # mat_data = {'iter_outer_x': iter_outer_x}
