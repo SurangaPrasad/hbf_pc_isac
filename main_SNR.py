@@ -124,7 +124,7 @@ for ss in range(len(snr_dB_list)):
     #     rate_UPGA_J_GradReuse[ss], CRB_UPGA_J_GradReuse[ss] = execute_UPGA_J_GradReuse(model_UPGA_J_GradReuse, H_test, snr_ss)
 
 
-# plot rate vs SNR ======================================================
+# ==========================plot rate vs SNR ======================================================
 fig_rate = plt.figure(1)
 plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_conv_PGA == 1:
@@ -156,82 +156,83 @@ plt.legend(loc='upper left', labelspacing  = 0.15, fontsize=12)
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
-# plot CRB vs SNR ======================================================
+
+
+#============================== plot CRB vs SNR ======================================================
+
+# ======================= Plot CRLB vs SNR with inset =======================
+
+fig_CRB = plt.figure(2)
+plt.rcParams["figure.figsize"] = (6.4, 4.0)
+ax = plt.gca()
+
+def crlb_from_log_inv(x):
+    return (1 / torch.exp(torch.tensor(x))).detach().cpu().numpy()
 
 def plot_curve(x, y, style, color, label=None, lw=3, ms=7, ax=None):
     if ax is None:
         ax = plt.gca()
     ax.plot(x, y, style, color=color, linewidth=lw, markersize=ms, label=label)
 
+curves = []
 
-ax = plt.gca()
-
-# ==================== Inset ====================
-axins = inset_axes(
-    ax,
-    width="42%",
-    height="42%",
-    loc='upper right',
-    borderpad=1.2
-)
-
-# Plot the same curves again
 if run_conv_PGA == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA)), '--', 'blue', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA), '--', 'blue', label_conv_PGA))
 
 if run_conv_PGA_J5 == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA_J5)), '--', 'blue', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J5), '--', 'blue', label_conv_PGA_J5))
 
 if run_conv_PGA_J10 == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA_J10)), '-*', 'blue', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J10), '-*', 'blue', label_conv_PGA_J10))
 
 if run_UPGA_J5 == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5)), '--', 'red', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5), '--', 'red', label_UPGA_J5))
 
 if run_UPGA_J10 == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10)), '-*', 'red', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J10), '-*', 'red', label_UPGA_J10))
 
 if run_UPGA_J20 == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20)), ':s', 'red', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J20), ':s', 'red', label_UPGA_J20))
 
 if run_UPGA_J5_decay == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5_decay)), '--', 'green', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5_decay), '--', 'green', label_UPGA_J5_decay))
 
 if run_UPGA_J10_decay == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10_decay)), '-*', 'green', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J10_decay), '-*', 'green', label_UPGA_J10_decay))
 
 if run_UPGA_J20_decay == 1:
-    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20_decay)), ':p', 'green', ax=axins)
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J20_decay), ':p', 'green', label_UPGA_J20_decay))
 
-# Zoom region
+# Main plot
+for x, y, style, color, label in curves:
+    plot_curve(x, y, style, color, label=label, ax=ax)
+
+ax.set_xlabel('SNR [dB]', fontsize=14)
+ax.set_ylabel(r'$\mathrm{CRLB}$', fontsize=14)
+ax.grid(True)
+# ax.legend(loc='upper right', labelspacing=0.15, fontsize=12)
+
+# Inset zoom
+axins = inset_axes(ax, width="42%", height="42%", loc='upper right', borderpad=1.2)
+
+for x, y, style, color, label in curves:
+    plot_curve(x, y, style, color, ax=axins, lw=2, ms=5)
+
 axins.set_xlim(10, 12)
 
-# Automatically determine y-range
 zoom_vals = []
+for x, y, style, color, label in curves:
+    x_arr = np.asarray(x)
+    y_arr = np.asarray(y)
+    mask = (x_arr >= 10) & (x_arr <= 12)
+    if np.any(mask):
+        zoom_vals.extend(y_arr[mask])
 
-datasets = [
-    run_conv_PGA,          lambda: 1/torch.exp(torch.tensor(CRB_conv_PGA)),
-    run_conv_PGA_J5,       lambda: 1/torch.exp(torch.tensor(CRB_conv_PGA_J5)),
-    run_conv_PGA_J10,      lambda: 1/torch.exp(torch.tensor(CRB_conv_PGA_J10)),
-    run_UPGA_J5,           lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J5)),
-    run_UPGA_J10,          lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J10)),
-    run_UPGA_J20,          lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J20)),
-    run_UPGA_J5_decay,     lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J5_decay)),
-    run_UPGA_J10_decay,    lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J10_decay)),
-    run_UPGA_J20_decay,    lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J20_decay))
-]
-
-for i in range(0, len(datasets), 2):
-    if datasets[i]:
-        zoom_vals.extend(np.array(datasets[i+1]())[-2:])
-
-ymin = np.min(zoom_vals)
-ymax = np.max(zoom_vals)
-
-axins.set_ylim(
-    ymin - 0.15*(ymax-ymin),
-    ymax + 0.15*(ymax-ymin)
-)
+if len(zoom_vals) > 0:
+    ymin = np.min(zoom_vals)
+    ymax = np.max(zoom_vals)
+    ypad = 0.15 * (ymax - ymin) if ymax > ymin else 0.1 * ymax
+    axins.set_ylim(ymin - ypad, ymax + ypad)
 
 axins.grid(True)
 axins.tick_params(labelsize=8)
@@ -240,8 +241,8 @@ axins.patch.set_facecolor("white")
 
 mark_inset(ax, axins, loc1=2, loc2=4, fc="white", ec="0.4", linewidth=1)
 
-plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02, transparent=False)
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02, transparent=False)
+plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02, transparent=False)
 # # Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
 # print('Saving SNR-curve results to .mat file...')
 # mat_data = {'snr_dB_list': snr_dB_list}
