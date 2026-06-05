@@ -183,6 +183,7 @@ class PGA_Unfold_JX(nn.Module):
             return F
 
         inner_iter_history = []
+        gradient_norm_history = []
         # print(f'Number of inner iterations: {self.step_size.shape[0]}')
         for ii in range(n_iter_outer):
 
@@ -191,6 +192,7 @@ class PGA_Unfold_JX(nn.Module):
             # ----------------------------------------------------
             grad_F_com = get_grad_F_com(H, F, W)
             grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+            grad_J_com = grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB
 
             if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                 print('Error NaN gradients before adaptive J!!!!!!!!!!!!!!!')
@@ -202,6 +204,7 @@ class PGA_Unfold_JX(nn.Module):
             if track_metrics:
 
                 inner_iter_history.append(n_inner)
+                gradient_norm_history.append(torch.linalg.norm(grad_J_com.reshape(grad_J_com.shape[0], -1), dim=1).mean().item())
 
                 # Run inner loop without checkpoint so that metrics
                 # can be recorded after each active inner update.
@@ -306,7 +309,8 @@ class PGA_Unfold_JX(nn.Module):
             crb_fes.transpose(0, 1),
             power_fes.transpose(0, 1),
             F,
-            W
+            W,
+            gradient_norm_history,
         )
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================

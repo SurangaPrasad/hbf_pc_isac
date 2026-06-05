@@ -76,7 +76,7 @@ if run_UPGA_J1 == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             
-            rate, __, __, F, W = model_UPGA_J1.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J1, track_metrics=False)
+            rate, __, __, F, W, __ = model_UPGA_J1.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J1, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -125,7 +125,7 @@ if run_UPGA_J20 == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             
-            rate, __, __, F, W = model_UPGA_J20.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20, track_metrics=False)
+            rate, __, __, F, W, __ = model_UPGA_J20.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J20, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -178,7 +178,7 @@ if run_UPGA_J10 == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             
-            rate, __, __, F, W = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
+            rate, __, __, F, W, __ = model_UPGA_J10.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J10, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -230,7 +230,7 @@ if run_UPGA_J5 == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             
-            rate, __, __, F, W = model_UPGA_J5.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J5, track_metrics=False)
+            rate, __, __, F, W, __ = model_UPGA_J5.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J5, track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
