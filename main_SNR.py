@@ -158,23 +158,23 @@ plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.e
 fig_CRB = plt.figure(2)
 plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_conv_PGA == 1:
-    plt.plot(snr_dB_list, CRB_conv_PGA, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_conv_PGA), '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA)
 if run_conv_PGA_J5 == 1:
-    plt.plot(snr_dB_list, CRB_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J5)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_conv_PGA_J5), '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J5)
 if run_conv_PGA_J10 == 1:
-    plt.plot(snr_dB_list, CRB_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J10)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_conv_PGA_J10), '-*', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J10)
 if run_UPGA_J5 == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J5, '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_UPGA_J5), '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
 if run_UPGA_J10 == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J10, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_UPGA_J10), '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J20, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_UPGA_J20), '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
 if run_UPGA_J5_decay == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J5_decay, '--', color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_UPGA_J5_decay), '--', color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
 if run_UPGA_J10_decay == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J10_decay, '-*', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_UPGA_J10_decay), '-*', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
 if run_UPGA_J20_decay == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+    plt.plot(snr_dB_list, 1/torch.exp(CRB_UPGA_J20_decay), ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
 
 # system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
 # plt.title(system_params)
@@ -234,10 +234,10 @@ plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.ep
 #     mat_data['crb_UPGA_J_GradReuse'] = CRB_UPGA_J_GradReuse
 #     mat_data['obj_UPGA_J_GradReuse'] = OMEGA * rate_UPGA_J_GradReuse + CRB_UPGA_J_GradReuse
 
-mat_file_name = directory_result + 'snr_results_' + str(Nt) + '_' + str(OMEGA) + '.mat'
-scipy.io.savemat(mat_file_name, mat_data)
-print(f'  Saved to {mat_file_name}')
+# mat_file_name = directory_result + 'snr_results_' + str(Nt) + '_' + str(OMEGA) + '.mat'
+# scipy.io.savemat(mat_file_name, mat_data)
+# print(f'  Saved to {mat_file_name}')
 
 
 
-plt.show()
+# plt.show()
