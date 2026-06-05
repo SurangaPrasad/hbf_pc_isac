@@ -328,7 +328,7 @@ if run_UPGA_J5_decay == 1:
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
 
-            __, __, __, F, W, _ = model_UPGA_J5_decay.execute_PGA(
+            __, __, __, F, W, __ = model_UPGA_J5_decay.execute_PGA(
                 H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, n_iter_inner_J5, track_metrics=False)
 
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)

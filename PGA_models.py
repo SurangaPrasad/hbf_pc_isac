@@ -312,11 +312,12 @@ class PGA_Unfold_JX(nn.Module):
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
 
-    def __init__(self, step_size, alpha=0.01):
+    def __init__(self, step_size, alpha=0.01, eps=1e-12, J_min=2):
         super().__init__()
 
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
-        self.J_min = 2  # minimum inner iterations to ensure some optimization progress
+        self.eps = eps
+        self.J_min = J_min  # minimum inner iterations to ensure some optimization progress
         self.inner_iter_history = []
 
         # Adaptive scheduling hyperparameter
@@ -479,7 +480,7 @@ class PGA_Unfold_JX_decay(nn.Module):
         # print("Adaptive inner iterations:", inner_iter_history)
         # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
 
-        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W), gradient_norm_history
+        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W, gradient_norm_history) 
 
 
 # PGA_Unfold_J20_decay is identical to PGA_Unfold_J10_decay.
