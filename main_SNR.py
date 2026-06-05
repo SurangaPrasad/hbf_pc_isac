@@ -128,139 +128,107 @@ plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_conv_PGA == 1:
     plt.plot(snr_dB_list, rate_conv_PGA, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA)
 if run_conv_PGA_J5 == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='cyan', linewidth=3, markersize=7, label=label_conv_PGA_J5)
+    plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J5)
 if run_conv_PGA_J10 == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_conv_PGA_J10)
-
+    plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J10)
 if run_UPGA_J5 == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J5, '-*', color='cyan', linewidth=3, markersize=7, label=label_UPGA_J5)
+    plt.plot(snr_dB_list, rate_UPGA_J5, '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
 if run_UPGA_J10 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J10, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J20, '-', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+    plt.plot(snr_dB_list, rate_UPGA_J20, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     plt.plot(snr_dB_list, rate_conv_PGA, ':', color='black', linewidth=3, markersize=7, label=label_conv)
-# if run_UPGA_J10_PC == 1:
-    # plt.plot(snr_dB_list, rate_UPGA_J10_PC, ':', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_PC)
-# if run_conv_PGA_J10_PC == 1:
-    # plt.plot(snr_dB_list, rate_conv_PGA_J10_PC, ':', color='orange', linewidth=3, markersize=7, label=label_conv_PGA_J10_PC)
-
-
 if run_UPGA_J5_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J5_decay, ':d', color='cyan', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J5_decay, '--', color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
 if run_UPGA_J10_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J10_decay, ':d', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J10_decay, '-*', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
 if run_UPGA_J20_decay == 1:
     plt.plot(snr_dB_list, rate_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
-# if run_UPGA_J_GradReuse == 1:
-#     plt.plot(snr_dB_list, rate_UPGA_J_GradReuse, ':^', color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
-# if benchmark == 1:
-#     plt.plot(snr_dB_list, rate_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
-#     plt.plot(snr_dB_list, rate_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
 
-system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
+# system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
 # plt.title(system_params)
-plt.xlabel('SNR [dB]')
-plt.ylabel(r'$R$ [bits/s/Hz]')
+plt.xlabel('SNR [dB]', fontsize=14)
+plt.ylabel(r'$R$ [bits/s/Hz]', fontsize=14)
 plt.grid()
-plt.legend(loc='upper left', labelspacing  = 0.15)
+plt.legend(loc='upper left', labelspacing  = 0.15, fontsize=12)
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
-
-
-
-plt.show()
 
 # plot CRB vs SNR ======================================================
 fig_CRB = plt.figure(2)
 plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_conv_PGA == 1:
-    plt.plot(snr_dB_list, CRB_conv_PGA, '--', color='blue', linewidth=3, markersize=7, label=label_UPGA_J1)
+    plt.plot(snr_dB_list, CRB_conv_PGA, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA)
 if run_conv_PGA_J5 == 1:
-    plt.plot(snr_dB_list, CRB_conv_PGA_J5, '--', color='cyan', linewidth=3, markersize=7, label=label_conv_PGA_J5)
+    plt.plot(snr_dB_list, CRB_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J5)
 if run_conv_PGA_J10 == 1:
-    plt.plot(snr_dB_list, CRB_conv_PGA_J10, '--', color='green', linewidth=3, markersize=7, label=label_conv_PGA_J10)
-
-
-
-
-
+    plt.plot(snr_dB_list, CRB_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J10)
 if run_UPGA_J5 == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J5, '-*', color='cyan', linewidth=3, markersize=7, label=label_UPGA_J5)
+    plt.plot(snr_dB_list, CRB_UPGA_J5, '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
 if run_UPGA_J10 == 1:
     plt.plot(snr_dB_list, CRB_UPGA_J10, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
     plt.plot(snr_dB_list, CRB_UPGA_J20, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
-
-# if run_UPGA_J10_PC == 1:
-#     plt.plot(snr_dB_list, CRB_UPGA_J10_PC, ':', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_PC)
-# if run_conv_PGA_J10_PC == 1:
-#     plt.plot(snr_dB_list, CRB_conv_PGA_J10_PC, ':', color='orange', linewidth=3, markersize=7, label=label_conv_PGA_J10_PC)
-
 if run_UPGA_J5_decay == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J5_decay, ':d', color='cyan', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+    plt.plot(snr_dB_list, CRB_UPGA_J5_decay, '--', color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
 if run_UPGA_J10_decay == 1:
-    plt.plot(snr_dB_list, CRB_UPGA_J10_decay, ':d', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    plt.plot(snr_dB_list, CRB_UPGA_J10_decay, '-*', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
 if run_UPGA_J20_decay == 1:
     plt.plot(snr_dB_list, CRB_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
-# if run_UPGA_J_GradReuse == 1:
-#     plt.plot(snr_dB_list, CRB_UPGA_J_GradReuse, ':^', color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
-# if benchmark == 1:
-#     plt.plot(snr_dB_list, CRB_SCA, '-x', color='black', linewidth=3, markersize=7, label=label_SCA)
-#     plt.plot(snr_dB_list, CRB_ZF, '-o', color='purple', linewidth=3, markersize=7, label=label_ZF)
 
-system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
+# system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
 # plt.title(system_params)
-plt.xlabel('SNR [dB]')
-plt.ylabel(r'$\mathrm{CRB}$')
+plt.xlabel('SNR [dB]', fontsize=14)
+plt.ylabel(r'$\mathrm{CRB}$', fontsize=14)
 plt.grid()
-plt.legend(loc='upper right', labelspacing  = 0.15)
+plt.legend(loc='upper right', labelspacing  = 0.15, fontsize=12)
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
 
-# Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
-print('Saving SNR-curve results to .mat file...')
-mat_data = {'snr_dB_list': snr_dB_list}
+# # Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
+# print('Saving SNR-curve results to .mat file...')
+# mat_data = {'snr_dB_list': snr_dB_list}
 
-if run_conv_PGA == 1:
-    mat_data['rate_conv_PGA_J1'] = rate_conv_PGA
-    mat_data['crb_conv_PGA_J1'] = CRB_conv_PGA
-    mat_data['obj_conv_PGA_J1'] = OMEGA * rate_conv_PGA + CRB_conv_PGA
-if run_conv_PGA_J5 == 1:
-    mat_data['rate_conv_PGA_J5'] = rate_conv_PGA_J5
-    mat_data['crb_conv_PGA_J5'] = CRB_conv_PGA_J5
-    mat_data['obj_conv_PGA_J5'] = OMEGA * rate_conv_PGA_J5 + CRB_conv_PGA_J5
-if run_conv_PGA_J10 == 1:
-    mat_data['rate_conv_PGA_J10'] = rate_conv_PGA_J10
-    mat_data['crb_conv_PGA_J10'] = CRB_conv_PGA_J10
-    mat_data['obj_conv_PGA_J10'] = OMEGA * rate_conv_PGA_J10 + CRB_conv_PGA_J10
+# if run_conv_PGA == 1:
+#     mat_data['rate_conv_PGA_J1'] = rate_conv_PGA
+#     mat_data['crb_conv_PGA_J1'] = CRB_conv_PGA
+#     mat_data['obj_conv_PGA_J1'] = OMEGA * rate_conv_PGA + CRB_conv_PGA
+# if run_conv_PGA_J5 == 1:
+#     mat_data['rate_conv_PGA_J5'] = rate_conv_PGA_J5
+#     mat_data['crb_conv_PGA_J5'] = CRB_conv_PGA_J5
+#     mat_data['obj_conv_PGA_J5'] = OMEGA * rate_conv_PGA_J5 + CRB_conv_PGA_J5
+# if run_conv_PGA_J10 == 1:
+#     mat_data['rate_conv_PGA_J10'] = rate_conv_PGA_J10
+#     mat_data['crb_conv_PGA_J10'] = CRB_conv_PGA_J10
+#     mat_data['obj_conv_PGA_J10'] = OMEGA * rate_conv_PGA_J10 + CRB_conv_PGA_J10
 
 
-if run_UPGA_J5 == 1:
-    mat_data['rate_UPGA_J5'] = rate_UPGA_J5
-    mat_data['crb_UPGA_J5'] = CRB_UPGA_J5
-    mat_data['obj_UPGA_J5'] = OMEGA * rate_UPGA_J5 + CRB_UPGA_J5
-if run_UPGA_J10 == 1:
-    mat_data['rate_UPGA_J10'] = rate_UPGA_J10
-    mat_data['crb_UPGA_J10'] = CRB_UPGA_J10
-    mat_data['obj_UPGA_J10'] = OMEGA * rate_UPGA_J10 + CRB_UPGA_J10
-if run_UPGA_J20 == 1:
-    mat_data['rate_UPGA_J20'] = rate_UPGA_J20
-    mat_data['crb_UPGA_J20'] = CRB_UPGA_J20
-    mat_data['obj_UPGA_J20'] = OMEGA * rate_UPGA_J20 + CRB_UPGA_J20
+# if run_UPGA_J5 == 1:
+#     mat_data['rate_UPGA_J5'] = rate_UPGA_J5
+#     mat_data['crb_UPGA_J5'] = CRB_UPGA_J5
+#     mat_data['obj_UPGA_J5'] = OMEGA * rate_UPGA_J5 + CRB_UPGA_J5
+# if run_UPGA_J10 == 1:
+#     mat_data['rate_UPGA_J10'] = rate_UPGA_J10
+#     mat_data['crb_UPGA_J10'] = CRB_UPGA_J10
+#     mat_data['obj_UPGA_J10'] = OMEGA * rate_UPGA_J10 + CRB_UPGA_J10
+# if run_UPGA_J20 == 1:
+#     mat_data['rate_UPGA_J20'] = rate_UPGA_J20
+#     mat_data['crb_UPGA_J20'] = CRB_UPGA_J20
+#     mat_data['obj_UPGA_J20'] = OMEGA * rate_UPGA_J20 + CRB_UPGA_J20
 
-if run_UPGA_J5_decay == 1:
-    mat_data['rate_UPGA_J5_decay'] = rate_UPGA_J5_decay
-    mat_data['crb_UPGA_J5_decay'] = CRB_UPGA_J5_decay
-    mat_data['obj_UPGA_J5_decay'] = OMEGA * rate_UPGA_J5_decay + CRB_UPGA_J5_decay
-if run_UPGA_J10_decay == 1:
-    mat_data['rate_UPGA_J10_decay'] = rate_UPGA_J10_decay
-    mat_data['crb_UPGA_J10_decay'] = CRB_UPGA_J10_decay
-    mat_data['obj_UPGA_J10_decay'] = OMEGA * rate_UPGA_J10_decay + CRB_UPGA_J10_decay
-if run_UPGA_J20_decay == 1:
-    mat_data['rate_UPGA_J20_decay'] = rate_UPGA_J20_decay
-    mat_data['crb_UPGA_J20_decay'] = CRB_UPGA_J20_decay
-    mat_data['obj_UPGA_J20_decay'] = OMEGA * rate_UPGA_J20_decay + CRB_UPGA_J20_decay
+# if run_UPGA_J5_decay == 1:
+#     mat_data['rate_UPGA_J5_decay'] = rate_UPGA_J5_decay
+#     mat_data['crb_UPGA_J5_decay'] = CRB_UPGA_J5_decay
+#     mat_data['obj_UPGA_J5_decay'] = OMEGA * rate_UPGA_J5_decay + CRB_UPGA_J5_decay
+# if run_UPGA_J10_decay == 1:
+#     mat_data['rate_UPGA_J10_decay'] = rate_UPGA_J10_decay
+#     mat_data['crb_UPGA_J10_decay'] = CRB_UPGA_J10_decay
+#     mat_data['obj_UPGA_J10_decay'] = OMEGA * rate_UPGA_J10_decay + CRB_UPGA_J10_decay
+# if run_UPGA_J20_decay == 1:
+#     mat_data['rate_UPGA_J20_decay'] = rate_UPGA_J20_decay
+#     mat_data['crb_UPGA_J20_decay'] = CRB_UPGA_J20_decay
+#     mat_data['obj_UPGA_J20_decay'] = OMEGA * rate_UPGA_J20_decay + CRB_UPGA_J20_decay
 # if run_UPGA_J_GradReuse == 1:
 #     mat_data['rate_UPGA_J_GradReuse'] = rate_UPGA_J_GradReuse
 #     mat_data['crb_UPGA_J_GradReuse'] = CRB_UPGA_J_GradReuse
