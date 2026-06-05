@@ -1,4 +1,5 @@
 from PGA_models import *
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -521,36 +522,88 @@ if plot_figure == 1:
 
     # ==================================== CRB (outer iters only) ================================================
     plt.figure()
+    ax = plt.gca()
+
+    curves = []
+
     if run_conv_PGA == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_conv_PGA_J1[outer_idx_J1]), '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=1)')
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_conv_PGA_J1[outer_idx_J1]), '--', 'blue', 'PGA (J=1)'))
+
     if run_conv_PGA_J5 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_conv_PGA_J5[outer_idx_J5]), '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=5)')
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_conv_PGA_J5[outer_idx_J5]), '--', 'blue', 'PGA (J=5)'))
+
     if run_conv_PGA_J10 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_conv_PGA_J10[outer_idx_J10]) , '-*', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=10)')
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_conv_PGA_J10[outer_idx_J10]), '-*', 'blue', 'PGA (J=10)'))
+
     if run_UPGA_J5 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J5[outer_idx_J5]), '--', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_UPGA_J5[outer_idx_J5]), '--', 'red', label_UPGA_J5))
+
     if run_UPGA_J10 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J10[outer_idx_J10]), '-*', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_UPGA_J10[outer_idx_J10]), '-*', 'red', label_UPGA_J10))
+
     if run_UPGA_J20 == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J20[outer_idx_J20]), ':s', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_UPGA_J20[outer_idx_J20]), ':s', 'red', label_UPGA_J20))
+
     if run_UPGA_J10_RMSProp == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J10_RMSProp[outer_idx_J10]), ':', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, RMSProp)')
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_UPGA_J10_RMSProp[outer_idx_J10]), ':', 'green', 'PGA (J=10, RMSProp)'))
+
     if run_UPGA_J10_PRCDN == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J10_PRCDN[outer_idx_J10]), ':*', markevery=5, color='green', linewidth=3, markersize=7, label='PGA (J=10, PRCDN)')
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_UPGA_J10_PRCDN[outer_idx_J10]), ':*', 'green', 'PGA (J=10, PRCDN)'))
+
     if run_UPGA_J5_decay == 1:
-        plt.plot(iter_outer_x_J5_decay, 1/ np.exp(crb_iter_UPGA_J5_decay[outer_idx_J5_decay]), '--', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+        curves.append((iter_outer_x_J5_decay, 1 / np.exp(crb_iter_UPGA_J5_decay[outer_idx_J5_decay]), '--', 'purple', label_UPGA_J5_decay))
+
     if run_UPGA_J10_decay == 1:
-        plt.plot(iter_outer_x_J10_decay, 1/ np.exp(crb_iter_UPGA_J10_decay[outer_idx_J10_decay]), '-*', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+        curves.append((iter_outer_x_J10_decay, 1 / np.exp(crb_iter_UPGA_J10_decay[outer_idx_J10_decay]), '-*', 'purple', label_UPGA_J10_decay))
+
     if run_UPGA_J20_decay == 1:
-        plt.plot(iter_outer_x_J20_decay, 1/ np.exp(crb_iter_UPGA_J20_decay[outer_idx_J20_decay]), '-', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+        curves.append((iter_outer_x_J20_decay, 1 / np.exp(crb_iter_UPGA_J20_decay[outer_idx_J20_decay]), '-', 'purple', label_UPGA_J20_decay))
+
     if run_UPGA_J_GradReuse == 1:
-        plt.plot(iter_outer_x, 1/ np.exp(crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]), ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
-    plt.ylabel('CRLB', fontsize=14)
-    plt.grid()
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_UPGA_J_GradReuse[outer_idx_J_GradReuse]), ':^', 'teal', label_UPGA_J_GradReuse))
+
+    # Main plot
+    for x, y, style, color, label in curves:
+        ax.plot(x, y,style,markevery=5,color=color,linewidth=3,markersize=7,label=label)
+
+    ax.set_xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
+    ax.set_ylabel('CRLB', fontsize=14)
+    ax.grid(True)
+
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
-    plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+
+    # Inset zoom
+    axins = inset_axes(ax,width="42%",height="38%",loc="upper right", borderpad=1.2)
+
+    for x, y, style, color, label in curves:
+        axins.plot(x, y,style,markevery=5,color=color,linewidth=2,markersize=5)
+
+    # Zoom region: outer layers 80 to 100
+    axins.set_xlim(80, 100)
+
+    # Automatically choose y-limits from values inside x=[80,100]
+    zoom_y_values = []
+    for x, y, style, color, label in curves:
+        x_arr = np.asarray(x)
+        y_arr = np.asarray(y)
+        mask = (x_arr >= 80) & (x_arr <= 100)
+        if np.any(mask):
+            zoom_y_values.extend(y_arr[mask])
+
+    if len(zoom_y_values) > 0:
+        y_min = np.min(zoom_y_values)
+        y_max = np.max(zoom_y_values)
+        y_pad = 0.12 * (y_max - y_min)
+        axins.set_ylim(y_min - y_pad, y_max + y_pad)
+
+    axins.grid(True)
+    axins.tick_params(axis='both', labelsize=9)
+
+    # Draw box and connector lines
+    mark_inset(ax,axins,loc1=2,loc2=4,fc="none",ec="0.4",linewidth=1.2)
+
+    plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png',bbox_inches='tight',pad_inches=0.02)
+    plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps',bbox_inches='tight',pad_inches=0.02)
 
     # ===================== OBJECTIVE (outer iters only) =============================================
     plt.figure()
