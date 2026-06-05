@@ -652,7 +652,7 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, ':^', markevery=5, color='teal', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
     plt.ylabel(r'$\omega R + \text{CRLB}^{-1}$', fontsize=14)
-    plt.title("Objective function vs Iterations", fontsize=14)
+    # plt.title("Objective function vs Iterations", fontsize=14)
     plt.grid()
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png',bbox_inches='tight',pad_inches=0.02)
@@ -670,11 +670,11 @@ if plot_figure == 1:
         plt.plot(iter_outer_x_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
     plt.ylabel(r'Gradient norm', fontsize=14)
-    plt.title("Gradient Norm vs Iterations", fontsize=14)
+    # plt.title("Gradient Norm vs Iterations", fontsize=14)
     plt.grid()
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
-    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
+    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
     # # ===================== SAVE OUTER-ITER RESULTS TO .mat FOR MATLAB =====================
     # print('Saving outer-iteration results to .mat file...')
     # mat_data = {'iter_outer_x': iter_outer_x}
