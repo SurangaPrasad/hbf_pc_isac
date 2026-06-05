@@ -570,10 +570,11 @@ if plot_figure == 1:
     ax.set_ylabel('CRLB', fontsize=14)
     ax.grid(True)
 
-    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
+    
 
     # Inset zoom
     axins = inset_axes(ax,width="42%",height="38%",loc="upper right", borderpad=1.2)
+    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
 
     for x, y, style, color, label in curves:
         axins.plot(x, y,style,markevery=5,color=color,linewidth=2,markersize=5)
