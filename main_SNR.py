@@ -235,18 +235,13 @@ axins.set_ylim(
 
 axins.grid(True)
 axins.tick_params(labelsize=8)
+axins.patch.set_alpha(1.0)
+axins.patch.set_facecolor("white")
 
-mark_inset(
-    ax,
-    axins,
-    loc1=2,
-    loc2=4,
-    fc="none",
-    ec="0.4",
-    linewidth=1
-)
+mark_inset(ax, axins, loc1=2, loc2=4, fc="white", ec="0.4", linewidth=1)
 
-
+plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02, transparent=False)
+plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02, transparent=False)
 # # Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
 # print('Saving SNR-curve results to .mat file...')
 # mat_data = {'snr_dB_list': snr_dB_list}

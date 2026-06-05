@@ -665,10 +665,10 @@ if plot_figure == 1:
     fig_grad = plt.figure(6)
     if run_UPGA_J5_decay == 1:
         grad_norms_J5_decay = np.array(gradient_norm_history_UPGA_J5_decay)
-        plt.plot(iter_outer_x_J5_decay, grad_norms_J5_decay, '--', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+        plt.plot(iter_outer_x_J5_decay, grad_norms_J5_decay, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
     if run_UPGA_J10_decay == 1:
         grad_norms_J10_decay = np.array(gradient_norm_history_UPGA_J10_decay)
-        plt.plot(iter_outer_x_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+        plt.plot(iter_outer_x_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
     plt.ylabel(r'Gradient norm', fontsize=14)
     # plt.title("Gradient Norm vs Iterations", fontsize=14)
