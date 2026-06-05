@@ -139,11 +139,11 @@ if run_UPGA_J20 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J20, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     plt.plot(snr_dB_list, rate_conv_PGA, ':', color='black', linewidth=3, markersize=7, label=label_conv)
 if run_UPGA_J5_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J5_decay, '--', color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J5_decay, '--', color='green', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
 if run_UPGA_J10_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J10_decay, '-*', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J10_decay, '-*', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
 if run_UPGA_J20_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J20_decay, ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J20_decay, ':p', color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
 
 # system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
 # plt.title(system_params)
@@ -170,11 +170,11 @@ if run_UPGA_J10 == 1:
 if run_UPGA_J20 == 1:
     plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20)), '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
 if run_UPGA_J5_decay == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5_decay)), '--', color='purple', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5_decay)), '--', color='green', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
 if run_UPGA_J10_decay == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10_decay)), '-*', color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10_decay)), '-*', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
 if run_UPGA_J20_decay == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20_decay)), ':p', color='brown', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20_decay)), ':p', color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
 
 # system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
 # plt.title(system_params)
