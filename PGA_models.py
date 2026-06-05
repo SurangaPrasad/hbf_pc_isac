@@ -479,6 +479,7 @@ class PGA_Unfold_JX_decay(nn.Module):
         self.inner_iter_history = list(inner_iter_history)
         # print("Adaptive inner iterations:", inner_iter_history)
         # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
+        # print("Gradient norms at outer iterations:", gradient_norm_history)
 
         return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W, gradient_norm_history) 
 
