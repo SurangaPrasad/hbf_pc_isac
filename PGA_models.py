@@ -316,6 +316,7 @@ class PGA_Unfold_JX_decay(nn.Module):
         super().__init__()
 
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+        self.J_min = 2  # minimum inner iterations to ensure some optimization progress
         self.inner_iter_history = []
 
         # Adaptive scheduling hyperparameter
