@@ -483,8 +483,8 @@ if plot_figure == 1:
     plt.ylabel('$R$ [bits/s/Hz]', fontsize=14)
     plt.grid()
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
-    plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+    plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
+    plt.savefig(directory_result + 'rate_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
     # ==================================== inverse CRB (outer iters only) ================================================
     # plt.figure()
@@ -655,8 +655,8 @@ if plot_figure == 1:
     plt.title("Objective function vs Iterations", fontsize=14)
     plt.grid()
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
-    plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png')
-    plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+    plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png',bbox_inches='tight',pad_inches=0.02)
+    plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps',bbox_inches='tight',pad_inches=0.02)
 
 
     # =======================Plot Gradient Norms (inner iters)========================================
