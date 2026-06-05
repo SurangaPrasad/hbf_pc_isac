@@ -191,7 +191,7 @@ if run_program == 1:
         model_UPGA_J5_decay.load_state_dict(torch.load(model_file_name_UPGA_J5_decay, map_location=device))
         register_step_size('UPGA (J=5, decay)', model_UPGA_J5_decay.step_size)
 
-        sum_rate_UPGA_J5_decay, crb_UPGA_J5_decay, power_UPGA_J5_decay, F_UPGA_J5_decay, W_UPGA_J5_decay = model_UPGA_J5_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J5_decay, crb_UPGA_J5_decay, power_UPGA_J5_decay, F_UPGA_J5_decay, W_UPGA_J5_decay, gradient_norm_history_UPGA_J5_decay = model_UPGA_J5_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J5)
@@ -207,7 +207,7 @@ if run_program == 1:
         model_UPGA_J10_decay.load_state_dict(torch.load(model_file_name_UPGA_J10_decay, map_location=device))
         register_step_size('UPGA (J=10, decay)', model_UPGA_J10_decay.step_size)
 
-        sum_rate_UPGA_J10_decay, crb_UPGA_J10_decay, power_UPGA_J10_decay, F_UPGA_J10_decay, W_UPGA_J10_decay = model_UPGA_J10_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J10_decay, crb_UPGA_J10_decay, power_UPGA_J10_decay, F_UPGA_J10_decay, W_UPGA_J10_decay, gradient_norm_history_UPGA_J10_decay = model_UPGA_J10_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J10)
@@ -222,7 +222,7 @@ if run_program == 1:
         model_UPGA_J20_decay.load_state_dict(torch.load(model_file_name_UPGA_J20_decay, map_location=device))
         register_step_size('UPGA (J=20, decay)', model_UPGA_J20_decay.step_size)
 
-        sum_rate_UPGA_J20_decay, crb_UPGA_J20_decay, power_UPGA_J20_decay, F_UPGA_J20_decay, W_UPGA_J20_decay = model_UPGA_J20_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J20_decay, crb_UPGA_J20_decay, power_UPGA_J20_decay, F_UPGA_J20_decay, W_UPGA_J20_decay, gradient_norm_history_UPGA_J20_decay = model_UPGA_J20_decay.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J20)

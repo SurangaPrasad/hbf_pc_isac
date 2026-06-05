@@ -332,47 +332,27 @@ class PGA_Unfold_JX_decay(nn.Module):
         # Shape: (n_outer, J+1, B)
         # [:, 0:J, :] = metrics after inner F-updates
         # [:, -1, :]  = metrics after W-update
-        rate_over_iters = torch.zeros(
-            n_iter_outer, n_iter_inner + 1, B, device=H.device
-        )
-        crb_over_iters = torch.zeros(
-            n_iter_outer, n_iter_inner + 1, B, device=H.device
-        )
-        power_over_iters = torch.zeros(
-            n_iter_outer, n_iter_inner + 1, B, device=H.device
-        )
+        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
-        def _n_inner(ii, n_iter_outer):
-            """
-            Outer-layer-based adaptive inner iteration decay.
+        def _n_inner_from_grad(grad_F_J):
 
-            Starts from max_inner at the first outer iteration and gradually
-            decays to min_inner at the last outer iteration.
-            """
+            J_max = self.step_size.shape[0]
+            J_min = min(self.J_min, J_max)
 
-            max_inner = self.step_size.shape[0]   # J
-            min_inner = 2                         # use 1 if you want to end at 1
+            Nt = F.shape[-2]
+            Nrf = F.shape[-1]
 
-            beta = 1.5                            # decay sharpness
-                                                # beta > 1: slower early decay
-                                                # beta = 1: linear decay
-                                                # beta < 1: faster early decay
+            g_i = torch.linalg.norm(grad_F_J.reshape(grad_F_J.shape[0], -1), dim=1) / (torch.sqrt(torch.tensor(Nt * Nrf, device=grad_F_J.device, dtype=grad_F_J.real.dtype)) + self.eps)
+            g_i = torch.mean(g_i)
+            r_i = g_i / (g_i + self.alpha)
 
-            if n_iter_outer <= 1:
-                return max_inner
+            n_inner = int(torch.ceil(J_max * r_i).item())
 
-            progress = ii / (n_iter_outer - 1)
+            n_inner = max(J_min, min(J_max, n_inner))
 
-            decay_ratio = (1.0 - progress) ** beta
-
-            n_inner = int(torch.ceil(
-                torch.tensor(
-                    min_inner + (max_inner - min_inner) * decay_ratio,
-                    device=self.step_size.device
-                )
-            ).item())
-
-            return max(min_inner, min(max_inner, n_inner))
+            return n_inner
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
 
@@ -387,18 +367,13 @@ class PGA_Unfold_JX_decay(nn.Module):
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                 delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
 
-                F = (
-                    F
-                    + delta_F_com * WEIGHT_F_COM
-                    + delta_F_crb * WEIGHT_F_CRB
-                )
-
+                F = (F+ delta_F_com * WEIGHT_F_COM+ delta_F_crb * WEIGHT_F_CRB)
                 F = normalize_power(F, W, H, Pt)
 
             return F
 
         inner_iter_history = []
-
+        gradient_norm_history = []
         for ii in range(n_iter_outer):
 
             # ----------------------------------------------------
@@ -411,11 +386,13 @@ class PGA_Unfold_JX_decay(nn.Module):
                 print('Error NaN gradients before adaptive J!!!!!!!!!!!!!!!')
 
             # Adaptive inner iteration count
-            n_inner = _n_inner(ii, n_iter_outer)
+            grad_F_J = WEIGHT_F_COM * grad_F_com + WEIGHT_F_CRB * grad_F_crb
+            n_inner = _n_inner_from_grad(grad_F_J)
             # n_inner = self.step_size.shape[0]
             if track_metrics:
 
                 inner_iter_history.append(n_inner)
+                gradient_norm_history.append(torch.linalg.norm(grad_F_J.reshape(grad_F_J.shape[0], -1), dim=1).mean().item())
 
                 # Run inner loop without checkpoint so that metrics
                 # can be recorded after each active inner update.
@@ -430,35 +407,18 @@ class PGA_Unfold_JX_decay(nn.Module):
                     delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                     delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
 
-                    F = (
-                        F
-                        + delta_F_com * WEIGHT_F_COM
-                        + delta_F_crb * WEIGHT_F_CRB
-                    )
+                    F = (F+ delta_F_com * WEIGHT_F_COM+ delta_F_crb * WEIGHT_F_CRB)
 
                     # Scale F only, consistent with training path
                     F = normalize_power(F, W, H, Pt)
 
                     rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[ii, jj] = get_crb_fe(
-                        H, F, W, xi_0, A_dot, R_N_inv, Pt
-                    ).detach()
+                    crb_over_iters[ii, jj] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                     power_over_iters[ii, jj] = get_power(F, W).detach()
 
             else:
 
-                F = checkpoint(
-                    inner_f_update,
-                    F,
-                    W,
-                    H,
-                    xi_0,
-                    A_dot,
-                    R_N_inv,
-                    n_inner,
-                    Pt,
-                    use_reentrant=False
-                )
+                F = checkpoint(inner_f_update,F,W,H,xi_0,A_dot,R_N_inv,n_inner,Pt,use_reentrant=False)
 
             # Projection of analog precoder
             F = project_unit_modulus(F)
@@ -469,11 +429,7 @@ class PGA_Unfold_JX_decay(nn.Module):
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
 
-            W_new = (
-                W
-                + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM
-                + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB
-            )
+            W_new = (W+ self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM+ self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB)
 
             # Projection / normalization
             F, W = normalize(F, W_new, H, Pt)
@@ -482,9 +438,7 @@ class PGA_Unfold_JX_decay(nn.Module):
             if track_metrics:
 
                 rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, -1] = get_crb_fe(
-                    H, F, W, xi_0, A_dot, R_N_inv, Pt
-                ).detach()
+                crb_over_iters[ii, -1] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                 power_over_iters[ii, -1] = get_power(F, W).detach()
 
         # --------------------------------------------------------
@@ -516,29 +470,15 @@ class PGA_Unfold_JX_decay(nn.Module):
 
             # No per-inner metrics are tracked on this path,
             # so retain the fixed rectangular layout.
-            rates = rate_over_iters.reshape(
-                n_iter_outer * (n_iter_inner + 1), B
-            ).detach()
-
-            crb_fes = crb_over_iters.reshape(
-                n_iter_outer * (n_iter_inner + 1), B
-            ).detach()
-
-            power_fes = power_over_iters.reshape(
-                n_iter_outer * (n_iter_inner + 1), B
-            ).detach()
+            rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+            crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+            power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
 
         self.inner_iter_history = list(inner_iter_history)
         # print("Adaptive inner iterations:", inner_iter_history)
         # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
 
-        return (
-            rates.transpose(0, 1),
-            crb_fes.transpose(0, 1),
-            power_fes.transpose(0, 1),
-            F,
-            W
-        )
+        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W), gradient_norm_history
 
 
 # PGA_Unfold_J20_decay is identical to PGA_Unfold_J10_decay.
