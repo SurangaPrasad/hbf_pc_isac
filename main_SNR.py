@@ -1,5 +1,7 @@
 from algorithms import *
 import scipy.io
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+import numpy as np
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -155,35 +157,94 @@ plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.p
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
 # plot CRB vs SNR ======================================================
-fig_CRB = plt.figure(2)
-plt.rcParams["figure.figsize"] = (6.4, 4.0)
-if run_conv_PGA == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA)), '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA)
-if run_conv_PGA_J5 == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA_J5)), '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J5)
-if run_conv_PGA_J10 == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA_J10)), '-*', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J10)
-if run_UPGA_J5 == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5)), '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
-if run_UPGA_J10 == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10)), '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
-if run_UPGA_J20 == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20)), '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
-if run_UPGA_J5_decay == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5_decay)), '--', color='green', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
-if run_UPGA_J10_decay == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10_decay)), '-*', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
-if run_UPGA_J20_decay == 1:
-    plt.plot(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20_decay)), ':p', color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
 
-# system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
-# plt.title(system_params)
-plt.xlabel('SNR [dB]', fontsize=14)
-plt.ylabel(r'$\mathrm{CRB}$', fontsize=14)
-plt.grid()
-plt.legend(loc='upper right', labelspacing  = 0.15, fontsize=12)
-plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
-plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+def plot_curve(x, y, style, color, label=None, lw=3, ms=7, ax=None):
+    if ax is None:
+        ax = plt.gca()
+    ax.plot(x, y, style, color=color, linewidth=lw, markersize=ms, label=label)
+
+
+ax = plt.gca()
+
+# ==================== Inset ====================
+axins = inset_axes(
+    ax,
+    width="42%",
+    height="42%",
+    loc='upper right',
+    borderpad=1.2
+)
+
+# Plot the same curves again
+if run_conv_PGA == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA)), '--', 'blue', ax=axins)
+
+if run_conv_PGA_J5 == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA_J5)), '--', 'blue', ax=axins)
+
+if run_conv_PGA_J10 == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_conv_PGA_J10)), '-*', 'blue', ax=axins)
+
+if run_UPGA_J5 == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5)), '--', 'red', ax=axins)
+
+if run_UPGA_J10 == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10)), '-*', 'red', ax=axins)
+
+if run_UPGA_J20 == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20)), ':s', 'red', ax=axins)
+
+if run_UPGA_J5_decay == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J5_decay)), '--', 'green', ax=axins)
+
+if run_UPGA_J10_decay == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J10_decay)), '-*', 'green', ax=axins)
+
+if run_UPGA_J20_decay == 1:
+    plot_curve(snr_dB_list, 1/torch.exp(torch.tensor(CRB_UPGA_J20_decay)), ':p', 'green', ax=axins)
+
+# Zoom region
+axins.set_xlim(10, 12)
+
+# Automatically determine y-range
+zoom_vals = []
+
+datasets = [
+    run_conv_PGA,          lambda: 1/torch.exp(torch.tensor(CRB_conv_PGA)),
+    run_conv_PGA_J5,       lambda: 1/torch.exp(torch.tensor(CRB_conv_PGA_J5)),
+    run_conv_PGA_J10,      lambda: 1/torch.exp(torch.tensor(CRB_conv_PGA_J10)),
+    run_UPGA_J5,           lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J5)),
+    run_UPGA_J10,          lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J10)),
+    run_UPGA_J20,          lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J20)),
+    run_UPGA_J5_decay,     lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J5_decay)),
+    run_UPGA_J10_decay,    lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J10_decay)),
+    run_UPGA_J20_decay,    lambda: 1/torch.exp(torch.tensor(CRB_UPGA_J20_decay))
+]
+
+for i in range(0, len(datasets), 2):
+    if datasets[i]:
+        zoom_vals.extend(np.array(datasets[i+1]())[-2:])
+
+ymin = np.min(zoom_vals)
+ymax = np.max(zoom_vals)
+
+axins.set_ylim(
+    ymin - 0.15*(ymax-ymin),
+    ymax + 0.15*(ymax-ymin)
+)
+
+axins.grid(True)
+axins.tick_params(labelsize=8)
+
+mark_inset(
+    ax,
+    axins,
+    loc1=2,
+    loc2=4,
+    fc="none",
+    ec="0.4",
+    linewidth=1
+)
 
 
 # # Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
