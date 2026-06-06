@@ -57,10 +57,9 @@ if run_conv_PGA == 1:
 
 # ====================================================== Unfolded PGA with J = 1 ====================================
 if run_UPGA_J1 == 1:
-
     model_UPGA_J1 = PGA_Unfold_JX(step_size_UPGA_J1)
-    optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J1)
-    # optimizer = torch.optim.Adam(model_UPGA_J1.parameters(), lr=learning_rate)
+    # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J1)
+    optimizer = torch.optim.Adam(model_UPGA_J1.parameters(), lr=learning_rate)
 
     epoch_losses = [] # To store average loss per epoch
 
@@ -84,15 +83,13 @@ if run_UPGA_J1 == 1:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # clip_gradients(model_UPGA_J1)
-            # optimizer.step()
             
             # .item() is critical to keep memory usage low!
             batch_losses.append(loss.item())
 
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
-        scheduler.step(avg_loss)
+        # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA_J1.state_dict(), model_file_name_UPGA_J1)
@@ -104,7 +101,7 @@ if run_UPGA_J1 == 1:
     plt.xlabel('Epoch')
     plt.ylabel('Average Loss')
     plt.grid(True)
-    plt.savefig(directory_data + "training_loss_UPGA_J5.png")
+    plt.savefig(directory_data + "training_loss_UPGA_J1.png")
 # ============================================================= proposed unfolding PGA =================================
 if run_UPGA_J20 == 1:
     model_UPGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
