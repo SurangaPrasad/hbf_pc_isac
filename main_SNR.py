@@ -128,7 +128,7 @@ for ss in range(len(snr_dB_list)):
 fig_rate = plt.figure(1)
 plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_conv_PGA == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA)
+    plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=7, label='Conventional PGA')
 if run_conv_PGA_J5 == 1:
     plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J5)
 if run_conv_PGA_J10 == 1:
@@ -177,7 +177,7 @@ def plot_curve(x, y, style, color, label=None, lw=3, ms=7, ax=None):
 curves = []
 
 if run_conv_PGA == 1:
-    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA), '--', 'blue', label_conv_PGA))
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA), '--', 'black', 'Conventional PGA'))
 
 if run_conv_PGA_J5 == 1:
     curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J5), '--', 'blue', label_conv_PGA_J5))

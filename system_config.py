@@ -11,7 +11,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
-run_conv_PGA = 0           # Conventional PGA without unfolding
+run_conv_PGA = 1           # Conventional PGA without unfolding
 run_conv_PGA_J5 = 1        # Conventional PGA with setting J = 5
 run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0

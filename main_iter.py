@@ -527,7 +527,7 @@ if plot_figure == 1:
     curves = []
 
     if run_conv_PGA == 1:
-        curves.append((iter_outer_x, 1 / np.exp(crb_iter_conv_PGA_J1[outer_idx_J1]), '--', 'blue', 'PGA (J=1)'))
+        curves.append((iter_outer_x, 1 / np.exp(crb_iter_conv_PGA_J1[outer_idx_J1]), '--', 'black', 'Conventional PGA'))
 
     if run_conv_PGA_J5 == 1:
         curves.append((iter_outer_x, 1 / np.exp(crb_iter_conv_PGA_J5[outer_idx_J5]), '--', 'blue', 'PGA (J=5)'))
@@ -611,7 +611,7 @@ if plot_figure == 1:
     fig_obj = plt.figure(5)
     if run_conv_PGA == 1:
         obj_iter_conv_PGA_J1 = OMEGA * rate_iter_conv_PGA_J1 + crb_iter_conv_PGA_J1
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=1)')
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='black', linewidth=3, markersize=7, label='Conventional PGA')
     if run_UPGA_J1 == 1:
         obj_iter_UPGA_J1 = OMEGA * rate_iter_UPGA_J1[outer_idx_J1] + crb_iter_UPGA_J1
         plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
@@ -665,7 +665,7 @@ if plot_figure == 1:
     fig_grad = plt.figure(6)
     if run_conv_PGA == 1:
         grad_norms_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1)
-        plt.plot(iter_outer_x, grad_norms_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=7, label='PGA (J=1)')
+        plt.plot(iter_outer_x, grad_norms_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=7, label='Conventional PGA')
     if run_conv_PGA_J5 == 1:
         grad_norms_conv_J5 = np.array(gradient_norm_history_conv_PGA_J5)
         plt.plot(iter_outer_x, grad_norms_conv_J5, '--', markevery=5, color='blue', linewidth=3, markersize=7, label='PGA (J=5)')
