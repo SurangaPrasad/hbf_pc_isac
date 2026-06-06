@@ -51,7 +51,7 @@ init_scheme = 'svd'  # proposed initialization for best convergence
 
 system_config = str(Nt) + "TX_" + str(M) + "UE_" + str(Nrf) + "RF"
 
-OMEGA = 4
+OMEGA = 0.25
 
 
 
@@ -73,10 +73,10 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 # ============================ TUNING PARAMETERS ===========================
 WEIGHT_F_RAD = OMEGA  # fixed
 WEIGHT_W_RAD = OMEGA / Nt * K
-WEIGHT_F_COM = 1  
-WEIGHT_W_COM = 1 
-WEIGHT_F_CRB = OMEGA
-WEIGHT_W_CRB = OMEGA
+WEIGHT_F_COM = OMEGA  
+WEIGHT_W_COM = OMEGA 
+WEIGHT_F_CRB = 1
+WEIGHT_W_CRB = 1
 
 # ========================= CRB PARAMETERS =========================
 # xi_0 = 10 ** (-40 / 10) ## path loss at reference distance (1 m) in linear scale

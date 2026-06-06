@@ -304,14 +304,7 @@ class PGA_Unfold_JX(nn.Module):
         # print("Adaptive inner iterations:", inner_iter_history)
         # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
 
-        return (
-            rates.transpose(0, 1),
-            crb_fes.transpose(0, 1),
-            power_fes.transpose(0, 1),
-            F,
-            W,
-            gradient_norm_history,
-        )
+        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history)
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
@@ -1275,8 +1268,8 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97):
 
     mean_crb = torch.mean(crb)
 
-    # loss = -(OMEGA * sum_rate + mean_crb)
-    loss = -( sum_rate + OMEGA * mean_crb)
+    loss = -(OMEGA * sum_rate + mean_crb)
+    # loss = -( sum_rate + OMEGA * mean_crb)
 
     return loss
 
