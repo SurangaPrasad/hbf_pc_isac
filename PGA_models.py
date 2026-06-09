@@ -309,7 +309,7 @@ class PGA_Unfold_JX(nn.Module):
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
 
-    def __init__(self, step_size, alpha=0.01, eps=1e-12, J_min=2):
+    def __init__(self, step_size, alpha=0.04, eps=1e-12, J_min=2):
         super().__init__()
 
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)

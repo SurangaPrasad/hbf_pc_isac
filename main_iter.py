@@ -453,7 +453,7 @@ if plot_figure == 1:
     # ==================================== RATES (outer iters only) ================================================
     plt.figure()
     if run_conv_PGA == 1:
-        plt.plot(iter_outer_x, rate_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J1)
+        plt.plot(iter_outer_x, rate_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
     if run_conv_PGA_J5 == 1:
         plt.plot(iter_outer_x, rate_iter_conv_PGA_J5[outer_idx_J5], '--', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
     if run_conv_PGA_J10 == 1:

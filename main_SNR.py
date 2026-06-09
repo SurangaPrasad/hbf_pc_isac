@@ -128,11 +128,11 @@ for ss in range(len(snr_dB_list)):
 fig_rate = plt.figure(1)
 plt.rcParams["figure.figsize"] = (6.4, 4.0)
 if run_conv_PGA == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=7, label='Conventional PGA')
+    plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
 if run_conv_PGA_J5 == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J5)
+    plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
 if run_conv_PGA_J10 == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J10)
+    plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=7, label=Conv_PGA_J10)
 if run_UPGA_J5 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J5, '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
 if run_UPGA_J10 == 1:
@@ -177,13 +177,13 @@ def plot_curve(x, y, style, color, label=None, lw=3, ms=7, ax=None):
 curves = []
 
 if run_conv_PGA == 1:
-    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA), '--', 'black', 'Conventional PGA'))
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA), '--', 'black', Conv_PGA_J1))
 
 if run_conv_PGA_J5 == 1:
-    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J5), '--', 'blue', label_conv_PGA_J5))
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J5), '--', 'blue', Conv_PGA_J5))
 
 if run_conv_PGA_J10 == 1:
-    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J10), '-*', 'blue', label_conv_PGA_J10))
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J10), '-*', 'blue', Conv_PGA_J10))
 
 if run_UPGA_J5 == 1:
     curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5), '--', 'red', label_UPGA_J5))
