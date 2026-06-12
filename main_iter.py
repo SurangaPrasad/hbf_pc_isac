@@ -59,7 +59,7 @@ if run_program == 1:
         print('Running conventional PGA with J = 1...')
         model_conv_PGA_J1 = PGA_Unfold_JX(step_size_UPGA_J1)  # Reuse the same shape of step sizes as J1
         register_step_size('Conv PGA (J=1)', model_conv_PGA_J1.step_size)
-        rate_conv_PGA_J1, crb_conv_PGA_J1, power_conv_PGA_J1, F_conv_PGA_J1, W_conv_PGA_J1, gradient_norm_history_conv_PGA_J1 = model_conv_PGA_J1.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J1, crb_conv_PGA_J1, power_conv_PGA_J1, F_conv_PGA_J1, W_conv_PGA_J1, gradient_norm_history_conv_PGA_J1, gradient_norm_history_conv_PGA_J1_W = model_conv_PGA_J1.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J1)  # Use n_iter_inner_J1 as J=1
@@ -72,7 +72,7 @@ if run_program == 1:
         print('Running conventional PGA with J = 5...')
         model_conv_PGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)  # Reuse the same shape of step sizes as J5
         register_step_size('Conv PGA (J=5)', model_conv_PGA_J5.step_size)
-        rate_conv_PGA_J5, crb_conv_PGA_J5, power_conv_PGA_J5, F_conv_PGA_J5, W_conv_PGA_J5, gradient_norm_history_conv_PGA_J5 = model_conv_PGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J5, crb_conv_PGA_J5, power_conv_PGA_J5, F_conv_PGA_J5, W_conv_PGA_J5, gradient_norm_history_conv_PGA_J5, gradient_norm_history_conv_PGA_J5_W = model_conv_PGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J5)  # Use n_iter_inner_J5 as J=5
@@ -85,7 +85,7 @@ if run_program == 1:
         print('Running conventional PGA with J = 10...')
         model_conv_PGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
         register_step_size('Conv PGA (J=10)', model_conv_PGA_J10.step_size)
-        rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10, gradient_norm_history_conv_PGA_J10 = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10, gradient_norm_history_conv_PGA_J10, gradient_norm_history_conv_PGA_J10_W = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
@@ -99,7 +99,7 @@ if run_program == 1:
         print('Running conventional PGA with J = 20...')
         model_conv_PGA_J20 = PGA_Unfold_JX(step_size_UPGA_J20)
         register_step_size('Conv PGA (J=20)', model_conv_PGA_J20.step_size)
-        rate_conv_PGA_J20, crb_conv_PGA_J20, power_conv_PGA_J20, F_conv_PGA_J20, W_conv_PGA_J20, gradient_norm_history_conv_PGA_J20 = model_conv_PGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J20, crb_conv_PGA_J20, power_conv_PGA_J20, F_conv_PGA_J20, W_conv_PGA_J20, gradient_norm_history_conv_PGA_J20, gradient_norm_history_conv_PGA_J20_W = model_conv_PGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J20)
@@ -115,7 +115,7 @@ if run_program == 1:
         model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
         register_step_size('UPGA (J=1)', model_UPGA_J1.step_size)
 
-        sum_rate_UPGA_J1, crb_UPGA_J1, power_UPGA_J1, F_UPGA_J1, W_UPGA_J1, gradient_norm_history_UPGA_J1 = model_UPGA_J1.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J1, crb_UPGA_J1, power_UPGA_J1, F_UPGA_J1, W_UPGA_J1, gradient_norm_history_UPGA_J1, gradient_norm_history_UPGA_J1_W = model_UPGA_J1.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J1)
@@ -130,7 +130,7 @@ if run_program == 1:
         model_UPGA_J5.load_state_dict(torch.load(model_file_name_UPGA_J5, map_location=device))
         register_step_size('UPGA (J=5)', model_UPGA_J5.step_size)
 
-        sum_rate_UPGA_J5, crb_UPGA_J5, power_UPGA_J5, F_UPGA_J5, W_UPGA_J5, gradient_norm_history_UPGA_J5 = model_UPGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J5, crb_UPGA_J5, power_UPGA_J5, F_UPGA_J5, W_UPGA_J5, gradient_norm_history_UPGA_J5, gradient_norm_history_UPGA_J5_W = model_UPGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J5)
@@ -146,7 +146,7 @@ if run_program == 1:
         model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
         register_step_size('UPGA (J=10)', model_UPGA_J10.step_size)
 
-        sum_rate_UPGA_J10, crb_UPGA_J10, power_UPGA_J10, F_UPGA_J10, W_UPGA_J10, gradient_norm_history_UPGA_J10 = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_J10, crb_UPGA_J10, power_UPGA_J10, F_UPGA_J10, W_UPGA_J10, gradient_norm_history_UPGA_J10, gradient_norm_history_UPGA_J10_W = model_UPGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J10)
@@ -163,7 +163,7 @@ if run_program == 1:
         model_UPGA_J20.load_state_dict(torch.load(model_file_name_UPGA_J20, map_location=device))
         register_step_size('UPGA (J=20)', model_UPGA_J20.step_size)
 
-        sum_rate_UPGA_J20, crb_UPGA_J20,power_UPGA_J20, F_UPGA_J20, W_UPGA_J20, gradient_norm_history_UPGA_J20 = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
+        sum_rate_UPGA_J20, crb_UPGA_J20,power_UPGA_J20, F_UPGA_J20, W_UPGA_J20, gradient_norm_history_UPGA_J20, gradient_norm_history_UPGA_J20_W = model_UPGA_J20.execute_PGA(H_test, xi_0, A_dot, R_N_inv, snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J20)
         rate_iter_UPGA_J20 = sum_rate_UPGA_J20.mean(0).cpu().numpy()
@@ -643,8 +643,8 @@ if plot_figure == 1:
 
 
     # =======================Plot Gradient Norms (inner iters)========================================
-    plt.figure()
-    fig_grad = plt.figure(6)
+    
+    fig_grad = plt.figure(6, figsize=(6.5, 3.2))
     if run_conv_PGA == 1:
         grad_norms_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1)
         plt.plot(iter_outer_x, grad_norms_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
@@ -676,6 +676,37 @@ if plot_figure == 1:
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
     plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
     plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
+
+    # ======================Plot Gradient Norms w.r.t. W========================================
+
+    fig_grad_W = plt.figure(7, figsize=(6.5, 3.2))
+    if run_conv_PGA == 1:
+        grad_norms_W_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1_W)
+        plt.plot(iter_outer_x, grad_norms_W_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
+    if run_conv_PGA_J5 == 1:
+        grad_norms_W_conv_J5 = np.array(gradient_norm_history_conv_PGA_J5_W)
+        plt.plot(iter_outer_x, grad_norms_W_conv_J5, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
+    if run_conv_PGA_J10 == 1:
+        grad_norms_W_conv_J10 = np.array(gradient_norm_history_conv_PGA_J10_W)
+        plt.plot(iter_outer_x, grad_norms_W_conv_J10, '--', markevery=5, color='red', linewidth=3, markersize=7, label=Conv_PGA_J10)
+    if run_UPGA_J1 == 1:
+        grad_norms_W_UPGA_J1 = np.array(gradient_norm_history_UPGA_J1_W)
+        plt.plot(iter_outer_x, grad_norms_W_UPGA_J1, '-d', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_J1)
+    if run_UPGA_J5 == 1:
+        grad_norms_W_UPGA_J5 = np.array(gradient_norm_history_UPGA_J5_W)
+        plt.plot(iter_outer_x, grad_norms_W_UPGA_J5, '-d', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J5)
+    if run_UPGA_J10 == 1:
+        grad_norms_W_UPGA_J10 = np.array(gradient_norm_history_UPGA_J10_W)
+        plt.plot(iter_outer_x, grad_norms_W_UPGA_J10, '-d', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    
+    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
+    plt.ylabel(r'Gradient norm w.r.t. $\mathbf{W}$', fontsize=14)
+    # plt.title("Gradient Norm vs Iterations", fontsize=14)
+    plt.grid()
+    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
+    plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
+    plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
+
     # # ===================== SAVE OUTER-ITER RESULTS TO .mat FOR MATLAB =====================
     # print('Saving outer-iteration results to .mat file...')
     # mat_data = {'iter_outer_x': iter_outer_x}

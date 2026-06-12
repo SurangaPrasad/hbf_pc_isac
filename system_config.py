@@ -57,7 +57,7 @@ OMEGA = 0.25
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 112 * 2    # size of training set
-test_size = 1     # size of testing set
+test_size = 50     # size of testing set
 batch_size = len(snr_dB_list) * 4
 n_epoch = 20         # number of training epochs
 learning_rate = 0.0005 # learning 

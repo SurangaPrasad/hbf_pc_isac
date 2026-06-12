@@ -184,6 +184,7 @@ class PGA_Unfold_JX(nn.Module):
 
         inner_iter_history = []
         gradient_norm_history = []
+        gradient_norm_history_W = []
         # print(f'Number of inner iterations: {self.step_size.shape[0]}')
         for ii in range(n_iter_outer):
 
@@ -205,7 +206,7 @@ class PGA_Unfold_JX(nn.Module):
 
                 inner_iter_history.append(n_inner)
                 gradient_norm_history.append(torch.linalg.norm(grad_J_com.reshape(grad_J_com.shape[0], -1), dim=1).mean().item())
-
+                # gradient_norm_history_W.append(torch.linalg.norm(grad_W_k_com.reshape(grad_W_k_com.shape[0], -1), dim=1).mean().item())
                 # Run inner loop without checkpoint so that metrics
                 # can be recorded after each active inner update.
                 for jj in range(n_inner):
@@ -240,6 +241,8 @@ class PGA_Unfold_JX(nn.Module):
             # ----------------------------------------------------
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+            grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
+            gradient_norm_history_W.append(torch.linalg.norm(grad_J_w.reshape(grad_J_w.shape[0], -1), dim=1).mean().item())
 
             W_new = (
                 W
@@ -304,7 +307,7 @@ class PGA_Unfold_JX(nn.Module):
         # print("Adaptive inner iterations:", inner_iter_history)
         # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
 
-        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history)
+        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history, gradient_norm_history_W)
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
