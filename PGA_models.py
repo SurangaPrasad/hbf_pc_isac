@@ -205,7 +205,9 @@ class PGA_Unfold_JX(nn.Module):
             if track_metrics:
 
                 inner_iter_history.append(n_inner)
-                gradient_norm_history.append((torch.linalg.norm(grad_J_com.reshape(grad_J_com.shape[0], -1), dim=1).mean().item()) / test_size)
+                # Average entry-wise magnitude of ∇_F J
+                g_F = torch.abs(grad_J_com).reshape(grad_J_com.shape[0], -1).mean(dim=1)
+                gradient_norm_history.append(g_F.mean().item())
                 # gradient_norm_history_W.append(torch.linalg.norm(grad_W_k_com.reshape(grad_W_k_com.shape[0], -1), dim=1).mean().item())
                 # Run inner loop without checkpoint so that metrics
                 # can be recorded after each active inner update.
@@ -242,7 +244,10 @@ class PGA_Unfold_JX(nn.Module):
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
             grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
-            gradient_norm_history_W.append((torch.linalg.norm(grad_J_w.reshape(grad_J_w.shape[0], -1), dim=1).mean().item()) / test_size)
+            
+            # Average entry-wise magnitude of ∇_W J
+            g_W = torch.abs(grad_J_w).reshape(grad_J_w.shape[0], -1).mean(dim=1)
+            gradient_norm_history_W.append(g_W.mean().item())
 
             W_new = (
                 W
