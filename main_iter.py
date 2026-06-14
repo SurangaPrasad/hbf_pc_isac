@@ -670,7 +670,7 @@ if plot_figure == 1:
     #     grad_norms_J10_decay = np.array(gradient_norm_history_UPGA_J10_decay)
     #     plt.plot(iter_outer_x_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
-    plt.ylabel(r'Gradient norm w.r.t. $\mathbf{F}$', fontsize=14)
+    plt.ylabel(r'Avg. entry-wise magnitude of $\nabla_{\mathbf{F}}\mathcal{J}$', fontsize=14)
     # plt.title("Gradient Norm vs Iterations", fontsize=14)
     plt.grid()
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
@@ -700,10 +700,10 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, grad_norms_W_UPGA_J10, '-d', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
     
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
-    plt.ylabel(r'Gradient norm w.r.t. $\mathbf{W}$', fontsize=14)
+    plt.ylabel(r'Avg. entry-wise magnitude of $\nabla_{\mathbf{W}}\mathcal{J}$'), fontsize=14)
     # plt.title("Gradient Norm vs Iterations", fontsize=14)
     plt.grid()
-    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
+    # safe_legend(loc='best', fontsize=12, labelspacing=0.15)
     plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
     plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
