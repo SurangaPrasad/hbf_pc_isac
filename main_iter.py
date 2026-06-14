@@ -700,7 +700,7 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, grad_norms_W_UPGA_J10, '-d', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
     
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
-    plt.ylabel(r'Avg. entry-wise magnitude of $\nabla_{\mathbf{W}}\mathcal{J}$'), fontsize=14)
+    plt.ylabel(r'Avg. entry-wise magnitude of $\nabla_{\mathbf{W}}\mathcal{J}$', fontsize=14)
     # plt.title("Gradient Norm vs Iterations", fontsize=14)
     plt.grid()
     # safe_legend(loc='best', fontsize=12, labelspacing=0.15)
