@@ -153,8 +153,8 @@ plt.xlabel('SNR [dB]', fontsize=14)
 plt.ylabel(r'$R$ [bits/s/Hz]', fontsize=14)
 plt.grid()
 plt.legend(loc='upper left', labelspacing  = 0.15, fontsize=12)
-plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
-plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
+plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
 
 
@@ -241,8 +241,8 @@ axins.patch.set_facecolor("white")
 
 mark_inset(ax, axins, loc1=2, loc2=4, fc="white", ec="0.4", linewidth=1)
 
-plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png')
-plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
+plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 # # Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
 # print('Saving SNR-curve results to .mat file...')
 # mat_data = {'snr_dB_list': snr_dB_list}
