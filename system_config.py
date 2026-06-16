@@ -166,17 +166,17 @@ label_conv_PGA_J20 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')
 
 label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 
-label_UPGA_J1 = 'UPGA, $J=1$'
-label_UPGA_J5 = 'UPGA, $J=5$'
-label_UPGA_J10 = 'UPGA, $J=10$'
-label_UPGA_J20 = 'UPGA, $J=20$'
+label_UPGA_J1 = 'Fixed UPGA, $J=1$'
+label_UPGA_J5 = 'Fixed UPGA, $J=5$'
+label_UPGA_J10 = 'Fixed UPGA, $J=10$'
+label_UPGA_J20 = 'Fixed UPGA, $J=20$'
 
 label_UPGA_J10_PC = r'UPGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 
-label_UPGA_J5_decay = 'Prop. UPGA, $J_{\max}=5$'
-label_UPGA_J10_decay = 'Prop. UPGA, $J_{\max}=10$'
-label_UPGA_J20_decay = 'Prop. UPGA, $J_{\max}=20$'
+label_UPGA_J5_decay = 'Adaptive UPGA, $J=5$'
+label_UPGA_J10_decay = 'Adaptive UPGA, $J=10$'
+label_UPGA_J20_decay = 'Adaptive UPGA, $J=20$'
 label_UPGA_J_GradReuse = r'UPGA ' + r'$(J=' + str(n_iter_inner_J10) + r', \mathrm{GradReuse})$'
 label_ZF = 'ZF (digital, comm. only)'
 label_SCA = 'SCA-ManOpt (converged)'
