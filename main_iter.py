@@ -451,7 +451,7 @@ if plot_figure == 1:
 
 
     # ==================================== RATES (outer iters only) ================================================
-    plt.figure()
+    plt.figure(figsize=(6.5, 3.2))
     if run_conv_PGA == 1:
         plt.plot(iter_outer_x, rate_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
     if run_conv_PGA_J5 == 1:
@@ -518,7 +518,7 @@ if plot_figure == 1:
 
 
     # ==================================== CRB (outer iters only) ================================================
-    plt.figure()
+    plt.figure(figsize=(6.5, 3.2))
     ax = plt.gca()
 
     curves = []
@@ -634,7 +634,7 @@ if plot_figure == 1:
         obj_iter_UPGA_J20_decay = OMEGA * rate_iter_UPGA_J20_decay[outer_idx_J20_decay] + crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
         plt.plot(iter_outer_x_J20_decay, obj_iter_UPGA_J20_decay, '-', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
-    plt.ylabel(r'$\omega R + \text{CRLB}^{-1}$', fontsize=14)
+    plt.ylabel(r'$\omega R + \log(\text{CRLB}^{-1})$', fontsize=14)
     # plt.title("Objective function vs Iterations", fontsize=14)
     plt.grid()
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
