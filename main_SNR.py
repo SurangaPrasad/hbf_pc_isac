@@ -126,7 +126,7 @@ for ss in range(len(snr_dB_list)):
 
 # ==========================plot rate vs SNR ======================================================
 fig_rate = plt.figure(1)
-plt.rcParams["figure.figsize"] = (6.4, 4.0)
+plt.rcParams["figure.figsize"] = (6.5, 3.2)
 if run_conv_PGA == 1:
     plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
 if run_conv_PGA_J5 == 1:
@@ -163,7 +163,7 @@ plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.e
 # ======================= Plot CRLB vs SNR with inset =======================
 
 fig_CRB = plt.figure(2)
-plt.rcParams["figure.figsize"] = (6.4, 4.0)
+plt.rcParams["figure.figsize"] = (6.5, 3.2)
 ax = plt.gca()
 
 def crlb_from_log_inv(x):
