@@ -57,7 +57,7 @@ OMEGA = 0.25
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 112 * 2    # size of training set
-test_size = 1     # size of testing set
+test_size = 50     # size of testing set
 batch_size = len(snr_dB_list) * 4
 n_epoch = 20         # number of training epochs
 learning_rate = 0.0005 # learning 
@@ -166,17 +166,17 @@ label_conv_PGA_J20 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')
 
 label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 
-label_UPGA_J1 = 'Fixed UPGA, $J=1$'
-label_UPGA_J5 = 'Fixed UPGA, $J=5$'
-label_UPGA_J10 = 'Fixed UPGA, $J=10$'
-label_UPGA_J20 = 'Fixed UPGA, $J=20$'
+label_UPGA_J1 = 'FL-UPGA, $J=1$'
+label_UPGA_J5 = 'FL-UPGA, $J=5$'
+label_UPGA_J10 = 'FL-UPGA, $J=10$'
+label_UPGA_J20 = 'FL-UPGA, $J=20$'
 
 label_UPGA_J10_PC = r'UPGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 
-label_UPGA_J5_decay = 'Adapt. UPGA, $J=5$'
-label_UPGA_J10_decay = 'Adapt. UPGA, $J=10$'
-label_UPGA_J20_decay = 'Adapt. UPGA, $J=20$'
+label_UPGA_J5_decay = 'AL-UPGA, $J=5$'
+label_UPGA_J10_decay = 'AL-UPGA, $J=10$'
+label_UPGA_J20_decay = 'AL-UPGA, $J=20$'
 label_UPGA_J_GradReuse = r'UPGA ' + r'$(J=' + str(n_iter_inner_J10) + r', \mathrm{GradReuse})$'
 label_ZF = 'ZF (digital, comm. only)'
 label_SCA = 'SCA-ManOpt (converged)'
