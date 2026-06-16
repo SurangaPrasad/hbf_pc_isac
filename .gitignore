@@ -11,3 +11,6 @@ model/
 
 # OS junk
 .DS_Store
+
+*.png
+*.eps
