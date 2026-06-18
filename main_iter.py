@@ -645,18 +645,18 @@ if plot_figure == 1:
     # =======================Plot Gradient Norms (inner iters)========================================
     
     fig_grad = plt.figure(6, figsize=(6.5, 3.2))
-    if run_conv_PGA == 1:
-        grad_norms_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1)
-        plt.plot(iter_outer_x, grad_norms_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
-    if run_conv_PGA_J5 == 1:
-        grad_norms_conv_J5 = np.array(gradient_norm_history_conv_PGA_J5)
-        plt.plot(iter_outer_x, grad_norms_conv_J5, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
-    if run_conv_PGA_J10 == 1:
-        grad_norms_conv_J10 = np.array(gradient_norm_history_conv_PGA_J10)
-        plt.plot(iter_outer_x, grad_norms_conv_J10, '--', markevery=5, color='red', linewidth=3, markersize=7, label=Conv_PGA_J10)
-    if run_UPGA_J1 == 1:
-        grad_norms_UPGA_J1 = np.array(gradient_norm_history_UPGA_J1)
-        plt.plot(iter_outer_x, grad_norms_UPGA_J1, '-d', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_J1)
+    # if run_conv_PGA == 1:
+    #     grad_norms_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1)
+    #     plt.plot(iter_outer_x, grad_norms_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
+    # if run_conv_PGA_J5 == 1:
+    #     grad_norms_conv_J5 = np.array(gradient_norm_history_conv_PGA_J5)
+    #     plt.plot(iter_outer_x, grad_norms_conv_J5, '--', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
+    # if run_conv_PGA_J10 == 1:
+    #     grad_norms_conv_J10 = np.array(gradient_norm_history_conv_PGA_J10)
+    #     plt.plot(iter_outer_x, grad_norms_conv_J10, '--', markevery=5, color='red', linewidth=3, markersize=7, label=Conv_PGA_J10)
+    # if run_UPGA_J1 == 1:
+    #     grad_norms_UPGA_J1 = np.array(gradient_norm_history_UPGA_J1)
+    #     plt.plot(iter_outer_x, grad_norms_UPGA_J1, '-d', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_UPGA_J5 == 1:
         grad_norms_UPGA_J5 = np.array(gradient_norm_history_UPGA_J5)
         plt.plot(iter_outer_x, grad_norms_UPGA_J5, '-d', markevery=5, color='blue', linewidth=3, markersize=7, label=label_UPGA_J5)
@@ -669,8 +669,8 @@ if plot_figure == 1:
     # if run_UPGA_J10_decay == 1:
     #     grad_norms_J10_decay = np.array(gradient_norm_history_UPGA_J10_decay)
     #     plt.plot(iter_outer_x_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
-    plt.ylabel(r'Avg. entry-wise magnitude of $\nabla_{\mathbf{F}}\mathcal{J}$', fontsize=14)
+    plt.xlabel(r'Outer layer index $i$', fontsize=14)
+    plt.ylabel(r'Average magnitude $\vartheta^{\mathbf{F}}_{(i)}$', fontsize=14)
     # plt.title("Gradient Norm vs Iterations", fontsize=14)
     plt.grid()
     safe_legend(loc='best', fontsize=12, labelspacing=0.15)
