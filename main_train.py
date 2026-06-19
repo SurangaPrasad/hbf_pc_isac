@@ -43,6 +43,7 @@ H_test = H_test0[:, :test_size, :, :]
 torch.manual_seed(3407)
 
 def run_UPGA(step_size_UPGA):
+    # print(f"Running UPGA with J = {step_size_UPGA.shape[0]}...")
     model_UPGA = PGA_Unfold_JX(step_size_UPGA)
     # optimizer, scheduler = build_optimizer_and_scheduler(model_UPGA_J5)
     optimizer = torch.optim.Adam(model_UPGA.parameters(), lr=learning_rate)
@@ -78,7 +79,7 @@ def run_UPGA(step_size_UPGA):
         # scheduler.step(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
-    torch.save(model_UPGA.state_dict(), model_file_name_UPGA_J5)
+    torch.save(model_UPGA.state_dict(), directory_model + f'UPGA_J{step_size_UPGA.shape[0]}.pth')
 # ====================================================== Conventional PGA ====================================
 if run_conv_PGA == 1:
     # Object defining
