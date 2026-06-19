@@ -29,9 +29,15 @@ if run_conv_PGA_J10 == 1:
 if run_UPGA_J1 == 1:
     model_UPGA_J1 = PGA_Unfold_JX(step_size_UPGA_J1)
     model_UPGA_J1.load_state_dict(torch.load(model_file_name_UPGA_J1, map_location=device))
+if run_UPGA_J4 == 1:
+    model_UPGA_J4 = PGA_Unfold_JX(step_size_UPGA_J4)
+    model_UPGA_J4.load_state_dict(torch.load(directory_model + 'UPGA_J4.pth', map_location=device))
 if run_UPGA_J5 == 1:
     model_UPGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)
     model_UPGA_J5.load_state_dict(torch.load(model_file_name_UPGA_J5, map_location=device))
+if run_UPGA_J6 == 1:
+    model_UPGA_J6 = PGA_Unfold_JX(step_size_UPGA_J6)
+    model_UPGA_J6.load_state_dict(torch.load(directory_model + 'UPGA_J6.pth', map_location=device))
 if run_UPGA_J10 == 1:
     model_UPGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
     model_UPGA_J10.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
@@ -61,7 +67,9 @@ rate_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_conv_PGA_J5 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 
+rate_UPGA_J4 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J5 = np.zeros([len(snr_dB_list), ], dtype=float)
+rate_UPGA_J6 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 rate_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 
@@ -78,7 +86,9 @@ CRB_conv_PGA = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_conv_PGA_J5 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_conv_PGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 
+CRB_UPGA_J4 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J5 = np.zeros([len(snr_dB_list), ], dtype=float)
+CRB_UPGA_J6 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J10 = np.zeros([len(snr_dB_list), ], dtype=float)
 CRB_UPGA_J20 = np.zeros([len(snr_dB_list), ], dtype=float)
 
@@ -107,8 +117,12 @@ for ss in range(len(snr_dB_list)):
     if run_conv_PGA_J10 == 1:
         rate_conv_PGA_J10[ss], CRB_conv_PGA_J10[ss] = execute_conv_PGA_J10(conv_PGA_J10, H_test, snr_ss)
 
+    if run_UPGA_J4 == 1:
+        rate_UPGA_J4[ss], CRB_UPGA_J4[ss] = execute_UPGA_J4(model_UPGA_J4, H_test, snr_ss)
     if run_UPGA_J5 == 1:
         rate_UPGA_J5[ss], CRB_UPGA_J5[ss] = execute_UPGA_J5(model_UPGA_J5, H_test, snr_ss)
+    if run_UPGA_J6 == 1:
+        rate_UPGA_J6[ss], CRB_UPGA_J6[ss] = execute_UPGA_J6(model_UPGA_J6, H_test, snr_ss)
     if run_UPGA_J10 == 1:
         rate_UPGA_J10[ss], CRB_UPGA_J10[ss] = execute_UPGA_J10(model_UPGA_J10, H_test, snr_ss)
     if run_UPGA_J20 == 1:
@@ -133,8 +147,12 @@ if run_conv_PGA_J5 == 1:
     plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
 if run_conv_PGA_J10 == 1:
     plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=7, label=Conv_PGA_J10)
+if run_UPGA_J4 == 1:
+    plt.plot(snr_dB_list, rate_UPGA_J4, '--', color='orange', linewidth=3, markersize=7, label=label_UPGA_J4)
 if run_UPGA_J5 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J5, '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
+if run_UPGA_J6 == 1:
+    plt.plot(snr_dB_list, rate_UPGA_J6, '-d', color='orange', linewidth=3, markersize=7, label=label_UPGA_J6)
 if run_UPGA_J10 == 1:
     plt.plot(snr_dB_list, rate_UPGA_J10, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
@@ -185,8 +203,14 @@ if run_conv_PGA_J5 == 1:
 if run_conv_PGA_J10 == 1:
     curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J10), '-*', 'blue', Conv_PGA_J10))
 
+if run_UPGA_J4 == 1:
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J4), '--', 'orange', label_UPGA_J4))
+
 if run_UPGA_J5 == 1:
     curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5), '--', 'red', label_UPGA_J5))
+
+if run_UPGA_J6 == 1:
+    curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J6), '-d', 'orange', label_UPGA_J6))
 
 if run_UPGA_J10 == 1:
     curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J10), '-*', 'red', label_UPGA_J10))

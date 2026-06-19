@@ -28,9 +28,20 @@ def execute_conv_PGA_J10(conv_PGA_J10, H_test, Pt):
     crb_avr = [r.detach().item() for r in (sum(crbs) / len(H_test[0]))][-1]
     return rate_avr, crb_avr
 
+def execute_UPGA_J4(model_UPGA_J4, H_test, Pt):
+    rates, crbs, _, F, W, _, _ = model_UPGA_J4.execute_PGA(H_test, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner_J4)
+    rate_avr = [r.detach().cpu().numpy() for r in (sum(rates) / len(H_test[0]))][-1]
+    crb_avr = [r.detach().item() for r in (sum(crbs) / len(H_test[0]))][-1]
+    return rate_avr, crb_avr
 
 def execute_UPGA_J5(model_UPGA_J5, H_test, Pt):
     rates, crbs, _, F, W, _, _ = model_UPGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner_J5)
+    rate_avr = [r.detach().cpu().numpy() for r in (sum(rates) / len(H_test[0]))][-1]
+    crb_avr = [r.detach().item() for r in (sum(crbs) / len(H_test[0]))][-1]
+    return rate_avr, crb_avr
+
+def execute_UPGA_J6(model_UPGA_J6, H_test, Pt):
+    rates, crbs, _, F, W, _, _ = model_UPGA_J6.execute_PGA(H_test, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner_J6)
     rate_avr = [r.detach().cpu().numpy() for r in (sum(rates) / len(H_test[0]))][-1]
     crb_avr = [r.detach().item() for r in (sum(crbs) / len(H_test[0]))][-1]
     return rate_avr, crb_avr

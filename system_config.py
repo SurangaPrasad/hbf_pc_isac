@@ -173,7 +173,9 @@ label_conv_PGA_J20 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')
 label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 
 label_UPGA_J1 = 'Fixed-UPGA, $J=1$'
+label_UPGA_J4 = 'Fixed-UPGA, $J=4$'
 label_UPGA_J5 = 'Fixed-UPGA, $J=5$'
+label_UPGA_J6 = 'Fixed-UPGA, $J=6$'
 label_UPGA_J10 = 'Fixed-UPGA, $J=10$'
 label_UPGA_J20 = 'Fixed-UPGA, $J=20$'
 
