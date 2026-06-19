@@ -152,6 +152,8 @@ if run_UPGA_J5 == 1:
 
 if run_UPGA_J4 == 1:
     run_UPGA(step_size_UPGA_J4)
+if run_UPGA_J6 == 1:
+    run_UPGA(step_size_UPGA_J6)
 
 # ============================================================= proposed unfolding PGA with decaying inner iterations ====
 if run_UPGA_J5_decay == 1:
