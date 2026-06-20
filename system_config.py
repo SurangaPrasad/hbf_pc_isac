@@ -20,7 +20,7 @@ run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J4 = 1
 run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
 run_UPGA_J6 = 1            # Unfolded PGA with setting J = 6 (for ablation on inner iteration number)
-run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
+run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
 run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
 run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
@@ -172,23 +172,23 @@ label_conv_PGA_J20 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')
 
 label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 
-label_UPGA_J1 = r'F-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=120$'
-label_UPGA_J4 = r'F-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=480$'
-label_UPGA_J5 = r'F-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=600$'
-label_UPGA_J6 = r'F-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=720$'
-label_UPGA_J10 = r'F-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=1200$'
-label_UPGA_J20 = r'F-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=2400$'
+label_UPGA_J1 = r'F-UPGA, $J=1$'
+label_UPGA_J4 = r'F-UPGA, $J=4$'
+label_UPGA_J5 = r'F-UPGA, $J=5$'
+label_UPGA_J6 = r'F-UPGA, $J=6$'
+label_UPGA_J10 = r'F-UPGA, $J=10$'
+label_UPGA_J20 = r'F-UPGA, $J=20$'
 
 label_UPGA_J10_PC = r'UPGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 
-label_UPGA_J5_decay = r'D-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=421$'
-label_UPGA_J10_decay = r'D-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=722$'
-label_UPGA_J20_decay = r'D-UPGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=20$'
+label_UPGA_J5_decay = r'D-UPGA, $J=5$'
+label_UPGA_J10_decay = r'D-UPGA, $J=10$'
+label_UPGA_J20_decay = r'D-UPGA, $J=20$'
 label_UPGA_J_GradReuse = r'UPGA ' + r'$(J=' + str(n_iter_inner_J10) + r', \mathrm{GradReuse})$'
 label_ZF = 'ZF (digital, comm. only)'
 label_SCA = 'SCA-ManOpt (converged)'
 
-Conv_PGA_J1 = r'Conv. PGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=120$'
-Conv_PGA_J5 = r'Conv. PGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=600$'
-Conv_PGA_J10 = r'Conv. PGA, $\sum_{i=0}^{I-1}\widehat{J}_{(i)}=1200$'
+Conv_PGA_J1 = r'Conv. PGA, $J=1$'
+Conv_PGA_J5 = r'Conv. PGA, $J=5$'
+Conv_PGA_J10 = r'Conv. PGA, $J=10$'
