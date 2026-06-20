@@ -172,19 +172,19 @@ label_conv_PGA_J20 = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J20) + ')
 
 label_PGA_J10 = 'PGA ' + '$(J = ' + str(n_iter_inner_J10) + ')$'
 
-label_UPGA_J1 = r'F-UPGA, $J=1$'
-label_UPGA_J4 = r'F-UPGA, $J=4$'
-label_UPGA_J5 = r'F-UPGA, $J=5$'
-label_UPGA_J6 = r'F-UPGA, $J=6$'
-label_UPGA_J10 = r'F-UPGA, $J=10$'
-label_UPGA_J20 = r'F-UPGA, $J=20$'
+label_UPGA_J1 = r'Fix. UPGA, $J=1$'
+label_UPGA_J4 = r'Fix. UPGA, $J=4$'
+label_UPGA_J5 = r'Fix. UPGA, $J=5$'
+label_UPGA_J6 = r'Fix. UPGA, $J=6$'
+label_UPGA_J10 = r'Fix. UPGA, $J=10$'
+label_UPGA_J20 = r'Fix. UPGA, $J=20$'
 
 label_UPGA_J10_PC = r'UPGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
 
-label_UPGA_J5_decay = r'D-UPGA, $J=5$'
-label_UPGA_J10_decay = r'D-UPGA, $J=10$'
-label_UPGA_J20_decay = r'D-UPGA, $J=20$'
+label_UPGA_J5_decay = r'Dyn. UPGA, $J=5$'
+label_UPGA_J10_decay = r'Dyn. UPGA, $J=10$'
+label_UPGA_J20_decay = r'Dyn. UPGA, $J=20$'
 label_UPGA_J_GradReuse = r'UPGA ' + r'$(J=' + str(n_iter_inner_J10) + r', \mathrm{GradReuse})$'
 label_ZF = 'ZF (digital, comm. only)'
 label_SCA = 'SCA-ManOpt (converged)'
