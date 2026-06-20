@@ -170,7 +170,7 @@ if run_UPGA_J20_decay == 1:
 plt.xlabel('SNR [dB]', fontsize=14)
 plt.ylabel(r'$R$ [bits/s/Hz]', fontsize=14)
 plt.grid()
-plt.legend(loc='upper left', labelspacing  = 0.15, fontsize=12)
+# plt.legend(loc='upper left', labelspacing  = 0.15, fontsize=12)
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
