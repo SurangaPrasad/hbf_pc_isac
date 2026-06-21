@@ -677,7 +677,7 @@ if plot_figure == 1:
     plt.ylabel(r'$\omega R + \log(\text{CRLB}^{-1})$', fontsize=14)
     # plt.title("Objective function vs Iterations", fontsize=14)
     plt.grid()
-    # safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.18), fontsize=11, labelspacing=0.1, ncol=2)
+    safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png',bbox_inches='tight',pad_inches=0.02)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps',bbox_inches='tight',pad_inches=0.02)
 
