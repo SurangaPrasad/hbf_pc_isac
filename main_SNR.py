@@ -2,6 +2,7 @@ from algorithms import *
 import scipy.io
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 import numpy as np
+from main_iter import safe_legend
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -175,7 +176,6 @@ plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.p
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
 
-
 #============================== plot CRB vs SNR ======================================================
 
 # ======================= Plot CRLB vs SNR with inset =======================
@@ -264,7 +264,7 @@ axins.patch.set_alpha(1.0)
 axins.patch.set_facecolor("white")
 
 mark_inset(ax, axins, loc1=2, loc2=4, fc="white", ec="0.4", linewidth=1)
-
+safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False)
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 # # Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
