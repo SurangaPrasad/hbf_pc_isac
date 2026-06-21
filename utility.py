@@ -652,3 +652,14 @@ def extract_active_elements(F):
     F_active = F_diag.permute(0, 2, 1).reshape(B, Nt, 1)
     return F_active
     
+def safe_legend(**kwargs):
+    """Add legend only when labeled artists exist to avoid Matplotlib warnings."""
+    ax = plt.gca()
+    handles, labels = ax.get_legend_handles_labels()
+    valid = [(h, l) for h, l in zip(handles, labels) if l and not l.startswith('_')]
+    if not valid:
+        return
+    valid_handles, valid_labels = zip(*valid)
+    # Use opaque legend frame to keep EPS exports warning-free.
+    kwargs.setdefault('framealpha', 1.0)
+    ax.legend(valid_handles, valid_labels, **kwargs)

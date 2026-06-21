@@ -2,7 +2,7 @@ from algorithms import *
 import scipy.io
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 import numpy as np
-from main_iter import safe_legend
+from utility import safe_legend
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
