@@ -632,8 +632,8 @@ if plot_figure == 1:
     plt.savefig(directory_result + 'crb_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps',bbox_inches='tight',pad_inches=0.02)
 
     # ===================== OBJECTIVE (outer iters only) =============================================
-    plt.figure()
-    fig_obj = plt.figure(5)
+    # plt.figure()
+    plt.figure(figsize=(8, 5.2))
     if run_conv_PGA == 1:
         obj_iter_conv_PGA_J1 = OMEGA * rate_iter_conv_PGA_J1 + crb_iter_conv_PGA_J1
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '--', markevery=5, color='black', linewidth=3, markersize=6, label=Conv_PGA_J1)
@@ -677,7 +677,7 @@ if plot_figure == 1:
     plt.ylabel(r'$\omega R + \log(\text{CRLB}^{-1})$', fontsize=14)
     # plt.title("Objective function vs Iterations", fontsize=14)
     plt.grid()
-    safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False)
+    safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False, columnspacing=0.6,)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png',bbox_inches='tight',pad_inches=0.02)
     plt.savefig(directory_result + 'objective_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps',bbox_inches='tight',pad_inches=0.02)
 
