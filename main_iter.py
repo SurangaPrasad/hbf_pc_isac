@@ -684,43 +684,74 @@ if plot_figure == 1:
     plt.figure(figsize=(8, 5.2))
     # if run_conv_PGA == 1:
     #     obj_iter_conv_PGA_J1 = OMEGA * rate_iter_conv_PGA_J1 + crb_iter_conv_PGA_J1
-    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '..', markevery=5, color='black', linewidth=3, markersize=8, label=Conv_PGA_J1)
+    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '..', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
     # if run_UPGA_J1 == 1:
     #     obj_iter_UPGA_J1 = OMEGA * rate_iter_UPGA_J1[outer_idx_J1] + crb_iter_UPGA_J1
-    #     plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=8, label=label_UPGA_J1)
+    #     plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
     # if run_conv_PGA_J5 == 1:
     #     obj_iter_conv_PGA_J5 = OMEGA * rate_iter_conv_PGA_J5 + crb_iter_conv_PGA_J5
-    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], '..', markevery=5, color='blue', linewidth=3, markersize=8, label=Conv_PGA_J5)
+    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], '..', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
     if run_conv_PGA_J10 == 1:
         obj_iter_conv_PGA_J10 = OMEGA * rate_iter_conv_PGA_J10 + crb_iter_conv_PGA_J10
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10[outer_idx_J10], '..*', markevery=5, color='blue', linewidth=3, markersize=8, label=Conv_PGA_J10)
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10[outer_idx_J10], ':o', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J10)
     # if run_conv_PGA_J20 == 1:
     #     obj_iter_conv_PGA_J20 = OMEGA * rate_iter_conv_PGA_J20 + crb_iter_conv_PGA_J20[outer_idx_J20]
-    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J20[outer_idx_J20], '.-', markevery=5, color='blue', linewidth=3, markersize=8, label=label_conv_PGA_J20)
+    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J20[outer_idx_J20], '.-', markevery=5, color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J20)
     if run_UPGA_J4 == 1:
         obj_iter_UPGA_J4 = OMEGA * rate_iter_UPGA_J4[outer_idx_J4] + crb_iter_UPGA_J4[outer_idx_J4]
-        plt.plot(iter_outer_x, obj_iter_UPGA_J4, '--', markevery=5, color='orange', linewidth=3, markersize=8, label=label_UPGA_J4)
+        plt.plot(iter_outer_x, obj_iter_UPGA_J4, '--', markevery=5, color='orange', linewidth=3, markersize=7, label=label_UPGA_J4)
     if run_UPGA_J5 == 1:
         obj_iter_UPGA_J5 = OMEGA * rate_iter_UPGA_J5[outer_idx_J5] + crb_iter_UPGA_J5[outer_idx_J5]
-        plt.plot(iter_outer_x, obj_iter_UPGA_J5, '--s', markevery=5, color='red', linewidth=3, markersize=8, label=label_UPGA_J5)
+        plt.plot(iter_outer_x, obj_iter_UPGA_J5, '--d', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
     if run_UPGA_J6 == 1:
         obj_iter_UPGA_J6 = OMEGA * rate_iter_UPGA_J6[outer_idx_J6] + crb_iter_UPGA_J6[outer_idx_J6]
-        plt.plot(iter_outer_x, obj_iter_UPGA_J6, '--d', markevery=5, color='orange', linewidth=3, markersize=8, label=label_UPGA_J6)
+        plt.plot(iter_outer_x, obj_iter_UPGA_J6, '--s', markevery=5, color='orange', linewidth=3, markersize=7, label=label_UPGA_J6)
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = OMEGA * rate_iter_UPGA_J10[outer_idx_J10] + crb_iter_UPGA_J10[outer_idx_J10]
-        plt.plot(iter_outer_x, obj_iter_UPGA_J10, '--*', markevery=5, color='red', linewidth=3, markersize=8, label=label_UPGA_J10)
+        plt.plot(iter_outer_x, obj_iter_UPGA_J10, '--o', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
     # if run_UPGA_J20 == 1:
     #     obj_iter_UPGA_J20 = OMEGA * rate_iter_UPGA_J20[outer_idx_J20] + crb_iter_UPGA_J20[outer_idx_J20]
-    #     plt.plot(iter_outer_x, obj_iter_UPGA_J20, '-->', markevery=5, color='red', linewidth=3, markersize=8, label=label_UPGA_J20)
+    #     plt.plot(iter_outer_x, obj_iter_UPGA_J20, '-->', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     if run_UPGA_J5_decay == 1:
         obj_iter_UPGA_J5_decay = OMEGA * rate_iter_UPGA_J5_decay[outer_idx_J5_decay] + crb_iter_UPGA_J5_decay[outer_idx_J5_decay]
-        plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_J5_decay, '-s', markevery=5, color='green', linewidth=3, markersize=8, label=label_UPGA_J5_decay)
+        plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_J5_decay, '-d', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
     if run_UPGA_J10_decay == 1:
         obj_iter_UPGA_J10_decay = OMEGA * rate_iter_UPGA_J10_decay[outer_idx_J10_decay] + crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
-        plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, '-*', markevery=5, color='green', linewidth=3, markersize=8, label=label_UPGA_J10_decay)
+        plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, '-', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
     # if run_UPGA_J20_decay == 1:
     #     obj_iter_UPGA_J20_decay = OMEGA * rate_iter_UPGA_J20_decay[outer_idx_J20_decay] + crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
-    #     plt.plot(iter_outer_x_J20_decay, obj_iter_UPGA_J20_decay, '-', markevery=5, color='green', linewidth=3, markersize=8, label=label_UPGA_J20_decay)
+    #     plt.plot(iter_outer_x_J20_decay, obj_iter_UPGA_J20_decay, '-', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+
+    # ---- "Fixed-UPGA" group arrow annotation ----
+    # Collect y-values at x=60 for all active Fixed-UPGA curves to pick arrow target point.
+    _ax_obj = plt.gca()
+    _fixed_upga_y_at60 = []
+    _arrow_x = 60   # x-position where the arrow tip lands (outer iteration index)
+    for _flag, _obj_arr, _idx in [
+        (run_UPGA_J4,  locals().get('obj_iter_UPGA_J4'),  outer_idx_J4),
+        (run_UPGA_J5,  locals().get('obj_iter_UPGA_J5'),  outer_idx_J5),
+        (run_UPGA_J6,  locals().get('obj_iter_UPGA_J6'),  outer_idx_J6),
+        (run_UPGA_J10, locals().get('obj_iter_UPGA_J10'), outer_idx_J10),
+    ]:
+        if _flag == 1 and _obj_arr is not None and len(_obj_arr) > 0:
+            # iter_outer_x is 1-based; find the index closest to _arrow_x
+            _i = np.searchsorted(iter_outer_x, _arrow_x, side='left')
+            _i = min(_i, len(_obj_arr) - 1)
+            _fixed_upga_y_at60.append(_obj_arr[_i])
+    if _fixed_upga_y_at60:
+        _y_mid = float(np.mean(_fixed_upga_y_at60))   # mid-point between the curves
+        _y_text = _y_mid - 1.8                         # label placed below the cluster
+        _ax_obj.annotate(
+            'Fixed-UPGA',
+            xy=(_arrow_x, _y_mid),
+            xytext=(_arrow_x - 18, _y_text),
+            fontsize=12,
+            color='black',
+            arrowprops=dict(arrowstyle='->', color='black', lw=1.5),
+            ha='center',
+        )
+    # ---- end annotation ----
+
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
     plt.ylabel(r'$\omega R + \log(\text{CRLB}^{-1})$', fontsize=14)
     # plt.title("Objective function vs Iterations", fontsize=14)
