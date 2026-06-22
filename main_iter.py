@@ -1,27 +1,19 @@
 from PGA_models import *
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+from utility import safe_legend
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 run_program = 1
 plot_figure = 1
 save_result = 0
-
-
-def safe_legend(**kwargs):
-    """Add legend only when labeled artists exist to avoid Matplotlib warnings."""
-    ax = plt.gca()
-    handles, labels = ax.get_legend_handles_labels()
-    valid = [(h, l) for h, l in zip(handles, labels) if l and not l.startswith('_')]
-    if not valid:
-        return
-    valid_handles, valid_labels = zip(*valid)
-    # Use opaque legend frame to keep EPS exports warning-free.
-    kwargs.setdefault('framealpha', 1.0)
-    ax.legend(valid_handles, valid_labels, **kwargs)
-
+load_saved_plot_data = 0
 
 step_size_snapshots = []
+
+
+def get_plot_cache_file_name():
+    return directory_result + 'plot_cache_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.npz'
 
 
 def register_step_size(label, step_size_tensor):
@@ -43,15 +35,85 @@ def average_step_size_by_outer(step_size_tensor):
         return arr
     return None
 
+
+def save_plot_cache(file_path, namespace):
+    """Persist the plotting arrays so plots can be regenerated without rerunning the models."""
+    prefixes = (
+        'rate_iter_',
+        'crb_iter_',
+        'power_iter_',
+        'beam_',
+        'gradient_norm_history_',
+        'inner_iter_history_',
+    )
+    payload = {}
+    for key, value in namespace.items():
+        if key == 'step_size_snapshots':
+            payload[key] = np.array(value, dtype=object)
+            continue
+        if not any(key.startswith(prefix) for prefix in prefixes):
+            continue
+        if isinstance(value, list):
+            payload[key] = np.asarray(value)
+        else:
+            payload[key] = value
+    np.savez(file_path, **payload)
+    print(f'Saved plot cache to {file_path}')
+
+
+def load_plot_cache(file_path):
+    """Load cached plotting arrays saved by save_plot_cache."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f'Plot cache file not found: {file_path}')
+
+    cache = np.load(file_path, allow_pickle=True)
+    loaded_data = {}
+    for key in cache.files:
+        value = cache[key]
+        if key == 'step_size_snapshots':
+            loaded_data[key] = [tuple(item) for item in value.tolist()]
+        elif value.shape == () and value.dtype == object:
+            loaded_data[key] = value.item()
+        else:
+            loaded_data[key] = value
+    return loaded_data
+
+
+def sync_run_flags_with_plot_data(namespace):
+    """Disable plot branches whose cached data is unavailable."""
+    flag_requirements = {
+        'run_conv_PGA': ('rate_iter_conv_PGA_J1', 'crb_iter_conv_PGA_J1', 'gradient_norm_history_conv_PGA_J1_W'),
+        'run_conv_PGA_J5': ('rate_iter_conv_PGA_J5', 'crb_iter_conv_PGA_J5', 'gradient_norm_history_conv_PGA_J5_W'),
+        'run_conv_PGA_J10': ('rate_iter_conv_PGA_J10', 'crb_iter_conv_PGA_J10', 'gradient_norm_history_conv_PGA_J10_W'),
+        'run_conv_PGA_J20': ('rate_iter_conv_PGA_J20', 'crb_iter_conv_PGA_J20'),
+        'run_UPGA_J1': ('rate_iter_UPGA_J1', 'crb_iter_UPGA_J1', 'gradient_norm_history_UPGA_J1_W'),
+        'run_UPGA_J4': ('rate_iter_UPGA_J4', 'crb_iter_UPGA_J4'),
+        'run_UPGA_J5': ('rate_iter_UPGA_J5', 'crb_iter_UPGA_J5', 'gradient_norm_history_UPGA_J5', 'gradient_norm_history_UPGA_J5_W'),
+        'run_UPGA_J6': ('rate_iter_UPGA_J6', 'crb_iter_UPGA_J6'),
+        'run_UPGA_J10': ('rate_iter_UPGA_J10', 'crb_iter_UPGA_J10', 'gradient_norm_history_UPGA_J10', 'gradient_norm_history_UPGA_J10_W'),
+        'run_UPGA_J20': ('rate_iter_UPGA_J20', 'crb_iter_UPGA_J20'),
+        'run_UPGA_J5_decay': ('rate_iter_UPGA_J5_decay', 'crb_iter_UPGA_J5_decay', 'inner_iter_history_UPGA_J5_decay'),
+        'run_UPGA_J10_decay': ('rate_iter_UPGA_J10_decay', 'crb_iter_UPGA_J10_decay', 'inner_iter_history_UPGA_J10_decay'),
+        'run_UPGA_J20_decay': ('rate_iter_UPGA_J20_decay', 'crb_iter_UPGA_J20_decay', 'inner_iter_history_UPGA_J20_decay'),
+        'run_UPGA_J_GradReuse': ('rate_iter_UPGA_J_GradReuse', 'crb_iter_UPGA_J_GradReuse'),
+    }
+    for flag_name, required_names in flag_requirements.items():
+        if namespace.get(flag_name) != 1:
+            continue
+        if not all(name in namespace for name in required_names):
+            namespace[flag_name] = 0
+            print(f'Skipping {flag_name} because cached plot data is incomplete.')
+
 # torch.manual_seed(3407)
 # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
-# Load training data
-H_train, H_test0 = get_data_tensor(data_source)
-H_test = H_train[:, :test_size, :, :]
-# H_test = H_train[:, 100:1+100, :, :]
+# Load training data only when the expensive model execution is requested.
+if run_program == 1:
+    H_train, H_test0 = get_data_tensor(data_source)
+    H_test = H_train[:, :test_size, :, :]
+    # H_test = H_train[:, 100:1+100, :, :]
 
-R, at0, theta, ideal_beam = get_radar_data(snr_dB, H_test)
-at = at0[:, : test_size, :, :]
+    R, at0, theta, ideal_beam = get_radar_data(snr_dB, H_test)
+    at = at0[:, : test_size, :, :]
 
 if run_program == 1:
     # ====================================================== Conv. PGA ====================================
@@ -302,19 +364,8 @@ if run_program == 1:
     #                                SAVE RESULTS
     # //////////////////////////////////////////////////////////////////////////////////////////////
     if save_result == 1:
-        print('Saving results...')
-        if run_conv_PGA == 1:
-            result_conv_PGA_file_name = directory_result + 'result_vs_iter_conv.npz'
-            np.savez(result_conv_PGA_file_name, name1=rate_iter_conv, name2=tau_iter_conv, name3=beam_conv_PGA)
-        if run_UPGA_J1 == 1:
-            result_UPGA_J1_file_name = directory_result + 'result_vs_iter_UPGA_J1.npz'
-            np.savez(result_UPGA_J1_file_name, name1=rate_iter_UPGA_J1, name2=tau_iter_UPGA_J1, name3=beam_UPGA_J1)
-        if run_UPGA_J10 == 1:
-            result_UPGA_J10_file_name = directory_result + 'result_vs_iter_UPGA_J10.npz'
-            np.savez(result_UPGA_J10_file_name, name1=rate_iter_UPGA_J10, name2=crb_iter_UPGA_J10, name3=beam_UPGA_J10)
-        if run_UPGA_J20 == 1:
-            result_UPGA_J20_file_name = directory_result + 'result_vs_iter_UPGA_J20.npz'
-            np.savez(result_UPGA_J20_file_name, name1=rate_iter_UPGA_J20, name2=crb_iter_UPGA_J20, name3=beam_UPGA_J20)
+        print('Saving plot data...')
+        save_plot_cache(get_plot_cache_file_name(), locals())
 
 # Save decay inner-iteration counts in a compact MATLAB file for external plotting.
 if run_program == 1:
@@ -332,6 +383,12 @@ if run_program == 1:
         print(f'Saved inner-iteration count data to {decay_inner_iter_file_name}')
 
 if plot_figure == 1:
+
+    if load_saved_plot_data == 1:
+        plot_cache_file_name = get_plot_cache_file_name()
+        print(f'Loading plot data from {plot_cache_file_name}...')
+        globals().update(load_plot_cache(plot_cache_file_name))
+        sync_run_flags_with_plot_data(globals())
 
     # ///////////////////////////////////////// SHOW OBJECTIVE VALUES OVER ITERATIONS ///////////////////////////////////
     benchmark = 0
@@ -435,25 +492,6 @@ if plot_figure == 1:
     outer_idx_J_GradReuse = outer_idx_J10
     frac_J_GradReuse = frac_J10
     iter_outer_x  = np.arange(1, n_iter_outer + 1)    # x-axis: 1 .. n_iter_outer
-
-    # //////////////////////////////// LOADING RESULTS //////////////////////////////////////////
-    if save_result == 1:
-        if run_conv_PGA == 1:
-            result_file_name = directory_result + 'result_vs_iter_conv.npz'
-            result = np.load(result_file_name)
-            rate_iter_conv, tau_iter_conv, beam_conv_PGA = result['name1'], result['name2'], result['name3']
-        if run_UPGA_J1 == 1:
-            result_file_name = directory_result + 'result_vs_iter_UPGA_J1.npz'
-            result = np.load(result_file_name)
-            rate_iter_UPGA_J1, tau_iter_UPGA_J1, beam_UPGA_J1 = result['name1'], result['name2'], result['name3']
-        if run_UPGA_J10 == 1:
-            result_file_name = directory_result + 'result_vs_iter_UPGA_J10.npz'
-            result = np.load(result_file_name)
-            rate_iter_UPGA_J10, tau_iter_UPGA_J10, beam_UPGA_J10 = result['name1'], result['name2'], result['name3']
-        if run_UPGA_J20 == 1:
-            result_file_name = directory_result + 'result_vs_iter_UPGA_J20.npz'
-            result = np.load(result_file_name)
-            rate_iter_UPGA_J20, tau_iter_UPGA_J20, beam_UPGA_J20 = result['name1'], result['name2'], result['name3']
 
     #  /////////////////////////////////////////////////////////////////////////////////////////
     #                               PLOT FIGURES
@@ -648,7 +686,7 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J10[outer_idx_J10], '-*', markevery=5, color='blue', linewidth=3, markersize=6, label=Conv_PGA_J10)
     if run_conv_PGA_J20 == 1:
         obj_iter_conv_PGA_J20 = OMEGA * rate_iter_conv_PGA_J20 + crb_iter_conv_PGA_J20[outer_idx_J20]
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J20[outer_idx_J20], '-', markevery=5, color='blue', linewidth=3, markersize=6, label=Conv_PGA_J20)
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J20[outer_idx_J20], '-', markevery=5, color='blue', linewidth=3, markersize=6, label=label_conv_PGA_J20)
     if run_UPGA_J4 == 1:
         obj_iter_UPGA_J4 = OMEGA * rate_iter_UPGA_J4[outer_idx_J4] + crb_iter_UPGA_J4[outer_idx_J4]
         plt.plot(iter_outer_x, obj_iter_UPGA_J4, '--', markevery=5, color='orange', linewidth=3, markersize=6, label=label_UPGA_J4)

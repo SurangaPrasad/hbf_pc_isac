@@ -140,7 +140,7 @@ for ss in range(len(snr_dB_list)):
 
 
 # ==========================plot rate vs SNR ======================================================
-plt.figure(figsize=(8, 5.2))
+plt.figure(figsize=(8, 4.2))
 # plt.rcParams["figure.figsize"] = (6.5, 3.2)
 if run_conv_PGA == 1:
     plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
@@ -171,7 +171,7 @@ if run_UPGA_J20_decay == 1:
 plt.xlabel('SNR [dB]', fontsize=14)
 plt.ylabel(r'$R$ [bits/s/Hz]', fontsize=14)
 plt.grid()
-# plt.legend(loc='upper left', labelspacing  = 0.15, fontsize=12)
+# safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False, columnspacing=0.6,)
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
 plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
@@ -180,7 +180,7 @@ plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.e
 
 # ======================= Plot CRLB vs SNR with inset =======================
 
-plt.figure(figsize=(8, 5.2))
+plt.figure(figsize=(8, 4.2))
 ax = plt.gca()
 
 def crlb_from_log_inv(x):
@@ -263,7 +263,7 @@ axins.patch.set_alpha(1.0)
 axins.patch.set_facecolor("white")
 
 mark_inset(ax, axins, loc1=2, loc2=4, fc="white", ec="0.4", linewidth=1)
-safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False, columnspacing=0.6)
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=12, labelspacing=0.1, ncol=2, frameon=False, columnspacing=0.6)
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
 plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 # # Save SNR-curve data for MATLAB plotting (rate, CRB, and objective)
