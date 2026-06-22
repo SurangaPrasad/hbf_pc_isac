@@ -25,12 +25,6 @@ outer_idx_J5  = make_outer_idx(n_outer, 5);
 outer_idx_J6  = make_outer_idx(n_outer, 6);
 outer_idx_J10 = make_outer_idx(n_outer, 10);
 
-black  = [0.00 0.00 0.00];
-blue   = [0.00 0.00 1.00];
-red    = [1.00 0.00 0.00];
-green  = [0.00 0.50 0.00];
-orange = [1.00 0.55 0.00];
-
 [outer_idx_J5_decay, iter_outer_x_J5_decay] = make_outer_idx_decay(S, 'inner_iter_history_UPGA_J5_decay');
 [outer_idx_J10_decay, iter_outer_x_J10_decay] = make_outer_idx_decay(S, 'inner_iter_history_UPGA_J10_decay');
 
@@ -46,7 +40,7 @@ mev = 5;
 if has_fields(S, {'rate_iter_conv_PGA_J5', 'crb_iter_conv_PGA_J5'})
     y = OMEGA .* as_row(S.rate_iter_conv_PGA_J5) + as_row(S.crb_iter_conv_PGA_J5);
     plot(iter_outer_x, y(outer_idx_J5), ':d', ...
-        'Color', blue, 'LineWidth', 3, 'MarkerSize', 8, ...
+        Color=bluetooth, blue, 'LineWidth', 3, 'MarkerSize', 8, ...
         'MarkerIndices', 1:mev:numel(iter_outer_x), ...
         'DisplayName', 'Conv. PGA, 600 inner iterations');
 end
@@ -64,7 +58,7 @@ if has_fields(S, {'rate_iter_UPGA_J4', 'crb_iter_UPGA_J4'})
 	y = OMEGA .* as_row(S.rate_iter_UPGA_J4) + as_row(S.crb_iter_UPGA_J4);
 	plot(iter_outer_x, y(outer_idx_J4), '--', ...
 		'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, ...
-		'DisplayName', 'Fixed-UPGA-reduced, 480 inner layers');
+		'DisplayName', 'Fixed-UPGA, 480 inner layers');
 end
 
 % Fixed-UPGA J5
@@ -73,7 +67,7 @@ if has_fields(S, {'rate_iter_UPGA_J5', 'crb_iter_UPGA_J5'})
 	plot(iter_outer_x, y(outer_idx_J5), '--d', ...
 		'Color', red, 'LineWidth', 3, 'MarkerSize', 8, ...
 		'MarkerIndices', 1:mev:numel(iter_outer_x), ...
-		'DisplayName', 'Fixed-UPGA-all, 600 inner layers');
+		'DisplayName', 'Fixed-UPGA, 600 inner layers');
 end
 
 % Fixed-UPGA J6
@@ -82,7 +76,7 @@ if has_fields(S, {'rate_iter_UPGA_J6', 'crb_iter_UPGA_J6'})
 	plot(iter_outer_x, y(outer_idx_J6), '--s', ...
 		'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, ...
 		'MarkerIndices', 1:mev:numel(iter_outer_x), ...
-		'DisplayName', 'Fixed-UPGA-reduced, 720 inner layers');
+		'DisplayName', 'Fixed-UPGA, 720 inner layers');
 end
 
 % Fixed-UPGA J10
@@ -91,7 +85,7 @@ if has_fields(S, {'rate_iter_UPGA_J10', 'crb_iter_UPGA_J10'})
 	plot(iter_outer_x, y(outer_idx_J10), '--o', ...
 		'Color', red, 'LineWidth', 3, 'MarkerSize', 8, ...
 		'MarkerIndices', 1:mev:numel(iter_outer_x), ...
-		'DisplayName', 'Fixed-UPGA-all, 1200 inner layers');
+		'DisplayName', 'Fixed-UPGA, 1200 inner layers');
 end
 
 % Dynamic-UPGA J5 decay
@@ -106,13 +100,12 @@ end
 % Dynamic-UPGA J10 decay
 if has_fields(S, {'rate_iter_UPGA_J10_decay', 'crb_iter_UPGA_J10_decay'}) && ~isempty(outer_idx_J10_decay)
 	y = OMEGA .* as_row(S.rate_iter_UPGA_J10_decay) + as_row(S.crb_iter_UPGA_J10_decay);
-	plot(iter_outer_x_J10_decay, y(outer_idx_J10_decay), '-o', ...
+	plot(iter_outer_x_J10_decay, y(outer_idx_J10_decay), '-', ...
 		'Color', green, 'LineWidth', 3, 'MarkerSize', 8, ...
-        'MarkerIndices', 1:mev:numel(iter_outer_x_J10_decay), ...
 		'DisplayName', 'Dynamic-UPGA, 722 inner layers');
 end
 
-xlabel('Number of outer iterations/layers (I)', 'FontSize', 18);
+xlabel('Number of iterations/layers (I)', 'FontSize', 18);
 ylabel('\omega R + log(CRLB^{-1})', 'FontSize', 18);
 set(gca, 'FontSize', 14);
 

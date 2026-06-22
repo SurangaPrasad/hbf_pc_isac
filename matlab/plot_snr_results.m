@@ -1,368 +1,170 @@
-%% plot_snr_results.m
-%  Loads SNR-curve results saved by main_SNR.py and produces a
-%  publication-quality two-panel figure:
-%    (a) Rate vs SNR
-%    (b) CRLB vs SNR
-%
-%  Legend is placed below the plots. No additional legend column is used.
+% Plot SNR-sweep figures from Python cached MAT file.
+% Uses same curves, colors and markers as main_SNR.py.
 
-clearvars; close all; clc;
+clear; clc; close all;
 
-%% ------------------------------------------------------------------------
-%  Configuration
-% -------------------------------------------------------------------------
-MAT_FILE = '../sim_results/64TX_4UE_4RF/snr_results_64_0.05.mat';
+% --------------------------- User settings ---------------------------
+Nt = 64;
+OMEGA = 0.25;
+system_config = sprintf('%dTX_4UE_4RF', Nt);
+result_dir = fullfile('..', 'sim_results', system_config);
+cache_file = fullfile(result_dir, sprintf('snr_plot_cache_%d_%g.mat', Nt, OMEGA));
 
-SAVE_FIG = true;
-OUT_NAME = 'snr_results_panel';
+if ~isfile(cache_file)
+    error('SNR cache file not found: %s\nRun main_SNR.py once with run_program=1 first.', cache_file);
+end
+S = load(cache_file);
 
-%% ------------------------------------------------------------------------
-%  Figure aesthetics
-% -------------------------------------------------------------------------
-FONT_NAME = 'Times New Roman';
+snr_dB_list = as_row(S.snr_dB_list);
 
-% Larger fonts for paper readability
-FONT_SIZE   = 20;     % axis tick labels
-LABEL_SIZE  = 21;     % x/y labels
-TITLE_SIZE  = 19;     % subplot titles
-LEGEND_SIZE = 16;     % legend text
+% Colors (same semantic mapping as Python)
+black  = [0.00 0.00 0.00];
+blue   = [0.00 0.00 1.00];
+red    = [1.00 0.00 0.00];
+green  = [0.00 0.50 0.00];
+orange = [1.00 0.55 0.00];
 
-LINE_WIDTH  = 2.3;
-MARKER_SIZE = 8.0;
+% ========================== Rate vs SNR ==========================
+figure('Color', 'w', 'Units', 'inches', 'Position', [1.5 1.5 8 4.2]);
+hold on; grid on;
 
-% Larger physical figure helps preserve readable fonts in the paper
-FIG_WIDTH   = 18.0;   % cm
-FIG_HEIGHT  = 9.2;    % cm
-
-COL = struct( ...
-    'blue',   [0.00 0.45 0.70], ...
-    'orange', [0.90 0.62 0.00], ...
-    'green',  [0.00 0.62 0.45], ...
-    'red',    [0.84 0.15 0.16], ...
-    'purple', [0.49 0.18 0.56], ...
-    'cyan',   [0.34 0.71 0.91], ...
-    'teal',   [0.00 0.62 0.62], ...
-    'brown',  [0.55 0.34 0.29], ...
-    'black',  [0.00 0.00 0.00]  ...
-);
-
-%% ------------------------------------------------------------------------
-%  Load data
-% -------------------------------------------------------------------------
-if ~isfile(MAT_FILE)
-    error('File not found: %s\nRun main_SNR.py first.', MAT_FILE);
+if isfield(S, 'rate_conv_PGA')
+    plot(snr_dB_list, as_row(S.rate_conv_PGA), '--', 'Color', black, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA J1');
+end
+if isfield(S, 'rate_conv_PGA_J5')
+    plot(snr_dB_list, as_row(S.rate_conv_PGA_J5), '--', 'Color', blue, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA J5');
+end
+if isfield(S, 'rate_conv_PGA_J10')
+    plot(snr_dB_list, as_row(S.rate_conv_PGA_J10), '-*', 'Color', blue, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA J10');
 end
 
-d = load(MAT_FILE);
-
-if ~isfield(d, 'snr_dB_list')
-    error('snr_dB_list is missing in %s.', MAT_FILE);
+if isfield(S, 'rate_UPGA_J4')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J4), '--', 'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J4');
+end
+if isfield(S, 'rate_UPGA_J5')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J5), '--', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J5');
+end
+if isfield(S, 'rate_UPGA_J6')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J6), '-d', 'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J6');
+end
+if isfield(S, 'rate_UPGA_J10')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J10), '-*', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J10');
+end
+if isfield(S, 'rate_UPGA_J20')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J20), '-*', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J20');
 end
 
-x = d.snr_dB_list(:);
-
-get = @(name) getfield_safe(d, name);
-
-%% ------------------------------------------------------------------------
-%  Build series table
-%
-%  Format:
-%  {label, rate, itheta_log, color, linestyle, marker, is_decay}
-%
-%  The crb_* fields are assumed to store log(I(theta)).
-%  The function log_info_to_crlb converts them to CRLB = 1/I(theta).
-% -------------------------------------------------------------------------
-series = {};
-
-if isfield(d,'rate_conv_PGA_J1')
-    series{end+1} = {'PGA, $J=1$', ...
-        get('rate_conv_PGA_J1'), get('crb_conv_PGA_J1'), ...
-        COL.blue, '--', 'none', false};
+if isfield(S, 'rate_UPGA_J5_decay')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J5_decay), '--', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J5 decay');
+end
+if isfield(S, 'rate_UPGA_J10_decay')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J10_decay), '-*', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J10 decay');
+end
+if isfield(S, 'rate_UPGA_J20_decay')
+    plot(snr_dB_list, as_row(S.rate_UPGA_J20_decay), ':p', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J20 decay');
 end
 
-if isfield(d,'rate_conv_PGA_J5')
-    series{end+1} = {'PGA, $J=5$', ...
-        get('rate_conv_PGA_J5'), get('crb_conv_PGA_J5'), ...
-        COL.orange, '--', 'none', false};
+xlabel('SNR [dB]', 'FontSize', 14);
+ylabel('R [bits/s/Hz]', 'FontSize', 14);
+set(gca, 'FontSize', 12);
+legend('Location', 'best');
+
+rate_png = fullfile(result_dir, sprintf('rate_vs_SNR_%d_%g_matlab.png', Nt, OMEGA));
+rate_eps = fullfile(result_dir, sprintf('rate_vs_SNR_%d_%g_matlab.eps', Nt, OMEGA));
+exportgraphics(gcf, rate_png, 'Resolution', 300);
+exportgraphics(gcf, rate_eps, 'ContentType', 'vector');
+
+% ========================== CRLB vs SNR ==========================
+figure('Color', 'w', 'Units', 'inches', 'Position', [1.5 1.5 8 4.2]);
+ax = gca;
+hold(ax, 'on');
+grid(ax, 'on');
+
+curves = {};
+if isfield(S, 'CRB_conv_PGA')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA)), '--', black, 'Conv. PGA J1'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_conv_PGA_J5')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA_J5)), '--', blue, 'Conv. PGA J5'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_conv_PGA_J10')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA_J10)), '-*', blue, 'Conv. PGA J10'}; %#ok<AGROW>
 end
 
-if isfield(d,'rate_conv_PGA_J10')
-    series{end+1} = {'PGA, $J=10$', ...
-        get('rate_conv_PGA_J10'), get('crb_conv_PGA_J10'), ...
-        COL.black, '--', 'none', false};
+if isfield(S, 'CRB_UPGA_J4')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J4)), '--', orange, 'UPGA J4'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_UPGA_J5')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J5)), '--', red, 'UPGA J5'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_UPGA_J6')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J6)), '-d', orange, 'UPGA J6'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_UPGA_J10')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J10)), '-*', red, 'UPGA J10'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_UPGA_J20')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J20)), ':s', red, 'UPGA J20'}; %#ok<AGROW>
 end
 
-if isfield(d,'rate_UPGA_J5')
-    series{end+1} = {'UPGA, $J=5$', ...
-        get('rate_UPGA_J5'), get('crb_UPGA_J5'), ...
-        COL.orange, '-', '*', false};
+if isfield(S, 'CRB_UPGA_J5_decay')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J5_decay)), '--', green, 'UPGA J5 decay'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_UPGA_J10_decay')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J10_decay)), '-*', green, 'UPGA J10 decay'}; %#ok<AGROW>
+end
+if isfield(S, 'CRB_UPGA_J20_decay')
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J20_decay)), ':p', green, 'UPGA J20 decay'}; %#ok<AGROW>
 end
 
-if isfield(d,'rate_UPGA_J10')
-    series{end+1} = {'UPGA, $J=10$', ...
-        get('rate_UPGA_J10'), get('crb_UPGA_J10'), ...
-        COL.red, '-', '*', false};
+for i = 1:numel(curves)
+    c = curves{i};
+    plot(ax, c{1}, c{2}, c{3}, 'Color', c{4}, 'LineWidth', 3, 'MarkerSize', 7, 'DisplayName', c{5});
 end
 
-if isfield(d,'rate_UPGA_J20')
-    series{end+1} = {'UPGA, $J=20$', ...
-        get('rate_UPGA_J20'), get('crb_UPGA_J20'), ...
-        COL.red, '-', 'none', false};
+xlabel(ax, 'SNR [dB]', 'FontSize', 14);
+ylabel(ax, 'CRLB', 'FontSize', 14);
+set(ax, 'FontSize', 12);
+
+% Inset zoom (10 to 12 dB)
+axins = axes('Position', [0.58 0.52 0.30 0.32]);
+hold(axins, 'on');
+grid(axins, 'on');
+for i = 1:numel(curves)
+    c = curves{i};
+    plot(axins, c{1}, c{2}, c{3}, 'Color', c{4}, 'LineWidth', 2, 'MarkerSize', 5);
 end
+xlim(axins, [10 12]);
 
-if isfield(d,'rate_UPGA_J5_decay')
-    series{end+1} = {'UPGA-d, $J_{\max}=5$', ...
-        get('rate_UPGA_J5_decay'), get('crb_UPGA_J5_decay'), ...
-        COL.purple, '-', '^', true};
-end
-
-if isfield(d,'rate_UPGA_J10_decay')
-    series{end+1} = {'UPGA-d, $J_{\max}=10$', ...
-        get('rate_UPGA_J10_decay'), get('crb_UPGA_J10_decay'), ...
-        COL.purple, '-', 'd', true};
-end
-
-if isfield(d,'rate_UPGA_J20_decay')
-    series{end+1} = {'UPGA-d, $J_{\max}=20$', ...
-        get('rate_UPGA_J20_decay'), get('crb_UPGA_J20_decay'), ...
-        COL.purple, '-', 'p', true};
-end
-
-if isempty(series)
-    error('No recognised rate/crb series found in %s.', MAT_FILE);
-end
-
-%% ------------------------------------------------------------------------
-%  Create figure
-% -------------------------------------------------------------------------
-fig = figure( ...
-    'Units', 'centimeters', ...
-    'Position', [2 2 FIG_WIDTH FIG_HEIGHT], ...
-    'Color', 'w');
-
-set(fig, ...
-    'DefaultAxesFontName', FONT_NAME, ...
-    'DefaultTextFontName', FONT_NAME, ...
-    'DefaultAxesFontSize', FONT_SIZE, ...
-    'DefaultTextInterpreter', 'latex', ...
-    'DefaultAxesTickLabelInterpreter', 'latex', ...
-    'DefaultLegendInterpreter', 'latex');
-
-tl = tiledlayout(fig, 1, 2, ...
-    'TileSpacing', 'compact', ...
-    'Padding', 'compact');
-
-%% ------------------------------------------------------------------------
-%  Panel (a): Rate vs SNR
-% -------------------------------------------------------------------------
-ax1 = nexttile(tl, 1);
-hold(ax1, 'on');
-box(ax1, 'on');
-grid(ax1, 'on');
-
-set(ax1, ...
-    'FontName', FONT_NAME, ...
-    'FontSize', FONT_SIZE, ...
-    'GridLineStyle', ':', ...
-    'GridAlpha', 0.35, ...
-    'TickDir', 'in', ...
-    'LineWidth', 1.2, ...
-    'Layer', 'top');
-
-%% ------------------------------------------------------------------------
-%  Panel (b): CRLB vs SNR
-% -------------------------------------------------------------------------
-ax2 = nexttile(tl, 2);
-hold(ax2, 'on');
-box(ax2, 'on');
-grid(ax2, 'on');
-
-set(ax2, ...
-    'FontName', FONT_NAME, ...
-    'FontSize', FONT_SIZE, ...
-    'GridLineStyle', ':', ...
-    'GridAlpha', 0.35, ...
-    'TickDir', 'in', ...
-    'LineWidth', 1.2, ...
-    'Layer', 'top');
-
-%% ------------------------------------------------------------------------
-%  Plot all curves
-% -------------------------------------------------------------------------
-for k = 1:numel(series)
-
-    s   = series{k};
-    lbl = s{1};
-    yr  = s{2};
-    yc  = log_info_to_crlb(s{3});
-    col = s{4};
-    ls  = s{5};
-    mk  = s{6};
-
-    is_decay = logical(s{7});
-
-    line_width_k = LINE_WIDTH;
-    marker_size_k = MARKER_SIZE;
-    marker_face_color_k = 'none';
-
-    if is_decay
-        line_width_k = LINE_WIDTH + 0.8;
-        marker_size_k = MARKER_SIZE + 1.0;
-        marker_face_color_k = col;
-    end
-
-    if strcmpi(mk, 'none')
-
-        plot(ax1, x, yr, ...
-            'LineStyle', ls, ...
-            'Color', col, ...
-            'LineWidth', line_width_k, ...
-            'DisplayName', lbl);
-
-        plot(ax2, x, yc, ...
-            'LineStyle', ls, ...
-            'Color', col, ...
-            'LineWidth', line_width_k, ...
-            'DisplayName', lbl);
-
-    else
-
-        plot(ax1, x, yr, ...
-            'LineStyle', ls, ...
-            'Marker', mk, ...
-            'Color', col, ...
-            'LineWidth', line_width_k, ...
-            'MarkerSize', marker_size_k, ...
-            'MarkerFaceColor', marker_face_color_k, ...
-            'MarkerEdgeColor', col, ...
-            'DisplayName', lbl);
-
-        plot(ax2, x, yc, ...
-            'LineStyle', ls, ...
-            'Marker', mk, ...
-            'Color', col, ...
-            'LineWidth', line_width_k, ...
-            'MarkerSize', marker_size_k, ...
-            'MarkerFaceColor', marker_face_color_k, ...
-            'MarkerEdgeColor', col, ...
-            'DisplayName', lbl);
-
+zoom_vals = [];
+for i = 1:numel(curves)
+    c = curves{i};
+    mask = (c{1} >= 10) & (c{1} <= 12);
+    if any(mask)
+        zoom_vals = [zoom_vals, c{2}(mask)]; %#ok<AGROW>
     end
 end
-
-%% ------------------------------------------------------------------------
-%  Axis labels and titles
-% -------------------------------------------------------------------------
-xlabel(ax1, 'SNR [dB]', ...
-    'FontSize', LABEL_SIZE, ...
-    'Interpreter', 'latex');
-
-ylabel(ax1, '$R$ [bits/s/Hz]', ...
-    'FontSize', LABEL_SIZE, ...
-    'Interpreter', 'latex');
-
-title(ax1, '(a) Rate vs SNR', ...
-    'FontSize', TITLE_SIZE, ...
-    'FontWeight', 'normal', ...
-    'Interpreter', 'latex');
-
-xlabel(ax2, 'SNR [dB]', ...
-    'FontSize', LABEL_SIZE, ...
-    'Interpreter', 'latex');
-
-ylabel(ax2, '$\mathrm{CRLB}=1/I(\theta)$', ...
-    'FontSize', LABEL_SIZE, ...
-    'Interpreter', 'latex');
-
-title(ax2, '(b) CRLB vs SNR', ...
-    'FontSize', TITLE_SIZE, ...
-    'FontWeight', 'normal', ...
-    'Interpreter', 'latex');
-
-xlim(ax1, [min(x), max(x)]);
-xlim(ax2, [min(x), max(x)]);
-
-xticks(ax1, x);
-xticks(ax2, x);
-
-%% ------------------------------------------------------------------------
-%  Optional axis limits
-% -------------------------------------------------------------------------
-% ylim(ax1, [10 30]);
-% ylim(ax2, [0 12e-7]);
-
-%% ------------------------------------------------------------------------
-%  Shared legend below both panels
-% -------------------------------------------------------------------------
-h = findobj(ax1, 'Type', 'Line');
-h = flipud(h);
-
-lgd = legend(ax1, h, ...
-    'Location', 'southoutside', ...
-    'Orientation', 'horizontal', ...
-    'NumColumns', 3, ...
-    'FontSize', LEGEND_SIZE, ...
-    'Interpreter', 'latex', ...
-    'Box', 'off');
-
-lgd.Layout.Tile = 'south';
-lgd.ItemTokenSize = [24, 10];
-
-lgd.Units = 'normalized';
-lgd.Position(1) = 0.08;
-lgd.Position(3) = 0.84;
-
-%% ------------------------------------------------------------------------
-%  Export
-% -------------------------------------------------------------------------
-if SAVE_FIG
-
-    out_dir = fileparts(MAT_FILE);
-
-    if isempty(out_dir)
-        out_dir = pwd;
-    end
-
-    base = fullfile(out_dir, OUT_NAME);
-
-    set(fig, 'PaperUnits', 'centimeters');
-    set(fig, 'PaperSize', [FIG_WIDTH FIG_HEIGHT]);
-    set(fig, 'PaperPosition', [0 0 FIG_WIDTH FIG_HEIGHT]);
-
-    exportgraphics(fig, [base '.pdf'], ...
-        'ContentType', 'vector');
-
-    exportgraphics(fig, [base '.eps'], ...
-        'ContentType', 'vector');
-
-    exportgraphics(fig, [base '.png'], ...
-        'Resolution', 600);
-
-    fprintf('Saved:\n  %s.pdf\n  %s.eps\n  %s.png\n', base, base, base);
+if ~isempty(zoom_vals)
+    ymin = min(zoom_vals);
+    ymax = max(zoom_vals);
+    ypad = 0.15 * (ymax - ymin);
+    ylim(axins, [ymin - ypad, ymax + ypad]);
 end
 
-%% ------------------------------------------------------------------------
-%  Helper functions
-% -------------------------------------------------------------------------
-function v = getfield_safe(s, name)
+legend(ax, 'Location', 'southoutside', 'NumColumns', 2, 'Box', 'off');
 
-    if isfield(s, name)
-        v = s.(name)(:);
-    else
-        v = [];
-    end
+crb_png = fullfile(result_dir, sprintf('CRB_vs_SNR_%d_%g_matlab.png', Nt, OMEGA));
+crb_eps = fullfile(result_dir, sprintf('CRB_vs_SNR_%d_%g_matlab.eps', Nt, OMEGA));
+exportgraphics(gcf, crb_png, 'Resolution', 300);
+exportgraphics(gcf, crb_eps, 'ContentType', 'vector');
 
+fprintf('Saved MATLAB SNR plots to:\n  %s\n  %s\n  %s\n  %s\n', rate_png, rate_eps, crb_png, crb_eps);
+
+% ============================ Helpers ============================
+function x = as_row(v)
+x = v(:).';
 end
 
-function y = log_info_to_crlb(log_i_theta)
-
-    % get_crb_fe stores log(I(theta)).
-    % Therefore:
-    %
-    %     CRLB = 1 / I(theta) = exp(-log(I(theta))).
-
-    y = nan(size(log_i_theta));
-    mask = isfinite(log_i_theta);
-    y(mask) = exp(-log_i_theta(mask));
-
+function y = crlb_from_log_inv(x)
+y = 1 ./ exp(x);
 end
