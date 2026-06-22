@@ -1,5 +1,6 @@
 from PGA_models import *
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+import scipy.io
 from utility import safe_legend
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -13,7 +14,7 @@ step_size_snapshots = []
 
 
 def get_plot_cache_file_name():
-    return directory_result + 'plot_cache_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.npz'
+    return directory_result + 'plot_cache_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.mat'
 
 
 def register_step_size(label, step_size_tensor):
@@ -26,7 +27,10 @@ def register_step_size(label, step_size_tensor):
 
 def average_step_size_by_outer(step_size_tensor):
     """Return shape (n_outer, n_channels) averaged over inner iterations if present."""
-    arr = step_size_tensor.numpy()
+    if torch.is_tensor(step_size_tensor):
+        arr = step_size_tensor.numpy()
+    else:
+        arr = np.asarray(step_size_tensor)
     if arr.ndim == 3:
         # [n_inner, n_outer, n_channels] -> [n_outer, n_channels]
         return arr.mean(axis=0)
@@ -49,15 +53,18 @@ def save_plot_cache(file_path, namespace):
     payload = {}
     for key, value in namespace.items():
         if key == 'step_size_snapshots':
-            payload[key] = np.array(value, dtype=object)
+            payload['step_size_snapshot_count'] = len(value)
+            for idx, (label, step_tensor) in enumerate(value):
+                payload[f'step_size_label_{idx}'] = label
+                payload[f'step_size_value_{idx}'] = np.asarray(step_tensor)
             continue
         if not any(key.startswith(prefix) for prefix in prefixes):
             continue
         if isinstance(value, list):
             payload[key] = np.asarray(value)
         else:
-            payload[key] = value
-    np.savez(file_path, **payload)
+            payload[key] = np.asarray(value) if torch.is_tensor(value) else value
+    scipy.io.savemat(file_path, payload)
     print(f'Saved plot cache to {file_path}')
 
 
@@ -66,16 +73,22 @@ def load_plot_cache(file_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f'Plot cache file not found: {file_path}')
 
-    cache = np.load(file_path, allow_pickle=True)
+    cache = scipy.io.loadmat(file_path, simplify_cells=True)
     loaded_data = {}
-    for key in cache.files:
-        value = cache[key]
-        if key == 'step_size_snapshots':
-            loaded_data[key] = [tuple(item) for item in value.tolist()]
-        elif value.shape == () and value.dtype == object:
-            loaded_data[key] = value.item()
-        else:
-            loaded_data[key] = value
+    step_size_snapshots = []
+    step_size_snapshot_count = int(cache.get('step_size_snapshot_count', 0))
+    for idx in range(step_size_snapshot_count):
+        label_key = f'step_size_label_{idx}'
+        value_key = f'step_size_value_{idx}'
+        if label_key in cache and value_key in cache:
+            step_size_snapshots.append((cache[label_key], np.asarray(cache[value_key])))
+    if step_size_snapshots:
+        loaded_data['step_size_snapshots'] = step_size_snapshots
+
+    for key, value in cache.items():
+        if key.startswith('__') or key == 'step_size_snapshot_count' or key.startswith('step_size_label_') or key.startswith('step_size_value_'):
+            continue
+        loaded_data[key] = np.asarray(value) if isinstance(value, list) else value
     return loaded_data
 
 
