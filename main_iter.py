@@ -373,12 +373,9 @@ if run_program == 1:
     if run_conv_PGA_J10 == 1:
         beam_conv_PGA_J10 = get_beampattern(F_conv_PGA_J10, W_conv_PGA_J10, at, snr)
 
-    # ////////////////////////////////////////////////////////////////////////////////////////////
-    #                                SAVE RESULTS
-    # //////////////////////////////////////////////////////////////////////////////////////////////
-    if save_result == 1:
-        print('Saving plot data...')
-        save_plot_cache(get_plot_cache_file_name(), locals())
+    # Always refresh the plot cache after an expensive run so plot-only reruns use the same file.
+    print('Saving plot data...')
+    save_plot_cache(get_plot_cache_file_name(), locals())
 
 # Save decay inner-iteration counts in a compact MATLAB file for external plotting.
 if run_program == 1:
