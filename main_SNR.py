@@ -143,28 +143,28 @@ for ss in range(len(snr_dB_list)):
 plt.figure(figsize=(8, 4.2))
 # plt.rcParams["figure.figsize"] = (6.5, 3.2)
 if run_conv_PGA == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
+    plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=8, label=Conv_PGA_J1)
 if run_conv_PGA_J5 == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
+    plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=8, label=Conv_PGA_J5)
 if run_conv_PGA_J10 == 1:
-    plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=7, label=Conv_PGA_J10)
+    plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=8, label=Conv_PGA_J10)
 if run_UPGA_J4 == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J4, '--', color='orange', linewidth=3, markersize=7, label=label_UPGA_J4)
+    plt.plot(snr_dB_list, rate_UPGA_J4, '--', color='orange', linewidth=3, markersize=8, label=label_UPGA_J4)
 if run_UPGA_J5 == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J5, '--', color='red', linewidth=3, markersize=7, label=label_UPGA_J5)
+    plt.plot(snr_dB_list, rate_UPGA_J5, '--', color='red', linewidth=3, markersize=8, label=label_UPGA_J5)
 if run_UPGA_J6 == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J6, '-d', color='orange', linewidth=3, markersize=7, label=label_UPGA_J6)
+    plt.plot(snr_dB_list, rate_UPGA_J6, '-d', color='orange', linewidth=3, markersize=8, label=label_UPGA_J6)
 if run_UPGA_J10 == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J10, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+    plt.plot(snr_dB_list, rate_UPGA_J10, '-*', color='red', linewidth=3, markersize=8, label=label_UPGA_J10)
 if run_UPGA_J20 == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J20, '-*', color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
-    plt.plot(snr_dB_list, rate_conv_PGA, ':', color='black', linewidth=3, markersize=7, label=label_conv)
+    plt.plot(snr_dB_list, rate_UPGA_J20, '-*', color='red', linewidth=3, markersize=8, label=label_UPGA_J20)
+    plt.plot(snr_dB_list, rate_conv_PGA, ':', color='black', linewidth=3, markersize=8, label=label_conv)
 if run_UPGA_J5_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J5_decay, '--', color='green', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J5_decay, '--', color='green', linewidth=3, markersize=8, label=label_UPGA_J5_decay)
 if run_UPGA_J10_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J10_decay, '-*', color='green', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J10_decay, '-*', color='green', linewidth=3, markersize=8, label=label_UPGA_J10_decay)
 if run_UPGA_J20_decay == 1:
-    plt.plot(snr_dB_list, rate_UPGA_J20_decay, ':p', color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+    plt.plot(snr_dB_list, rate_UPGA_J20_decay, ':p', color='green', linewidth=3, markersize=8, label=label_UPGA_J20_decay)
 
 # system_params = '$N=' + str(Nt) + ', M=' + str(M) + ', N_{\\mathrm{RF}}=' + str(Nrf) + ', \\omega=' + str(OMEGA) + '$'
 # plt.title(system_params)
