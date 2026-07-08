@@ -276,7 +276,7 @@ if run_program == 1:
     if run_UPGA_partial_J5 == 1:
         print('Running unfolded PGA with J = 5 and partial coupling...')
         # Create new model and load states
-        model_UPGA_partial_J5 = PGA_Unfold_JX_partial(step_size_UPGA_J5)
+        model_UPGA_partial_J5 = PGA_Unfold_JX_partial(step_size_UPGA_J5, Nt, Nrf)
         model_UPGA_partial_J5.load_state_dict(torch.load(model_file_name_UPGA_partial_J5, map_location=device))
         register_step_size('UPGA (J=5, partial)', model_UPGA_partial_J5.step_size)
         sum_rate_UPGA_partial_J5, crb_UPGA_partial_J5, power_UPGA_partial_J5, F_UPGA_partial_J5, W_UPGA_partial_J5, gradient_norm_history_UPGA_partial_J5, gradient_norm_history_UPGA_partial_J5_W = model_UPGA_partial_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
@@ -290,7 +290,7 @@ if run_program == 1:
     if run_UPGA_partial_J10 == 1:
         print('Running unfolded PGA with J = 10 and partial coupling...')
         # Create new model and load states
-        model_UPGA_partial_J10 = PGA_Unfold_JX_partial(step_size_UPGA_J10)
+        model_UPGA_partial_J10 = PGA_Unfold_JX_partial(step_size_UPGA_J10, Nt, Nrf)
         model_UPGA_partial_J10.load_state_dict(torch.load(model_file_name_UPGA_partial_J10, map_location=device))
         register_step_size('UPGA (J=10, partial)', model_UPGA_partial_J10.step_size)
         sum_rate_UPGA_partial_J10, crb_UPGA_partial_J10, power_UPGA_partial_J10, F_UPGA_partial_J10, W_UPGA_partial_J10, gradient_norm_history_UPGA_partial_J10, gradient_norm_history_UPGA_partial_J10_W = model_UPGA_partial_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
