@@ -585,7 +585,7 @@ class PGA_Unfold_JX_partial(nn.Module):
             # ----------------------------------------------------
             # CRITICAL CRUX: project_unit_modulus sets element magnitudes to 1 (e^jθ). 
             # We MUST apply the mask right after to force un-connected phase shifters back to 0.
-            F = project_unit_modulus(F) * self.mask
+            F = project_unit_modulus(F) * self.mask.to(F.device)
 
             # ----------------------------------------------------
             # Digital precoder update
@@ -602,7 +602,7 @@ class PGA_Unfold_JX_partial(nn.Module):
 
             # Projection / normalization
             F, W = normalize(F, W_new, H, Pt)
-            F = F * self.mask # Safeguard mask safety after composite normalization
+            F = F * self.mask.to(F.device) # Safeguard mask safety after composite normalization
 
             # Record metrics after W-update
             if track_metrics:
