@@ -11,24 +11,24 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
-run_conv_PGA = 1           # Conventional PGA without unfolding
-run_conv_PGA_J5 = 1        # Conventional PGA with setting J = 5
-run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
+run_conv_PGA = 0           # Conventional PGA without unfolding
+run_conv_PGA_J5 = 0        # Conventional PGA with setting J = 5
+run_conv_PGA_J10 = 0       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
-run_UPGA_J4 = 1
-run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
-run_UPGA_J6 = 1            # Unfolded PGA with setting J = 6 (for ablation on inner iteration number)
-run_UPGA_J10 = 1           # Unfolded PGA with setting J = 10
+run_UPGA_J4 = 0
+run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
+run_UPGA_J6 = 0            # Unfolded PGA with setting J = 6 (for ablation on inner iteration number)
+run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
-run_UPGA_J10_PC = 0        # Unfolded PGA with J = 10 and partial coupling (PC)
-run_UPGA_J10_PC_AP = 0     # Unfolded PGA with J = 10, partial coupling (PC)
+run_UPGA_partial_J5 = 1    # Unfolded PGA with J = 5 and partial coupling
+run_UPGA_partial_J10 = 0   # Unfolded PGA with J = 10 and partial coupling
 run_UPGA_J10_PRCDN = 0 
 
 run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive step sizes
-run_UPGA_J5_decay = 1        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
-run_UPGA_J10_decay = 1       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
+run_UPGA_J5_decay = 0        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
+run_UPGA_J10_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J20_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
@@ -152,7 +152,8 @@ model_file_name_UPGA_J5 = directory_model + 'UPGA_J5.pth'
 model_file_name_UPGA_J10 = directory_model + 'UPGA_J10.pth'
 model_file_name_UPGA_J10_PRCDN = directory_model + 'UPGA_J10_PRCDN.pth'
 model_file_name_UPGA_J20 = directory_model + 'UPGA_J20.pth'
-model_file_name_UPGA_J10_PC = directory_model + 'UPGA_J10_PC.pth'
+model_file_name_UPGA_partial_J5 = directory_model + 'UPGA_J5_partial.pth'
+model_file_name_UPGA_partial_J10 = directory_model + 'UPGA_J10_partial.pth'
 model_file_name_UPGA_J5_decay = directory_model + 'UPGA_J5_decay.pth'
 model_file_name_UPGA_J10_decay = directory_model + 'UPGA_J10_decay.pth'
 model_file_name_UPGA_J20_decay = directory_model + 'UPGA_J20_decay.pth'
@@ -179,8 +180,8 @@ label_UPGA_J6 = r'Fixed-UPGA, $720$ inner layers'
 label_UPGA_J10 = r'Fixed-UPGA, $1200$ inner layers'
 label_UPGA_J20 = r'Fixed-UPGA, $2400$ inner layers'
 
-label_UPGA_J10_PC = r'UPGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
-label_conv_PGA_J10_PC = 'Conventional PGA ' + '$(J = ' + str(n_iter_inner_J10) + ', PC)$'
+label_UPGA_partial_J5 = r'Fixed-UPGA-PC, $600$ inner layers'
+label_UPGA_partial_J10 = r'Fixed-UPGA-PC, $1200$ inner layers'
 
 label_UPGA_J5_decay = r'Dynamic-UPGA, $421$ inner layers'
 label_UPGA_J10_decay = r'Dynamic-UPGA, $722$ inner layers'

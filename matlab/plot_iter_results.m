@@ -40,8 +40,8 @@ fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1.5 1.5 9.5 7.7]);
 hold on;
 grid on;
 
-% markevery=5 equivalent: show a marker every 5 outer iterations.
-mev = 5;
+% Increase marker spacing so symbols are not crowded on long iteration curves.
+mev = 10;
 % Conventional PGA J5
 if has_fields(S, {'rate_iter_conv_PGA_J5', 'crb_iter_conv_PGA_J5'})
     y = OMEGA .* as_row(S.rate_iter_conv_PGA_J5) + as_row(S.crb_iter_conv_PGA_J5);

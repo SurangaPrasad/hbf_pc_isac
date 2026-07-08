@@ -489,12 +489,130 @@ class PGA_Unfold_JX_decay(nn.Module):
         return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W, gradient_norm_history) 
 
 
-# PGA_Unfold_J20_decay is identical to PGA_Unfold_J10_decay.
-# The max inner-iteration count is read dynamically from
-# self.step_size.shape[0], so passing a step_size tensor with
-# n_iter_inner_J20 rows gives J20 behaviour automatically.
-PGA_Unfold_J20_decay = PGA_Unfold_JX_decay
+class PGA_Unfold_JX_partial(nn.Module):
+    def __init__(self, step_size, Nt=None, Nrf=None, mask=None, alpha=0.01):
+        super().__init__()
 
+        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+        self.inner_iter_history = []
+        self.alpha = alpha
+
+        # 1. Defining the Mask
+        # If a custom binary mask tensor is passed, use it. 
+        # Otherwise, construct a standard block-diagonal mask for a sub-connected HBF architecture.
+        if mask is not None:
+            self.register_buffer('mask', mask.float())
+        elif Nt is not None and Nrf is not None:
+            assert Nt % Nrf == 0, "Number of antennas (Nt) must be perfectly divisible by RF chains (Nrf) for symmetric sub-connection."
+            ant_per_rf = Nt // Nrf
+            template_mask = torch.zeros(Nt, Nrf)
+            for r in range(Nrf):
+                template_mask[r * ant_per_rf : (r + 1) * ant_per_rf, r] = 1.0
+            self.register_buffer('mask', template_mask)
+        else:
+            raise ValueError("You must provide either a explicit 'mask' tensor or both 'Nt' and 'Nrf' dimensions.")
+
+    # =========== Projection Gradient Ascent execution ===================
+    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
+
+        _, F, W = initialize(H, Pt, initial_normalization)
+        
+        # 2. Apply Mask immediately after initialization to clear unauthorized paths
+        F = F * self.mask
+        
+        B = len(H[0])
+
+        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+
+        ## Inner loop
+        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+
+            for jj in range(n_inner):
+
+                grad_F_com = get_grad_F_com(H, F, W)
+                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                    print('Error NaN gradients!!!!!!!!!!!!!!!')
+
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+ 
+                # 2. Mask applied during gradient update step
+                F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB ) * self.mask
+
+                F = normalize_power(F, W, H, Pt)
+                F = F * self.mask # Ensure zero-mask is perfectly maintained after power scaling
+
+            return F
+
+        gradient_norm_history, gradient_norm_history_W = [], []
+
+        for ii in range(n_iter_outer):
+
+            n_inner = self.step_size.shape[0]
+    
+            if track_metrics:
+                for jj in range(n_inner):
+
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+
+                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                        print('Error NaN gradients during inner update!!!!!!!!!!!!!!!')
+
+                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+
+                    # 2. Mask applied during tracked gradient update step
+                    F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB) * self.mask
+
+                    # Scale F only, consistent with training path
+                    F = normalize_power(F, W, H, Pt)
+                    F = F * self.mask
+
+                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, jj] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    power_over_iters[ii, jj] = get_power(F, W).detach()
+
+            else:
+
+                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, use_reentrant=False)
+
+            # ----------------------------------------------------
+            # Projection of analog precoder
+            # ----------------------------------------------------
+            # CRITICAL CRUX: project_unit_modulus sets element magnitudes to 1 (e^jθ). 
+            # We MUST apply the mask right after to force un-connected phase shifters back to 0.
+            F = project_unit_modulus(F) * self.mask
+
+            # ----------------------------------------------------
+            # Digital precoder update
+            # ----------------------------------------------------
+            grad_W_k_com = get_grad_W_com(H, F, W)
+            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+            grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
+            
+            # Average entry-wise magnitude of ∇_W J
+            g_W = torch.abs(grad_J_w).reshape(grad_J_w.shape[0], -1).mean(dim=1)
+            gradient_norm_history_W.append(g_W.mean().item())
+
+            W_new = W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB
+
+            # Projection / normalization
+            F, W = normalize(F, W_new, H, Pt)
+            F = F * self.mask # Safeguard mask safety after composite normalization
+
+            # Record metrics after W-update
+            if track_metrics:
+
+                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, -1] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                power_over_iters[ii, -1] = get_power(F, W).detach()
+
+
+        return (rate_over_iters.transpose(0, 1), crb_over_iters.transpose(0, 1), power_over_iters.transpose(0, 1), F, W, gradient_norm_history, gradient_norm_history_W)
 # ============================================ Proposed PGA model with gradient reuse ====================================
 class PGA_Unfold_J_GradReuse(nn.Module):
     """Unfolded PGA with lazy gradient reuse to reduce per-inner-iteration cost.
@@ -705,167 +823,6 @@ class PGA_Unfold_J_GradReuse(nn.Module):
         return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
 
 
-# ============================================== Proposed PGA model light with preconditioner=============================
-class PGA_Unfold_J10_PRCDN(nn.Module):
-
-    def __init__(self, n_iter_inner, n_iter_outer, dim_F, dim_W):
-        super().__init__()
-
-        # ===== Diagonal preconditioner for F =====
-        # Shape: [n_iter_inner, n_iter_outer, 64]
-        self.mu = nn.Parameter( 1e-2 * torch.ones(n_iter_inner, n_iter_outer, dim_F, device=device))
-
-        # ===== Diagonal preconditioner for W =====
-        # Shape: [n_iter_outer, 4]
-        self.lambda_ = nn.Parameter( 1e-2 * torch.ones(n_iter_outer, dim_W, device=device))
-
-
-
-    # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
-        rate_init, F, W = initialize(H, Pt, initial_normalization)
-        B = len(H[0])
-        # Shape: (n_outer, J+1, B)
-        rate_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        crb_over_iters   = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-
-        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, mu_ii, n_inner, Pt):
-            for jj in range(n_inner):
-                grad_F_com = get_grad_F_com(H, F, W)
-                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
-                    print('Error NaN gradients!!!!!!!!!!!!!!!')
-                grad_vec_com = grad_F_com.reshape(64, -1)
-                grad_vec_crb = grad_F_crb.reshape(64, -1)
-                mu_vec = mu_ii[jj]
-                delta_vec_com = mu_vec.unsqueeze(1) * grad_vec_com
-                delta_vec_crb = mu_vec.unsqueeze(1) * grad_vec_crb
-                delta_F_com = delta_vec_com.reshape_as(grad_F_com)
-                delta_F_crb = delta_vec_crb.reshape_as(grad_F_crb)
-                F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
-                F = normalize_power(F, W, H, Pt)
-            return F
-
-        for ii in range(n_iter_outer):
-            if track_metrics:
-                # Run inner loop without checkpoint so we can record per-inner metrics
-                mu_ii = self.mu[:, ii]
-                for jj in range(n_iter_inner):
-                    grad_F_com = get_grad_F_com(H, F, W)
-                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-                    grad_vec_com = grad_F_com.reshape(64, -1)
-                    grad_vec_crb = grad_F_crb.reshape(64, -1)
-                    mu_vec = mu_ii[jj]
-                    delta_F_com = (mu_vec.unsqueeze(1) * grad_vec_com).reshape_as(grad_F_com)
-                    delta_F_crb = (mu_vec.unsqueeze(1) * grad_vec_crb).reshape_as(grad_F_crb)
-                    F = F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB
-                    F = normalize_power(F, W, H, Pt)
-                    rate_over_iters[ii, jj]  = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[ii, jj]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                    power_over_iters[ii, jj] = get_power(F, W).detach()
-            else:
-                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, self.mu[:, ii], n_iter_inner, Pt, use_reentrant=False)
-            F = project_unit_modulus(F)
-
-            # update W  (K == 1 always, unroll the k-loop)
-            grad_W_k_com = get_grad_W_com(H, F, W)
-            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-            lambda_vec = self.lambda_[ii]
-            grad_vec_com = grad_W_k_com[0].reshape(4, -1)
-            grad_vec_crb = grad_W_k_crb[0].reshape(4, -1)
-            delta_vec_com = lambda_vec.unsqueeze(1) * grad_vec_com
-            delta_vec_crb = lambda_vec.unsqueeze(1) * grad_vec_crb
-            W_new = W.clone().detach()
-            W_new[0] = W[0] + delta_vec_com.reshape_as(grad_W_k_com[0]) * WEIGHT_W_COM \
-                            + delta_vec_crb.reshape_as(grad_W_k_crb[0]) * WEIGHT_W_CRB
-
-            # Projection
-            F, W = normalize(F, W_new, H, Pt)
-
-            # Record metrics after W-update (last slot of this outer iter)
-            if track_metrics:
-                rate_over_iters[ii, -1]  = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, -1]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                power_over_iters[ii, -1] = get_power(F, W).detach()
-
-        # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
-        rates     = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        crb_fes   = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
-
-# ============================================== Proposed PGA model light for RMSProp=============================
-
-class PGA_Unfold_J10_RMSProp(nn.Module):
-
-    def __init__(self):
-        super().__init__()
-
-        self.beta = 0.9
-        self.eps = 1e-8
-        self.eta_F = 1e-2   # base learning rate for F
-        self.eta_W = 1e-2   # base learning rate for W
-
-
-
-    # =========== Projection Gradient Ascent execution ===================
-    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
-        rate_init, F, W = initialize(H, Pt, initial_normalization)
-        B = len(H[0])
-        # Shape: (n_outer, J+1, B)
-        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        crb_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-
-        s_F = torch.zeros_like(F)
-        s_W = torch.zeros_like(W)
-
-        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, s_F):
-            for jj in range(n_inner):
-                grad_F_com = get_grad_F_com(H, F, W)
-                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-                grad_F = grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB
-                s_F = self.beta * s_F + (1 - self.beta) * grad_F
-                F = F + self.eta_F * grad_F / (torch.sqrt(s_F) + self.eps)
-                F = normalize_power(F, W, H, Pt)
-            return F
-
-        for ii in range(n_iter_outer):
-            if track_metrics:
-                # Run inner loop without checkpoint so we can record per-inner metrics
-                for jj in range(n_iter_inner):
-                    grad_F_com = get_grad_F_com(H, F, W)
-                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-                    grad_F = grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB
-                    s_F = self.beta * s_F + (1 - self.beta) * grad_F
-                    F = F + self.eta_F * grad_F / (torch.sqrt(s_F) + self.eps)
-                    F = normalize_power(F, W, H, Pt)
-                    rate_over_iters[ii, jj + 1] = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[ii, jj + 1]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-            else:
-                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_iter_inner, Pt, s_F, use_reentrant=False)
-            F = project_unit_modulus(F)
-
-            # update W with RMSProp (K == 1 always, unroll the k-loop)
-            grad_W_k_com = get_grad_W_com(H, F, W)
-            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
-            if ii == 0:
-                s_W = torch.zeros_like(W)
-            grad_W_0 = grad_W_k_com[0] * WEIGHT_W_COM + grad_W_k_crb[0] * WEIGHT_W_CRB
-            s_W[0] = self.beta * s_W[0] + (1 - self.beta) * grad_W_0
-            W_new = W.clone()
-            W_new[0] = W[0] + self.eta_W * grad_W_0 / (torch.sqrt(s_W[0]) + self.eps)
-            F, W = normalize(F, W_new, H, Pt)
-
-            # Record metrics after W-update (slot 0 of this outer iter)
-            if track_metrics:
-                rate_over_iters[ii, 0] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, 0]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-
-        # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1))
-        rates   = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), F, W
 
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             COMM GRADIENTS
@@ -939,307 +896,6 @@ def get_grad_W_com(H, F, W):
 
     grad_W = grad_W / K
     return grad_W
-
-
-def generate_pi_matrix(B_matrix, H_tilde, Nt, Nrf):
-    """
-    Batched Pi matrix generation for partially connected architecture.
-    
-    Parameters
-    ----------
-    B_matrix : torch.Tensor
-        Digital covariance matrix, shape (Bsz, Nrf, Nrf)
-    H_tilde : torch.Tensor
-        Channel outer product, shape (Bsz, Nt, Nt)
-    Nt : int
-        Total number of antennas
-    Nrf : int
-        Number of RF chains (subarrays)
-    
-    Returns
-    -------
-    Pi : torch.Tensor
-        Condensed sensing/channel matrix, shape (Bsz, Nt, Nt)
-    """
-    Bsz = B_matrix.shape[0]
-    antennas_per_rf = Nt // Nrf
-    
-    Bt = B_matrix.transpose(-1, -2)  # (Bsz, Nrf, Nrf)
-    # Reshape H_tilde into (Bsz, Nrf, aprf, Nrf, aprf) blocks, scale by Bt, reshape back
-    H_blocks = H_tilde.reshape(Bsz, Nrf, antennas_per_rf, Nrf, antennas_per_rf)
-    Pi_blocks = Bt.unsqueeze(2).unsqueeze(4) * H_blocks  # (Bsz, Nrf, aprf, Nrf, aprf)
-    Pi = Pi_blocks.reshape(Bsz, Nt, Nt)
-    return Pi
-
-
-def quad_form(Pi, f):
-    """
-    Computes f^H Pi f for batch.
-    
-    Parameters
-    ----------
-    Pi : torch.Tensor
-        Matrix, shape (B, Nt, Nt)
-    f : torch.Tensor
-        Vector, shape (B, Nt, 1)
-    
-    Returns
-    -------
-    result : torch.Tensor
-        Quadratic form result, shape (B, 1, 1)
-    """
-    return torch.bmm(f.conj().transpose(-1, -2), torch.bmm(Pi, f))
-
-
-def extract_active_elements_pc(F, Nt, Nrf):
-    """
-    Extract active (non-zero) elements from a block-diagonal analog precoder.
-    
-    Parameters
-    ----------
-    F : torch.Tensor
-        Analog precoder of shape (B, Nt, Nrf), complex
-    Nt : int
-        Total number of antennas
-    Nrf : int
-        Number of RF chains (subarrays)
-    
-    Returns
-    -------
-    f_active : torch.Tensor
-        Active elements of shape (B, Nt, 1)
-    """
-    B = F.shape[0]
-    antennas_per_rf = Nt // Nrf
-    
-    # Reshape F into blocks: F_blocks[b, m, r, n] = F[b, m*aprf+r, n]
-    F_blocks = F.reshape(B, Nrf, antennas_per_rf, Nrf)
-    # Extract diagonal blocks: F_diag[b, r, m] = F_blocks[b, m, r, m] = F[b, m*aprf+r, m]
-    F_diag = torch.diagonal(F_blocks, dim1=1, dim2=3)  # (B, aprf, Nrf)
-    # Rearrange to active vector layout: f_active[b, m*aprf+r, 0] = F[b, m*aprf+r, m]
-    f_active = F_diag.permute(0, 2, 1).reshape(B, Nt, 1)
-    return f_active
-
-
-def compute_digital_covariance_pc(W, Pt, Nrf, eps=1e-12):
-    """
-    Computes the digital precoder covariance matrix V = W W^H
-    with PC-specific power normalization.
-    
-    Parameters
-    ----------
-    W : torch.Tensor
-        Digital precoder, shape (B, Nrf, M)
-    Pt : float or torch.Tensor
-        Total transmit power (scalar or shape (B,))
-    Nrf : int
-        Number of RF chains (used for PC normalization)
-    eps : float
-        Numerical stability constant
-    
-    Returns
-    -------
-    V : torch.Tensor
-        Digital covariance matrix, shape (B, Nrf, Nrf)
-    """
-    B = W.shape[0]
-    
-    # Frobenius norm ||W||_F per batch
-    fro_norm = torch.linalg.norm(W, ord='fro', dim=(1, 2), keepdim=True)  # (B, 1, 1)
-    
-    # Handle scalar or batched Pt
-    if not torch.is_tensor(Pt):
-        P_vec = torch.tensor(float(Pt), device=W.device).view(1).repeat(B)
-    else:
-        P_vec = Pt.to(W.device).view(B) if Pt.dim() > 0 else Pt.repeat(B)
-    
-    # sqrt(Pt / Nrf) for PC normalization
-    scale = torch.sqrt(P_vec / Nrf).view(B, 1, 1)
-    
-    # Normalized W (PC case)
-    W_normalized = scale * W / (fro_norm + eps)
-    
-    # Digital covariance V = W W^H
-    V = torch.bmm(W_normalized, W_normalized.conj().transpose(-1, -2))  # (B, Nrf, Nrf)
-    
-    return V
-
-
-def get_grad_F_rad_AP(F, W, R, Pt, Nt, Nrf):
-    """
-    Computes the Euclidean gradient of the sensing objective
-    for partially connected architecture.
-    
-    This is the sensing/radar gradient: ∇_f τ where τ = ||f^H Pi f - target||²
-    
-    Parameters
-    ----------
-    F : torch.Tensor
-        Analog precoder, shape (K, B, Nt, Nrf) or (B, Nt, Nrf)
-    W : torch.Tensor
-        Digital precoder, shape (K, B, Nrf, M) or (B, Nrf, M)
-    R : torch.Tensor
-        Target sensing covariance matrix, shape (K, B, Nt, Nt) or (B, Nt, Nt)
-    Pt : float or torch.Tensor
-        Total transmit power
-    Nt : int
-        Total number of antennas
-    Nrf : int
-        Number of RF chains
-    
-    Returns
-    -------
-    grad_F : torch.Tensor
-        Gradient w.r.t. F in active element space, same shape as F
-    """
-    # Handle both 4D (K, B, Nt, Nrf) and 3D (B, Nt, Nrf) inputs
-    if F.dim() == 4:
-        K_freq, Bsz, _, _ = F.shape
-        F_single = F[0]  # Work with first frequency
-        W_single = W[0] if W.dim() == 4 else W
-        R_single = R[0] if R.dim() == 4 else R
-    else:
-        Bsz = F.shape[0]
-        F_single = F
-        W_single = W
-        R_single = R
-        K_freq = None
-    
-    # ---------------------------------------------------
-    # 1. Extract active elements
-    # ---------------------------------------------------
-    f_active = extract_active_elements_pc(F_single, Nt, Nrf)  # (B, Nt, 1)
-    
-    # ---------------------------------------------------
-    # 2. Compute digital covariance V = W W^H (normalized)
-    # ---------------------------------------------------
-    V = compute_digital_covariance_pc(W_single, Pt, Nrf)  # (B, Nrf, Nrf)
-    
-    # ---------------------------------------------------
-    # 3. Generate Pi matrix: Pi = Σ_rf V_rf * R_block
-    # ---------------------------------------------------
-    Pi = generate_pi_matrix(V, R_single, Nt, Nrf)  # (B, Nt, Nt)
-    
-    # ---------------------------------------------------
-    # 4. Compute gradient: ∇_f τ = 2 * Pi * f
-    #    This is the gradient of f^H Pi f w.r.t. f
-    # ---------------------------------------------------
-    grad_f_active = 2.0 * torch.bmm(Pi, f_active)  # (B, Nt, 1)
-    
-    # ---------------------------------------------------
-    # 5. Lift gradient from active vector back to F matrix
-    # ---------------------------------------------------
-    aprf = Nt // Nrf
-    eye_nrf = torch.eye(Nrf, device=grad_f_active.device, dtype=grad_f_active.dtype)
-    gf = grad_f_active.squeeze(-1).reshape(Bsz, Nrf, aprf)            # (B, Nrf, aprf)
-    grad_F_blocks = gf.unsqueeze(-1) * eye_nrf.unsqueeze(0).unsqueeze(2)  # (B, Nrf, aprf, Nrf)
-    grad_F = grad_F_blocks.reshape(Bsz, Nt, Nrf)
-    
-    # ---------------------------------------------------
-    # 6. Replicate for all frequencies if needed
-    # ---------------------------------------------------
-    if K_freq is not None:
-        grad_F_all_freq = torch.cat([grad_F.unsqueeze(0)] * K_freq, dim=0)
-        return grad_F_all_freq
-    else:
-        return grad_F
-
-
-def get_grad_F_com_AP(f_active, H, F, W):
-    """
-    Computes ∇_a R for partially connected architecture.
-    
-    Parameters
-    ----------
-    H : (K, B, M, Nt) channel
-    F : (K, B, Nt, Nrf) analog precoder
-    W : (K, B, Nrf, M) digital precoder
-    
-    Returns
-    -------
-    grad_F : (K, B, Nt, Nrf) gradient of rate w.r.t. F
-    """
-    
-    # Get dimensions from F
-    K_freq, Bsz, Nt, Nrf = F.shape
-    _, _, M, _ = H.shape
-    
-    # ---------------------------------------------------
-    # 1. Extract active elements: f = N[vec(F)]
-    # ---------------------------------------------------
-    # f_active shape: (B, Nt, 1)
-    
-    # ---------------------------------------------------
-    # 2. Channel outer products: H̃_m = h_m h_m^H
-    # ---------------------------------------------------
-    # H shape: (K, B, M, Nt), we need (B, M, Nt, Nt)
-    H_single_freq = H[0]  # (B, M, Nt) - work with first frequency for gradient
-    H_tilde = (
-        H_single_freq.unsqueeze(-1) @ H_single_freq.conj().unsqueeze(-2)
-    )  # (B, M, Nt, Nt)
-    
-    # ---------------------------------------------------
-    # 3. Digital covariance terms
-    # ---------------------------------------------------
-    W_single_freq = W[0]  # (B, Nrf, M)
-    w = W_single_freq.permute(0, 2, 1).unsqueeze(-1)   # (B, M, Nrf, 1)
-    BmT = w @ w.conj().transpose(-1, -2)  # (B, M, Nrf, Nrf)
-    B_all = BmT.sum(dim=1, keepdim=True)  # (B, 1, Nrf, Nrf)
-    BmT_tilde = B_all - BmT               # (B, M, Nrf, Nrf)
-    
-    ln2 = torch.log(torch.tensor(2.0, device=F.device))
-    grad_f_active = torch.zeros_like(f_active)
-    
-    # ---------------------------------------------------
-    # 4. Sum over m (users)
-    # ---------------------------------------------------
-    for m in range(M):
-        # Generate Pi matrices using digital covariance and channel outer products
-        Pi_mm = generate_pi_matrix(
-            BmT[:, m], H_tilde[:, m], Nt, Nrf
-        )  # (B, Nt, Nt)
-        
-        Pi_m_tilde = generate_pi_matrix(
-            BmT_tilde[:, m], H_tilde[:, m], Nt, Nrf
-        )  # (B, Nt, Nt)
-        
-        # Quadratic forms
-        fH_Pi_mm_f = quad_form(Pi_mm, f_active)  # (B, 1, 1)
-        fH_Pi_m_tilde_f = quad_form(Pi_m_tilde, f_active)  # (B, 1, 1)
-        
-        # Denominators with noise
-        denom1 = (
-            fH_Pi_mm_f + fH_Pi_m_tilde_f + sigma2
-        )
-        denom2 = fH_Pi_m_tilde_f + sigma2
-        
-        # Gradient terms
-        term1 = (
-            fH_Pi_mm_f / (ln2 * denom1)
-        )
-        
-        term2 = (
-            2 * fH_Pi_mm_f
-            * torch.bmm(Pi_m_tilde, f_active)
-            / (ln2 * denom1 * denom2)
-        )
-        
-        grad_f_active += term1 * f_active - term2
-    
-    # ---------------------------------------------------
-    # 5. Lift gradient from active vector back to F matrix
-    # ---------------------------------------------------
-    aprf = Nt // Nrf
-    eye_nrf = torch.eye(Nrf, device=grad_f_active.device, dtype=grad_f_active.dtype)
-    gf = grad_f_active.squeeze(-1).reshape(Bsz, Nrf, aprf)            # (B, Nrf, aprf)
-    grad_F_blocks = gf.unsqueeze(-1) * eye_nrf.unsqueeze(0).unsqueeze(2)  # (B, Nrf, aprf, Nrf)
-    grad_F = grad_F_blocks.reshape(Bsz, Nt, Nrf)
-    
-    # Replicate for all frequencies
-    grad_F_all_freq = torch.cat([grad_F.unsqueeze(0)] * K_freq, dim=0)
-    
-    return grad_F_all_freq
-
 
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             RADAR GRADIENTS

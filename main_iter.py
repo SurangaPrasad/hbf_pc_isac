@@ -273,6 +273,34 @@ if run_program == 1:
         crb_iter_UPGA_J20  = crb_UPGA_J20.mean(0).cpu().numpy()
         power_iter_UPGA_J20 = power_UPGA_J20.mean(0).cpu().numpy()
     
+    if run_UPGA_partial_J5 == 1:
+        print('Running unfolded PGA with J = 5 and partial coupling...')
+        # Create new model and load states
+        model_UPGA_partial_J5 = PGA_Unfold_JX_partial(step_size_UPGA_J5)
+        model_UPGA_partial_J5.load_state_dict(torch.load(model_file_name_UPGA_partial_J5, map_location=device))
+        register_step_size('UPGA (J=5, partial)', model_UPGA_partial_J5.step_size)
+        sum_rate_UPGA_partial_J5, crb_UPGA_partial_J5, power_UPGA_partial_J5, F_UPGA_partial_J5, W_UPGA_partial_J5, gradient_norm_history_UPGA_partial_J5, gradient_norm_history_UPGA_partial_J5_W = model_UPGA_partial_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J5)
+        rate_iter_UPGA_partial_J5  = sum_rate_UPGA_partial_J5.mean(0).cpu().numpy()
+        crb_iter_UPGA_partial_J5   = crb_UPGA_partial_J5.mean(0).cpu().numpy()
+        power_iter_UPGA_partial_J5 = power_UPGA_partial_J5.mean(0).cpu().numpy()    
+    
+    if run_UPGA_partial_J10 == 1:
+        print('Running unfolded PGA with J = 10 and partial coupling...')
+        # Create new model and load states
+        model_UPGA_partial_J10 = PGA_Unfold_JX_partial(step_size_UPGA_J10)
+        model_UPGA_partial_J10.load_state_dict(torch.load(model_file_name_UPGA_partial_J10, map_location=device))
+        register_step_size('UPGA (J=10, partial)', model_UPGA_partial_J10.step_size)
+        sum_rate_UPGA_partial_J10, crb_UPGA_partial_J10, power_UPGA_partial_J10, F_UPGA_partial_J10, W_UPGA_partial_J10, gradient_norm_history_UPGA_partial_J10, gradient_norm_history_UPGA_partial_J10_W = model_UPGA_partial_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J10)
+        rate_iter_UPGA_partial_J10  = sum_rate_UPGA_partial_J10.mean(0).cpu().numpy()
+        crb_iter_UPGA_partial_J10   = crb_UPGA_partial_J10.mean(0).cpu().numpy()
+        power_iter_UPGA_partial_J10 = power_UPGA_partial_J10.mean(0).cpu().numpy()
+    
     # ====================================================== Propsed Unofolded PGA with PRCDN ====================================
 
     if run_UPGA_J10_PRCDN:
@@ -709,6 +737,13 @@ if plot_figure == 1:
     if run_UPGA_J10 == 1:
         obj_iter_UPGA_J10 = OMEGA * rate_iter_UPGA_J10[outer_idx_J10] + crb_iter_UPGA_J10[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_J10, '--o', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
+
+    if run_UPGA_partial_J5 == 1:
+        obj_iter_UPGA_partial_J5 = OMEGA * rate_iter_UPGA_partial_J5[outer_idx_J5] + crb_iter_UPGA_partial_J5[outer_idx_J5]
+        plt.plot(iter_outer_x, obj_iter_UPGA_partial_J5, '--^', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_partial_J5)
+    if run_UPGA_partial_J10 == 1:
+        obj_iter_UPGA_partial_J10 = OMEGA * rate_iter_UPGA_partial_J10[outer_idx_J10] + crb_iter_UPGA_partial_J10[outer_idx_J10]
+        plt.plot(iter_outer_x, obj_iter_UPGA_partial_J10, '--v', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_partial_J10)
     # if run_UPGA_J20 == 1:
     #     obj_iter_UPGA_J20 = OMEGA * rate_iter_UPGA_J20[outer_idx_J20] + crb_iter_UPGA_J20[outer_idx_J20]
     #     plt.plot(iter_outer_x, obj_iter_UPGA_J20, '-->', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)

@@ -165,35 +165,46 @@ if plot_figure == 1:
         print(f'Loading SNR plot data from {snr_cache_file_name}...')
         globals().update(load_snr_plot_cache(snr_cache_file_name))
 
+    # Keep legend text consistent with objective-function figures.
+    label_conv_PGA_J5_obj = 'Conv. PGA, 600 inner iterations'
+    label_conv_PGA_J10_obj = 'Conv. PGA, 1200 inner iterations'
+    label_UPGA_J4_obj = 'Fixed-UPGA-reduced, 480 inner layers'
+    label_UPGA_J5_obj = 'Fixed-UPGA-all, 600 inner layers'
+    label_UPGA_J6_obj = 'Fixed-UPGA-reduced, 720 inner layers'
+    label_UPGA_J10_obj = 'Fixed-UPGA-all, 1200 inner layers'
+    label_UPGA_J5_decay_obj = 'Dynamic-UPGA, 421 inner layers'
+    label_UPGA_J10_decay_obj = 'Dynamic-UPGA, 722 inner layers'
+
     # ========================== plot rate vs SNR ==========================
     plt.figure(figsize=(8, 4.2))
     if run_conv_PGA == 1:
         plt.plot(snr_dB_list, rate_conv_PGA, '--', color='black', linewidth=3, markersize=8, label=Conv_PGA_J1)
     if run_conv_PGA_J5 == 1:
-        plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=8, label=Conv_PGA_J5)
+        plt.plot(snr_dB_list, rate_conv_PGA_J5, '--', color='blue', linewidth=3, markersize=8, label=label_conv_PGA_J5_obj)
     if run_conv_PGA_J10 == 1:
-        plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=8, label=Conv_PGA_J10)
+        plt.plot(snr_dB_list, rate_conv_PGA_J10, '-*', color='blue', linewidth=3, markersize=8, label=label_conv_PGA_J10_obj)
     if run_UPGA_J4 == 1:
-        plt.plot(snr_dB_list, rate_UPGA_J4, '--', color='orange', linewidth=3, markersize=8, label=label_UPGA_J4)
+        plt.plot(snr_dB_list, rate_UPGA_J4, '--', color='orange', linewidth=3, markersize=8, label=label_UPGA_J4_obj)
     if run_UPGA_J5 == 1:
-        plt.plot(snr_dB_list, rate_UPGA_J5, '--', color='red', linewidth=3, markersize=8, label=label_UPGA_J5)
+        plt.plot(snr_dB_list, rate_UPGA_J5, '--', color='red', linewidth=3, markersize=8, label=label_UPGA_J5_obj)
     if run_UPGA_J6 == 1:
-        plt.plot(snr_dB_list, rate_UPGA_J6, '-d', color='orange', linewidth=3, markersize=8, label=label_UPGA_J6)
+        plt.plot(snr_dB_list, rate_UPGA_J6, '-d', color='orange', linewidth=3, markersize=8, label=label_UPGA_J6_obj)
     if run_UPGA_J10 == 1:
-        plt.plot(snr_dB_list, rate_UPGA_J10, '-*', color='red', linewidth=3, markersize=8, label=label_UPGA_J10)
+        plt.plot(snr_dB_list, rate_UPGA_J10, '-*', color='red', linewidth=3, markersize=8, label=label_UPGA_J10_obj)
     if run_UPGA_J20 == 1:
         plt.plot(snr_dB_list, rate_UPGA_J20, '-*', color='red', linewidth=3, markersize=8, label=label_UPGA_J20)
         plt.plot(snr_dB_list, rate_conv_PGA, ':', color='black', linewidth=3, markersize=8, label=label_conv)
     if run_UPGA_J5_decay == 1:
-        plt.plot(snr_dB_list, rate_UPGA_J5_decay, '--', color='green', linewidth=3, markersize=8, label=label_UPGA_J5_decay)
+        plt.plot(snr_dB_list, rate_UPGA_J5_decay, '--', color='green', linewidth=3, markersize=8, label=label_UPGA_J5_decay_obj)
     if run_UPGA_J10_decay == 1:
-        plt.plot(snr_dB_list, rate_UPGA_J10_decay, '-*', color='green', linewidth=3, markersize=8, label=label_UPGA_J10_decay)
+        plt.plot(snr_dB_list, rate_UPGA_J10_decay, '-*', color='green', linewidth=3, markersize=8, label=label_UPGA_J10_decay_obj)
     if run_UPGA_J20_decay == 1:
         plt.plot(snr_dB_list, rate_UPGA_J20_decay, ':p', color='green', linewidth=3, markersize=8, label=label_UPGA_J20_decay)
 
     plt.xlabel('SNR [dB]', fontsize=14)
     plt.ylabel(r'$R$ [bits/s/Hz]', fontsize=14)
     plt.grid()
+    safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False, columnspacing=0.6)
     plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
     plt.savefig(directory_result + 'rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
@@ -214,23 +225,23 @@ if plot_figure == 1:
     if run_conv_PGA == 1:
         curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA), '--', 'black', Conv_PGA_J1))
     if run_conv_PGA_J5 == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J5), '--', 'blue', Conv_PGA_J5))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J5), '--', 'blue', label_conv_PGA_J5_obj))
     if run_conv_PGA_J10 == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J10), '-*', 'blue', Conv_PGA_J10))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_conv_PGA_J10), '-*', 'blue', label_conv_PGA_J10_obj))
     if run_UPGA_J4 == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J4), '--', 'orange', label_UPGA_J4))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J4), '--', 'orange', label_UPGA_J4_obj))
     if run_UPGA_J5 == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5), '--', 'red', label_UPGA_J5))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5), '--', 'red', label_UPGA_J5_obj))
     if run_UPGA_J6 == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J6), '-d', 'orange', label_UPGA_J6))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J6), '-d', 'orange', label_UPGA_J6_obj))
     if run_UPGA_J10 == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J10), '-*', 'red', label_UPGA_J10))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J10), '-*', 'red', label_UPGA_J10_obj))
     if run_UPGA_J20 == 1:
         curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J20), ':s', 'red', label_UPGA_J20))
     if run_UPGA_J5_decay == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5_decay), '--', 'green', label_UPGA_J5_decay))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J5_decay), '--', 'green', label_UPGA_J5_decay_obj))
     if run_UPGA_J10_decay == 1:
-        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J10_decay), '-*', 'green', label_UPGA_J10_decay))
+        curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J10_decay), '-*', 'green', label_UPGA_J10_decay_obj))
     if run_UPGA_J20_decay == 1:
         curves.append((snr_dB_list, crlb_from_log_inv(CRB_UPGA_J20_decay), ':p', 'green', label_UPGA_J20_decay))
 
@@ -267,6 +278,6 @@ if plot_figure == 1:
     axins.patch.set_facecolor("white")
 
     mark_inset(ax, axins, loc1=2, loc2=4, fc="white", ec="0.4", linewidth=1)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=12, labelspacing=0.1, ncol=2, frameon=False, columnspacing=0.6)
+    safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), fontsize=11, labelspacing=0.1, ncol=2, frameon=False, columnspacing=0.6)
     plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
     plt.savefig(directory_result + 'CRB_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)

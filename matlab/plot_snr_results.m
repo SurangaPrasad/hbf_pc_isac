@@ -28,46 +28,37 @@ orange = [1.00 0.55 0.00];
 figure('Color', 'w', 'Units', 'inches', 'Position', [1.5 1.5 8 4.2]);
 hold on; grid on;
 
-if isfield(S, 'rate_conv_PGA')
-    plot(snr_dB_list, as_row(S.rate_conv_PGA), '--', 'Color', black, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA J1');
-end
 if isfield(S, 'rate_conv_PGA_J5')
-    plot(snr_dB_list, as_row(S.rate_conv_PGA_J5), '--', 'Color', blue, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA J5');
+    plot(snr_dB_list, as_row(S.rate_conv_PGA_J5), ':d', 'Color', blue, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA, 600 inner iterations');
 end
 if isfield(S, 'rate_conv_PGA_J10')
-    plot(snr_dB_list, as_row(S.rate_conv_PGA_J10), '-*', 'Color', blue, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA J10');
+    plot(snr_dB_list, as_row(S.rate_conv_PGA_J10), ':o', 'Color', blue, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Conv. PGA, 1200 inner iterations');
 end
 
 if isfield(S, 'rate_UPGA_J4')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J4), '--', 'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J4');
+    plot(snr_dB_list, as_row(S.rate_UPGA_J4), '--', 'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Fixed-UPGA-reduced, 480 inner layers');
 end
 if isfield(S, 'rate_UPGA_J5')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J5), '--', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J5');
+    plot(snr_dB_list, as_row(S.rate_UPGA_J5), '--d', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Fixed-UPGA-all, 600 inner layers');
 end
 if isfield(S, 'rate_UPGA_J6')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J6), '-d', 'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J6');
+    plot(snr_dB_list, as_row(S.rate_UPGA_J6), '--s', 'Color', orange, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Fixed-UPGA-reduced, 720 inner layers');
 end
 if isfield(S, 'rate_UPGA_J10')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J10), '-*', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J10');
-end
-if isfield(S, 'rate_UPGA_J20')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J20), '-*', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J20');
+    plot(snr_dB_list, as_row(S.rate_UPGA_J10), '--o', 'Color', red, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Fixed-UPGA-all, 1200 inner layers');
 end
 
 if isfield(S, 'rate_UPGA_J5_decay')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J5_decay), '--', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J5 decay');
+    plot(snr_dB_list, as_row(S.rate_UPGA_J5_decay), '-d', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Dynamic-UPGA, 421 inner layers');
 end
 if isfield(S, 'rate_UPGA_J10_decay')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J10_decay), '-*', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J10 decay');
-end
-if isfield(S, 'rate_UPGA_J20_decay')
-    plot(snr_dB_list, as_row(S.rate_UPGA_J20_decay), ':p', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'UPGA J20 decay');
+    plot(snr_dB_list, as_row(S.rate_UPGA_J10_decay), '-o', 'Color', green, 'LineWidth', 3, 'MarkerSize', 8, 'DisplayName', 'Dynamic-UPGA, 722 inner layers');
 end
 
 xlabel('SNR [dB]', 'FontSize', 14);
 ylabel('R [bits/s/Hz]', 'FontSize', 14);
 set(gca, 'FontSize', 12);
-legend('Location', 'best');
+
 
 rate_png = fullfile(result_dir, sprintf('rate_vs_SNR_%d_%g_matlab.png', Nt, OMEGA));
 rate_eps = fullfile(result_dir, sprintf('rate_vs_SNR_%d_%g_matlab.eps', Nt, OMEGA));
@@ -81,40 +72,31 @@ hold(ax, 'on');
 grid(ax, 'on');
 
 curves = {};
-if isfield(S, 'CRB_conv_PGA')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA)), '--', black, 'Conv. PGA J1'}; %#ok<AGROW>
-end
 if isfield(S, 'CRB_conv_PGA_J5')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA_J5)), '--', blue, 'Conv. PGA J5'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA_J5)), ':d', blue, 'Conv. PGA, 600 inner iterations', false}; %#ok<AGROW>
 end
 if isfield(S, 'CRB_conv_PGA_J10')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA_J10)), '-*', blue, 'Conv. PGA J10'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_conv_PGA_J10)), ':o', blue, 'Conv. PGA, 1200 inner iterations', false}; %#ok<AGROW>
 end
 
 if isfield(S, 'CRB_UPGA_J4')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J4)), '--', orange, 'UPGA J4'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J4)), '--', orange, 'Fixed-UPGA-reduced, 480 inner layers', true}; %#ok<AGROW>
 end
 if isfield(S, 'CRB_UPGA_J5')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J5)), '--', red, 'UPGA J5'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J5)), '--d', red, 'Fixed-UPGA-all, 600 inner layers', true}; %#ok<AGROW>
 end
 if isfield(S, 'CRB_UPGA_J6')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J6)), '-d', orange, 'UPGA J6'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J6)), '--s', orange, 'Fixed-UPGA-reduced, 720 inner layers', true}; %#ok<AGROW>
 end
 if isfield(S, 'CRB_UPGA_J10')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J10)), '-*', red, 'UPGA J10'}; %#ok<AGROW>
-end
-if isfield(S, 'CRB_UPGA_J20')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J20)), ':s', red, 'UPGA J20'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J10)), '--o', red, 'Fixed-UPGA-all, 1200 inner layers', true}; %#ok<AGROW>
 end
 
 if isfield(S, 'CRB_UPGA_J5_decay')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J5_decay)), '--', green, 'UPGA J5 decay'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J5_decay)), '-d', green, 'Dynamic-UPGA, 421 inner layers', true}; %#ok<AGROW>
 end
 if isfield(S, 'CRB_UPGA_J10_decay')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J10_decay)), '-*', green, 'UPGA J10 decay'}; %#ok<AGROW>
-end
-if isfield(S, 'CRB_UPGA_J20_decay')
-    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J20_decay)), ':p', green, 'UPGA J20 decay'}; %#ok<AGROW>
+    curves{end+1} = {snr_dB_list, crlb_from_log_inv(as_row(S.CRB_UPGA_J10_decay)), '-o', green, 'Dynamic-UPGA, 722 inner layers', true}; %#ok<AGROW>
 end
 
 for i = 1:numel(curves)
@@ -139,9 +121,14 @@ xlim(axins, [10 12]);
 zoom_vals = [];
 for i = 1:numel(curves)
     c = curves{i};
-    mask = (c{1} >= 10) & (c{1} <= 12);
-    if any(mask)
-        zoom_vals = [zoom_vals, c{2}(mask)]; %#ok<AGROW>
+
+    include_in_zoom_vals = c{6};
+
+    if include_in_zoom_vals
+        mask = (c{1} >= 10) & (c{1} <= 12);
+        if any(mask)
+            zoom_vals = [zoom_vals, c{2}(mask)]; %#ok<AGROW>
+        end
     end
 end
 if ~isempty(zoom_vals)
