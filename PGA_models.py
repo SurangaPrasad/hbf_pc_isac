@@ -518,7 +518,7 @@ class PGA_Unfold_JX_partial(nn.Module):
         _, F, W = initialize(H, Pt, initial_normalization)
         
         # 2. Apply Mask immediately after initialization to clear unauthorized paths
-        F = F * self.mask
+        F = F * self.mask.to(F.device)
         
         B = len(H[0])
 
@@ -540,10 +540,10 @@ class PGA_Unfold_JX_partial(nn.Module):
                 delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
  
                 # 2. Mask applied during gradient update step
-                F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB ) * self.mask
+                F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB ) * self.mask.to(F.device)
 
                 F = normalize_power(F, W, H, Pt)
-                F = F * self.mask # Ensure zero-mask is perfectly maintained after power scaling
+                F = F * self.mask.to(F.device) # Ensure zero-mask is perfectly maintained after power scaling
 
             return F
 
@@ -566,11 +566,11 @@ class PGA_Unfold_JX_partial(nn.Module):
                     delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
 
                     # 2. Mask applied during tracked gradient update step
-                    F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB) * self.mask
+                    F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB) * self.mask.to(F.device)
 
                     # Scale F only, consistent with training path
                     F = normalize_power(F, W, H, Pt)
-                    F = F * self.mask
+                    F = F * self.mask.to(F.device)
 
                     rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
                     crb_over_iters[ii, jj] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
