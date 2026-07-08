@@ -75,6 +75,7 @@ def run_UPGA_partial(step_size_UPGA, Nt, Nrf):
         avg_loss = sum(batch_losses) / len(batch_losses)
         epoch_losses.append(avg_loss)
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
+    torch.save(model_UPGA_partial.state_dict(), directory_model + f'UPGA_partial_J{step_size_UPGA.shape[0]}.pth')
 
 def run_UPGA(step_size_UPGA):
     # print(f"Running UPGA with J = {step_size_UPGA.shape[0]}...")
