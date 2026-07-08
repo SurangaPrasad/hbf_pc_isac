@@ -489,6 +489,7 @@ if plot_figure == 1:
     outer_idx_J20 = np.arange(n_iter_inner_J20,
                               n_iter_outer * (n_iter_inner_J20 + 1),
                               n_iter_inner_J20 + 1)   # length = n_iter_outer
+
     # outer_idx for J_decay/adaptive schedule: W-update is the LAST slot of each block
     if run_UPGA_J5_decay == 1:
         outer_idx_J5_decay = []
@@ -739,10 +740,10 @@ if plot_figure == 1:
         plt.plot(iter_outer_x, obj_iter_UPGA_J10, '--o', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J10)
 
     if run_UPGA_partial_J5 == 1:
-        obj_iter_UPGA_partial_J5 = OMEGA * rate_iter_UPGA_partial_J5[outer_idx_J5] + crb_iter_UPGA_partial_J5[outer_idx_J5]
+        obj_iter_UPGA_partial_J5 = OMEGA * rate_iter_UPGA_partial_J5[n_iter_outer] + crb_iter_UPGA_partial_J5[n_iter_outer]
         plt.plot(iter_outer_x, obj_iter_UPGA_partial_J5, '--^', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_partial_J5)
     if run_UPGA_partial_J10 == 1:
-        obj_iter_UPGA_partial_J10 = OMEGA * rate_iter_UPGA_partial_J10[outer_idx_J10] + crb_iter_UPGA_partial_J10[outer_idx_J10]
+        obj_iter_UPGA_partial_J10 = OMEGA * rate_iter_UPGA_partial_J10[n_iter_outer] + crb_iter_UPGA_partial_J10[n_iter_outer]
         plt.plot(iter_outer_x, obj_iter_UPGA_partial_J10, '--v', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_partial_J10)
     # if run_UPGA_J20 == 1:
     #     obj_iter_UPGA_J20 = OMEGA * rate_iter_UPGA_J20[outer_idx_J20] + crb_iter_UPGA_J20[outer_idx_J20]
