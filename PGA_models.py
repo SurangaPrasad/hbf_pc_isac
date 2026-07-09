@@ -612,6 +612,8 @@ class PGA_Unfold_JX_partial(nn.Module):
                 power_over_iters[ii, -1] = get_power(F, W).detach()
 
 
+        print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
+
         # Match PGA_Unfold_JX output convention:
         # flatten to (n_outer*(J+1), B), then transpose to (B, n_outer*(J+1)).
         rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
