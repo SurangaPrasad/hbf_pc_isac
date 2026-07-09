@@ -612,7 +612,21 @@ class PGA_Unfold_JX_partial(nn.Module):
                 power_over_iters[ii, -1] = get_power(F, W).detach()
 
 
-        return (rate_over_iters.transpose(0, 1), crb_over_iters.transpose(0, 1), power_over_iters.transpose(0, 1), F, W, gradient_norm_history, gradient_norm_history_W)
+        # Match PGA_Unfold_JX output convention:
+        # flatten to (n_outer*(J+1), B), then transpose to (B, n_outer*(J+1)).
+        rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+
+        return (
+            rates.transpose(0, 1),
+            crb_fes.transpose(0, 1),
+            power_fes.transpose(0, 1),
+            F,
+            W,
+            gradient_norm_history,
+            gradient_norm_history_W,
+        )
 # ============================================ Proposed PGA model with gradient reuse ====================================
 class PGA_Unfold_J_GradReuse(nn.Module):
     """Unfolded PGA with lazy gradient reuse to reduce per-inner-iteration cost.
