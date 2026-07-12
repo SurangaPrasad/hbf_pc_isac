@@ -88,7 +88,7 @@ def run_UPGA_partial_decay(step_size_UPGA, Nt, Nrf):
 
         H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
 
-        for i_batch in range(0, len(H_train), batch_size):
+        for i_batch in range(0, len(H_train[0]), batch_size):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]
             snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
@@ -431,3 +431,6 @@ if run_UPGA_J_GradReuse == 1:
 
 if run_UPGA_partial_decay_J5 == 1:
     run_UPGA_partial_decay(step_size_UPGA_J5, Nt, Nrf)
+
+if run_UPGA_partial_decay_J10 == 1:
+    run_UPGA_partial_decay(step_size_UPGA_J10, Nt, Nrf)

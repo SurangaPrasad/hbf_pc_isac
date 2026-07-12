@@ -363,6 +363,35 @@ if run_program == 1:
         power_iter_UPGA_J20_decay = power_UPGA_J20_decay.mean(0).cpu().numpy()
         inner_iter_history_UPGA_J20_decay = list(model_UPGA_J20_decay.inner_iter_history)
     
+    if run_UPGA_partial_decay_J5 == 1:
+        print('Running unfolded PGA with decaying J (max J=5) and partial coupling...')
+        model_UPGA_partial_decay_J5 = PGA_Unfold_JX_partial_decay(step_size_UPGA_J5, Nt, Nrf)
+        model_UPGA_partial_decay_J5.load_state_dict(torch.load(model_file_name_UPGA_partial_decay_J5, map_location=device))
+        register_step_size('UPGA (J=5, decay, partial)', model_UPGA_partial_decay_J5.step_size)
+
+        sum_rate_UPGA_partial_decay_J5, crb_UPGA_partial_decay_J5, power_UPGA_partial_decay_J5, F_UPGA_partial_decay_J5, W_UPGA_partial_decay_J5, gradient_norm_history_UPGA_partial_decay_J5 = model_UPGA_partial_decay_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                            n_iter_inner_J5)
+        rate_iter_UPGA_partial_decay_J5  = sum_rate_UPGA_partial_decay_J5.mean(0).cpu().numpy()
+        crb_iter_UPGA_partial_decay_J5   = crb_UPGA_partial_decay_J5.mean(0).cpu().numpy()
+        power_iter_UPGA_partial_decay_J5 = power_UPGA_partial_decay_J5.mean(0).cpu().numpy()
+        inner_iter_history_UPGA_partial_decay_J5 = list(model_UPGA_partial_decay_J5.inner_iter_history)
+
+    if run_UPGA_partial_decay_J10 == 1:
+        print('Running unfolded PGA with decaying J (max J=10) and partial coupling...')
+        model_UPGA_partial_decay_J10 = PGA_Unfold_JX_partial_decay(step_size_UPGA_J10, Nt, Nrf)
+        model_UPGA_partial_decay_J10.load_state_dict(torch.load(model_file_name_UPGA_partial_decay_J10, map_location=device))
+        register_step_size('UPGA (J=10, decay, partial)', model_UPGA_partial_decay_J10.step_size)
+
+        sum_rate_UPGA_partial_decay_J10, crb_UPGA_partial_decay_J10, power_UPGA_partial_decay_J10, F_UPGA_partial_decay_J10, W_UPGA_partial_decay_J10, gradient_norm_history_UPGA_partial_decay_J10 = model_UPGA_partial_decay_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                            n_iter_inner_J10)
+        rate_iter_UPGA_partial_decay_J10  = sum_rate_UPGA_partial_decay_J10.mean(0).cpu().numpy()
+        crb_iter_UPGA_partial_decay_J10   = crb_UPGA_partial_decay_J10.mean(0).cpu().numpy()
+        power_iter_UPGA_partial_decay_J10 = power_UPGA_partial_decay_J10.mean(0).cpu().numpy()
+        inner_iter_history_UPGA_partial_decay_J10 = list(model_UPGA_partial_decay_J10.inner_iter_history)
     # ====================================================== Proposed Unfolded PGA with gradient reuse ====================================
     if run_UPGA_J_GradReuse == 1:
         print('Running unfolded PGA with gradient reuse (J = 10)...')
@@ -754,6 +783,15 @@ if plot_figure == 1:
     if run_UPGA_J10_decay == 1:
         obj_iter_UPGA_J10_decay = OMEGA * rate_iter_UPGA_J10_decay[outer_idx_J10_decay] + crb_iter_UPGA_J10_decay[outer_idx_J10_decay]
         plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_J10_decay, '-', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J10_decay)
+    
+    
+    if run_UPGA_partial_decay_J5 == 1:
+        obj_iter_UPGA_partial_decay_J5 = OMEGA * rate_iter_UPGA_partial_decay_J5[outer_idx_J5_decay] + crb_iter_UPGA_partial_decay_J5[outer_idx_J5_decay]
+        plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_partial_decay_J5, '-^', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_partial_decay_J5)
+    if run_UPGA_partial_decay_J10 == 1:
+        obj_iter_UPGA_partial_decay_J10 = OMEGA * rate_iter_UPGA_partial_decay_J10[outer_idx_J10_decay] + crb_iter_UPGA_partial_decay_J10[outer_idx_J10_decay]
+        plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_partial_decay_J10, '-v', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_partial_decay_J10)
+    
     # if run_UPGA_J20_decay == 1:
     #     obj_iter_UPGA_J20_decay = OMEGA * rate_iter_UPGA_J20_decay[outer_idx_J20_decay] + crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
     #     plt.plot(iter_outer_x_J20_decay, obj_iter_UPGA_J20_decay, '-', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)

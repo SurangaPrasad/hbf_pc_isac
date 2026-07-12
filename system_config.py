@@ -163,6 +163,9 @@ model_file_name_UPGA_J10_decay = directory_model + 'UPGA_J10_decay.pth'
 model_file_name_UPGA_J20_decay = directory_model + 'UPGA_J20_decay.pth'
 model_file_name_UPGA_J_GradReuse = directory_model + 'UPGA_J_GradReuse.pth'
 model_file_name_UPGA_J10_PC_omega03 = directory_model03 + 'UPGA_J10_PC.pth'
+
+model_file_name_UPGA_partial_decay_J5 = directory_model + 'UPGA_partial_decay_J5.pth'
+model_file_name_UPGA_partial_decay_J10 = directory_model + 'UPGA_partial_decay_J10.pth'
 # To save result figures
 directory_result = "./sim_results/" + system_config + "/"
 if not os.path.exists(directory_result):
@@ -197,3 +200,7 @@ label_SCA = 'SCA-ManOpt (converged)'
 Conv_PGA_J1 = r'Conv. PGA, $120$ inner iterations'
 Conv_PGA_J5 = r'Conv. PGA, $600$ inner iterations'
 Conv_PGA_J10 = r'Conv. PGA, $1200$ inner iterations'
+
+
+label_UPGA_partial_decay_J5 = r'Dynamic-UPGA-PC, $421$ inner layers'
+label_UPGA_partial_decay_J10 = r'Dynamic-UPGA-PC, $722$ inner layers'
