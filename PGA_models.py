@@ -497,9 +497,6 @@ class PGA_Unfold_JX_partial(nn.Module):
         self.inner_iter_history = []
         self.alpha = alpha
 
-        # 1. Defining the Mask
-        # If a custom binary mask tensor is passed, use it. 
-        # Otherwise, construct a standard block-diagonal mask for a sub-connected HBF architecture.
         if mask is not None:
             self.register_buffer('mask', mask.float())
         elif Nt is not None and Nrf is not None:
@@ -580,16 +577,8 @@ class PGA_Unfold_JX_partial(nn.Module):
 
                 F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, use_reentrant=False)
 
-            # ----------------------------------------------------
-            # Projection of analog precoder
-            # ----------------------------------------------------
-            # CRITICAL CRUX: project_unit_modulus sets element magnitudes to 1 (e^jθ). 
-            # We MUST apply the mask right after to force un-connected phase shifters back to 0.
             F = project_unit_modulus(F) * self.mask.to(F.device)
 
-            # ----------------------------------------------------
-            # Digital precoder update
-            # ----------------------------------------------------
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
             grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
@@ -614,21 +603,154 @@ class PGA_Unfold_JX_partial(nn.Module):
 
         print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
 
-        # Match PGA_Unfold_JX output convention:
-        # flatten to (n_outer*(J+1), B), then transpose to (B, n_outer*(J+1)).
         rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
 
-        return (
-            rates.transpose(0, 1),
-            crb_fes.transpose(0, 1),
-            power_fes.transpose(0, 1),
-            F,
-            W,
-            gradient_norm_history,
-            gradient_norm_history_W,
-        )
+        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history,gradient_norm_history_W,)
+    
+class PGA_Unfold_JX_partial_decay(nn.Module):
+    def __init__(self, step_size=None, Nt=None, Nrf=None, alpha=0.04, eps=1e-12, J_min=2):
+        super().__init__()
+
+        self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
+        self.eps = eps
+        self.J_min = J_min
+        self.inner_iter_history = []
+
+        # Adaptive scheduling hyperparameter
+        self.alpha = alpha
+
+        if Nt is not None and Nrf is not None:
+            assert Nt % Nrf == 0, "Number of antennas (Nt) must be perfectly divisible by RF chains (Nrf) for symmetric sub-connection."
+            ant_per_rf = Nt // Nrf
+            template_mask = torch.zeros(Nt, Nrf)
+            for r in range(Nrf):
+                template_mask[r * ant_per_rf : (r + 1) * ant_per_rf, r] = 1.0
+            self.register_buffer('mask', template_mask)
+        else:
+            raise ValueError("You must provide either a explicit 'mask' tensor or both 'Nt' and 'Nrf' dimensions.")
+
+    # =========== Projection Gradient Ascent execution ===================
+    def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
+
+        _, F, W = initialize(H, Pt, initial_normalization)
+        F = F * self.mask.to(F.device)
+        
+        B = len(H[0])
+
+        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+
+        ## Inner loop
+        def _n_inner_from_grad(grad_F_J):
+
+            J_max = self.step_size.shape[0]
+            J_min = min(self.J_min, J_max)
+
+            Nt = F.shape[-2]
+            Nrf = F.shape[-1]
+
+            g_i = torch.linalg.norm(grad_F_J.reshape(grad_F_J.shape[0], -1), dim=1) / (torch.sqrt(torch.tensor(Nt * Nrf, device=grad_F_J.device, dtype=grad_F_J.real.dtype)) + self.eps)
+            g_i = torch.mean(g_i)
+            r_i = g_i / (g_i + self.alpha)
+
+            n_inner = int(torch.ceil(J_max * r_i).item())
+
+            n_inner = max(J_min, min(J_max, n_inner))
+
+            return n_inner
+        
+        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+
+            for jj in range(n_inner):
+
+                grad_F_com = get_grad_F_com(H, F, W)
+                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                    print('Error NaN gradients!!!!!!!!!!!!!!!')
+
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+ 
+                # 2. Mask applied during gradient update step
+                F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB ) * self.mask.to(F.device)
+
+                F = normalize_power(F, W, H, Pt)
+                F = F * self.mask.to(F.device) # Ensure zero-mask is perfectly maintained after power scaling
+
+            return F
+
+        gradient_norm_history, gradient_norm_history_W = [], []
+
+        for ii in range(n_iter_outer):
+
+            grad_F_com = get_grad_F_com(H, F, W)
+            grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+            # calculate the grad_F_J
+            grad_F_J = WEIGHT_F_COM * grad_F_com + WEIGHT_F_CRB * grad_F_crb
+            n_inner = _n_inner_from_grad(grad_F_J)
+    
+            if track_metrics:
+                for jj in range(n_inner):
+
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+
+                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                        print('Error NaN gradients during inner update!!!!!!!!!!!!!!!')
+
+                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
+                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+
+                    # 2. Mask applied during tracked gradient update step
+                    F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB) * self.mask.to(F.device)
+
+                    # Scale F only, consistent with training path
+                    F = normalize_power(F, W, H, Pt)
+                    F = F * self.mask.to(F.device)
+
+                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
+                    crb_over_iters[ii, jj] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                    power_over_iters[ii, jj] = get_power(F, W).detach()
+
+            else:
+
+                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, use_reentrant=False)
+
+            F = project_unit_modulus(F) * self.mask.to(F.device)
+
+            grad_W_k_com = get_grad_W_com(H, F, W)
+            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+            grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
+            
+            # Average entry-wise magnitude of ∇_W J
+            g_W = torch.abs(grad_J_w).reshape(grad_J_w.shape[0], -1).mean(dim=1)
+            gradient_norm_history_W.append(g_W.mean().item())
+
+            W_new = W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB
+
+            # Projection / normalization
+            F, W = normalize(F, W_new, H, Pt)
+            F = F * self.mask.to(F.device) # Safeguard mask safety after composite normalization
+
+            # Record metrics after W-update
+            if track_metrics:
+
+                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, -1] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                power_over_iters[ii, -1] = get_power(F, W).detach()
+
+
+        # print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
+
+        rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+
+        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history,gradient_norm_history_W,)
 # ============================================ Proposed PGA model with gradient reuse ====================================
 class PGA_Unfold_J_GradReuse(nn.Module):
     """Unfolded PGA with lazy gradient reuse to reduce per-inner-iteration cost.

@@ -77,6 +77,40 @@ def run_UPGA_partial(step_size_UPGA, Nt, Nrf):
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
     torch.save(model_UPGA_partial.state_dict(), directory_model + f'UPGA_partial_J{step_size_UPGA.shape[0]}.pth')
 
+def run_UPGA_partial_decay(step_size_UPGA, Nt, Nrf):
+
+    model_UPGA_partial_decay = PGA_Unfold_JX_partial_decay(step_size_UPGA, Nt, Nrf)
+    optimizer = torch.optim.Adam(model_UPGA_partial_decay.parameters(), lr=learning_rate)
+    epoch_losses = []  # To store average loss per epoch
+
+    for i_epoch in range(n_epoch):
+        batch_losses = []  # To store loss of each batch in current epoch
+
+        H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+
+        for i_batch in range(0, len(H_train), batch_size):
+            H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
+            cur_bs = H.shape[1]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),dtype=torch.float32, device=device)
+
+            __, __, __, F, W, __, _ = model_UPGA_partial_decay.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, step_size_UPGA.shape[0], track_metrics=False)
+
+            loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
+            print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # .item() is critical to keep memory usage low!
+            batch_losses.append(loss.item())
+
+        avg_loss = sum(batch_losses) / len(batch_losses)
+        epoch_losses.append(avg_loss)
+        print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
+    torch.save(model_UPGA_partial_decay.state_dict(), directory_model + f'UPGA_partial_decay_J{step_size_UPGA.shape[0]}.pth')
+
 def run_UPGA(step_size_UPGA):
     # print(f"Running UPGA with J = {step_size_UPGA.shape[0]}...")
     model_UPGA = PGA_Unfold_JX(step_size_UPGA)
@@ -393,3 +427,7 @@ if run_UPGA_J_GradReuse == 1:
     plt.ylabel('Average Loss')
     plt.grid(True)
     plt.savefig(directory_result + "training_loss_UPGA_J_GradReuse.png")
+
+
+if run_UPGA_partial_decay_J5 == 1:
+    run_UPGA_partial_decay(step_size_UPGA_J5, Nt, Nrf)
