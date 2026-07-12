@@ -369,7 +369,7 @@ if run_program == 1:
         model_UPGA_partial_decay_J5.load_state_dict(torch.load(model_file_name_UPGA_partial_decay_J5, map_location=device))
         register_step_size('UPGA (J=5, decay, partial)', model_UPGA_partial_decay_J5.step_size)
 
-        sum_rate_UPGA_partial_decay_J5, crb_UPGA_partial_decay_J5, power_UPGA_partial_decay_J5, F_UPGA_partial_decay_J5, W_UPGA_partial_decay_J5, gradient_norm_history_UPGA_partial_decay_J5 = model_UPGA_partial_decay_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_partial_decay_J5, crb_UPGA_partial_decay_J5, power_UPGA_partial_decay_J5, F_UPGA_partial_decay_J5, W_UPGA_partial_decay_J5, gradient_norm_history_UPGA_partial_decay_J5, _ = model_UPGA_partial_decay_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J5)
@@ -384,7 +384,7 @@ if run_program == 1:
         model_UPGA_partial_decay_J10.load_state_dict(torch.load(model_file_name_UPGA_partial_decay_J10, map_location=device))
         register_step_size('UPGA (J=10, decay, partial)', model_UPGA_partial_decay_J10.step_size)
 
-        sum_rate_UPGA_partial_decay_J10, crb_UPGA_partial_decay_J10, power_UPGA_partial_decay_J10, F_UPGA_partial_decay_J10, W_UPGA_partial_decay_J10, gradient_norm_history_UPGA_partial_decay_J10 = model_UPGA_partial_decay_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        sum_rate_UPGA_partial_decay_J10, crb_UPGA_partial_decay_J10, power_UPGA_partial_decay_J10, F_UPGA_partial_decay_J10, W_UPGA_partial_decay_J10, gradient_norm_history_UPGA_partial_decay_J10, _ = model_UPGA_partial_decay_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                             n_iter_inner_J10)
