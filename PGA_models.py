@@ -540,7 +540,7 @@ class PGA_Unfold_JX_partial(nn.Module):
                 F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB ) * self.mask.to(F.device)
 
                 F = normalize_power(F, W, H, Pt)
-                F = F * self.mask.to(F.device) # Ensure zero-mask is perfectly maintained after power scaling
+                F = F * self.mask.to(F.device)
 
             return F
 
@@ -591,7 +591,7 @@ class PGA_Unfold_JX_partial(nn.Module):
 
             # Projection / normalization
             F, W = normalize(F, W_new, H, Pt)
-            F = F * self.mask.to(F.device) # Safeguard mask safety after composite normalization
+            F = F * self.mask.to(F.device)
 
             # Record metrics after W-update
             if track_metrics:
@@ -601,7 +601,7 @@ class PGA_Unfold_JX_partial(nn.Module):
                 power_over_iters[ii, -1] = get_power(F, W).detach()
 
 
-        print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
+        # print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
 
         rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
