@@ -212,41 +212,21 @@ class PGA_Unfold_JX(nn.Module):
             # Projection / normalization
             F, W = normalize(F, W_new, H, Pt)
 
+            # Record metrics after W-update
             if track_metrics:
 
                 rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
                 crb_over_iters[ii, -1] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                 power_over_iters[ii, -1] = get_power(F, W).detach()
 
-        # --------------------------------------------------------
-        # Collect variable-length metric history
-        # --------------------------------------------------------
-        if track_metrics:
 
-            rate_slots = []
-            crb_slots = []
-            power_slots = []
+        # print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
 
-            for ii, n_inner_ii in enumerate(inner_iter_history):
+        rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
 
-                if n_inner_ii > 0:
-                    rate_slots.append(rate_over_iters[ii, :n_inner_ii])
-                    crb_slots.append(crb_over_iters[ii, :n_inner_ii])
-                    power_slots.append(power_over_iters[ii, :n_inner_ii])
 
-                # Add metric after W-update
-                rate_slots.append(rate_over_iters[ii, -1:].clone())
-                crb_slots.append(crb_over_iters[ii, -1:].clone())
-                power_slots.append(power_over_iters[ii, -1:].clone())
-
-            rates = torch.cat(rate_slots, dim=0).detach()
-            crb_fes = torch.cat(crb_slots, dim=0).detach()
-            power_fes = torch.cat(power_slots, dim=0).detach()
-
-        else:
-            rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-            crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-            power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
 
         self.inner_iter_history = list(inner_iter_history)
         return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history, gradient_norm_history_W)
@@ -509,9 +489,9 @@ class PGA_Unfold_JX_partial(nn.Module):
             # Record metrics after W-update
             if track_metrics:
 
-                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, -1] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                power_over_iters[ii, -1] = get_power(F, W).detach()
+                rate_over_iters[ii, -1] = get_sum_rate(H, F_eff, W, Pt).detach()
+                crb_over_iters[ii, -1] = get_crb_fe(H, F_eff, W, xi_0, A_dot, R_N_inv, Pt).detach()
+                power_over_iters[ii, -1] = get_power(F_eff, W).detach()
 
 
         # print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
