@@ -152,13 +152,9 @@ class PGA_Unfold_JX(nn.Module):
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt,
                     n_iter_outer, n_iter_inner, track_metrics=True):
 
-        rate_init, F, W = initialize(H, Pt, initial_normalization)
+        _ , F, W = initialize(H, Pt, initial_normalization)
 
         B = len(H[0])
-
-        # Shape: (n_outer, J+1, B)
-        # [:, 0:J, :] = metrics after inner F-updates
-        # [:, -1, :]  = metrics after W-update
         rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         crb_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
@@ -188,59 +184,21 @@ class PGA_Unfold_JX(nn.Module):
         # print(f'Number of inner iterations: {self.step_size.shape[0]}')
         for ii in range(n_iter_outer):
 
-            # ----------------------------------------------------
-            # Gradient-norm-based adaptive inner iterations
-            # ----------------------------------------------------
             grad_F_com = get_grad_F_com(H, F, W)
             grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
             grad_J_com = grad_F_com * WEIGHT_F_COM + grad_F_crb * WEIGHT_F_CRB
 
             if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                 print('Error NaN gradients before adaptive J!!!!!!!!!!!!!!!')
-
-            # Adaptive inner iteration count
-            # n_inner = _n_inner(ii, n_iter_outer)
             n_inner = self.step_size.shape[0]
     
             if track_metrics:
-
-                inner_iter_history.append(n_inner)
-                # Average entry-wise magnitude of ∇_F J
-                g_F = torch.abs(grad_J_com).reshape(grad_J_com.shape[0], -1).mean(dim=1)
-                gradient_norm_history.append(g_F.mean().item())
-                # gradient_norm_history_W.append(torch.linalg.norm(grad_W_k_com.reshape(grad_W_k_com.shape[0], -1), dim=1).mean().item())
-                # Run inner loop without checkpoint so that metrics
-                # can be recorded after each active inner update.
-                for jj in range(n_inner):
-
-                    grad_F_com = get_grad_F_com(H, F, W)
-                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-
-                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
-                        print('Error NaN gradients during inner update!!!!!!!!!!!!!!!')
-
-                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-
-                    F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB)
-
-                    # Scale F only, consistent with training path
-                    F = normalize_power(F, W, H, Pt)
-
-                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[ii, jj] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                    power_over_iters[ii, jj] = get_power(F, W).detach()
-
+                F = inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt)
             else:
-
                 F = checkpoint(inner_f_update,F,W,H,xi_0,A_dot,R_N_inv, n_inner, Pt, use_reentrant=False)
 
             # Projection of analog precoder
             F = project_unit_modulus(F)
-
-            # ----------------------------------------------------
-            # Digital precoder update
-            # ----------------------------------------------------
             grad_W_k_com = get_grad_W_com(H, F, W)
             grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
             grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
@@ -249,22 +207,15 @@ class PGA_Unfold_JX(nn.Module):
             g_W = torch.abs(grad_J_w).reshape(grad_J_w.shape[0], -1).mean(dim=1)
             gradient_norm_history_W.append(g_W.mean().item())
 
-            W_new = (
-                W
-                + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM
-                + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB
-            )
+            W_new = (W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB)
 
             # Projection / normalization
             F, W = normalize(F, W_new, H, Pt)
 
-            # Record metrics after W-update
             if track_metrics:
 
                 rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, -1] = get_crb_fe(
-                    H, F, W, xi_0, A_dot, R_N_inv, Pt
-                ).detach()
+                crb_over_iters[ii, -1] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
                 power_over_iters[ii, -1] = get_power(F, W).detach()
 
         # --------------------------------------------------------
@@ -293,25 +244,11 @@ class PGA_Unfold_JX(nn.Module):
             power_fes = torch.cat(power_slots, dim=0).detach()
 
         else:
-
-            # No per-inner metrics are tracked on this path,
-            # so retain the fixed rectangular layout.
-            rates = rate_over_iters.reshape(
-                n_iter_outer * (n_iter_inner + 1), B
-            ).detach()
-
-            crb_fes = crb_over_iters.reshape(
-                n_iter_outer * (n_iter_inner + 1), B
-            ).detach()
-
-            power_fes = power_over_iters.reshape(
-                n_iter_outer * (n_iter_inner + 1), B
-            ).detach()
+            rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+            crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+            power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
 
         self.inner_iter_history = list(inner_iter_history)
-        # print("Adaptive inner iterations:", inner_iter_history)
-        # print("Average inner iterations:", sum(inner_iter_history) / len(inner_iter_history))
-
         return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history, gradient_norm_history_W)
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
@@ -515,7 +452,7 @@ class PGA_Unfold_JX_partial(nn.Module):
         _, F, W = initialize(H, Pt, initial_normalization)
         
         # 2. Apply Mask immediately after initialization to clear unauthorized paths
-        F = F * self.mask.to(F.device)
+        F_eff = F * self.mask.to(F.device)
         
         B = len(H[0])
 
@@ -524,25 +461,23 @@ class PGA_Unfold_JX_partial(nn.Module):
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         ## Inner loop
-        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+        def inner_f_update(F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
 
             for jj in range(n_inner):
 
-                grad_F_com = get_grad_F_com(H, F, W)
-                grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
+                grad_F_com = self.mask.to(F.device) * get_grad_F_com(H, F_eff, W)
+                grad_F_crb = self.mask.to(F.device) * get_grad_F_crb(F_eff, W, xi_0, A_dot, R_N_inv)
                 if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                     print('Error NaN gradients!!!!!!!!!!!!!!!')
 
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                 delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
- 
-                # 2. Mask applied during gradient update step
-                F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB ) * self.mask.to(F.device)
 
-                F = normalize_power(F, W, H, Pt)
-                F = F * self.mask.to(F.device)
+                F_eff = ( F_eff + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB )
 
-            return F
+                F_eff = normalize_power(F_eff, W, H, Pt)
+
+            return F_eff
 
         gradient_norm_history, gradient_norm_history_W = [], []
 
@@ -551,36 +486,14 @@ class PGA_Unfold_JX_partial(nn.Module):
             n_inner = self.step_size.shape[0]
     
             if track_metrics:
-                for jj in range(n_inner):
-
-                    grad_F_com = get_grad_F_com(H, F, W)
-                    grad_F_crb = get_grad_F_crb(F, W, xi_0, A_dot, R_N_inv)
-
-                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
-                        print('Error NaN gradients during inner update!!!!!!!!!!!!!!!')
-
-                    delta_F_com = self.step_size[jj][ii][0] * grad_F_com
-                    delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-
-                    # 2. Mask applied during tracked gradient update step
-                    F = ( F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB) * self.mask.to(F.device)
-
-                    # Scale F only, consistent with training path
-                    F = normalize_power(F, W, H, Pt)
-                    F = F * self.mask.to(F.device)
-
-                    rate_over_iters[ii, jj] = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[ii, jj] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                    power_over_iters[ii, jj] = get_power(F, W).detach()
-
+                F_eff = inner_f_update(F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt)
             else:
+                F_eff = checkpoint(inner_f_update, F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, use_reentrant=False)
 
-                F = checkpoint(inner_f_update, F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, use_reentrant=False)
+            F_eff = project_unit_modulus(F_eff) * self.mask.to(F_eff.device)
 
-            F = project_unit_modulus(F) * self.mask.to(F.device)
-
-            grad_W_k_com = get_grad_W_com(H, F, W)
-            grad_W_k_crb = get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv)
+            grad_W_k_com = get_grad_W_com(H, F_eff, W)
+            grad_W_k_crb = get_grad_W_crb(F_eff, W, xi_0, A_dot, R_N_inv)
             grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
             
             # Average entry-wise magnitude of ∇_W J
@@ -590,8 +503,8 @@ class PGA_Unfold_JX_partial(nn.Module):
             W_new = W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB
 
             # Projection / normalization
-            F, W = normalize(F, W_new, H, Pt)
-            F = F * self.mask.to(F.device)
+            F_eff, W = normalize(F_eff, W_new, H, Pt)
+            F_eff = F_eff * self.mask.to(F_eff.device)
 
             # Record metrics after W-update
             if track_metrics:

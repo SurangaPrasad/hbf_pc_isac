@@ -18,11 +18,11 @@ run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J4 = 0
-run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
+run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
 run_UPGA_J6 = 0            # Unfolded PGA with setting J = 6 (for ablation on inner iteration number)
 run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
-run_UPGA_partial_J5 = 0    # Unfolded PGA with J = 5 and partial coupling
+run_UPGA_partial_J5 = 1    # Unfolded PGA with J = 5 and partial coupling
 run_UPGA_partial_J10 = 0   # Unfolded PGA with J = 10 and partial coupling
 run_UPGA_J10_PRCDN = 0 
 
@@ -33,7 +33,7 @@ run_UPGA_J20_decay = 0       # Unfolded PGA with decaying inner iterations (J_ma
 run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
 
-run_UPGA_partial_decay_J5 = 1   # Unfolded PGA with J=5 and partial coupling and decaying inner iterations (J_max=5 → 1)
+run_UPGA_partial_decay_J5 = 0   # Unfolded PGA with J=5 and partial coupling and decaying inner iterations (J_max=5 → 1)
 run_UPGA_partial_decay_J10 = 0  # Unfolded PGA with J=10 and partial coupling and decaying inner iterations (J_max=10 → 1)
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
