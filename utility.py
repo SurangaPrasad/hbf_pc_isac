@@ -607,6 +607,34 @@ def get_radar_data(snr_dB, H):
     return R, at, theta, ideal_beam[0, :]
 
 
+# =================================== compute the power consumption of the hybrid precoding system ==================================================
+def get_power_consumption(F, W, mask, P_RF=P_RF, P_PS=P_PS, eta=PA_EFFICIENCY):
+    # 1.  Compute the transmit power of the hybrid precoding system
+    transmit_power = torch.linalg.matrix_norm(( F * mask ) @ W, ord='fro') ** 2  # (K, B)
+    transmit_power = (transmit_power.sum(dim=0).real) / eta            # (B,)
+
+    # ================= Active-connection mask =================
+    mask_active = torch.abs(mask) > 0                      # (Nt, Nrf) or (B, Nt, Nrf)
+    if mask_active.dim() == 2:
+        mask_active = mask_active.unsqueeze(0)              # (1, Nt, Nrf) -> broadcast over batch
+
+    # 2. Compute the RF chain power consumption
+    # rf_chain_power = number of non-zero columns in mask x P_rf (power consumption of a single RF chain)
+    n_rf_active = mask_active.any(dim=-2).sum(dim=-1).to(transmit_power.dtype)  # (1,) or (B,)
+    rf_chain_power = n_rf_active * P_RF
+
+    # 3. Calculate the phase shifters power consumption
+    # phase_shifter_power = number of non-zero elements in mask x P_ps (power consumption of a single phase shifter)
+    n_ps_active = mask_active.sum(dim=(-2, -1)).to(transmit_power.dtype)        # (1,) or (B,)
+    phase_shifter_power = n_ps_active * P_PS
+
+    # 4. Calculate the total power consumption
+    total_power_consumption = transmit_power + rf_chain_power + phase_shifter_power
+
+    return total_power_consumption
+
+
+
 # =================================== get the array of beampattern values ==================================================
 def get_beampattern(F, W, at, Pt):
     Q = F @ W
