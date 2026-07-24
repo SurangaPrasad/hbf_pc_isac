@@ -407,25 +407,32 @@ class PGA_Unfold_JX_decay(nn.Module):
 
 
 class PGA_Unfold_JX_partial(nn.Module):
-    def __init__(self, step_size, Nt=None, Nrf=None, mask=None, alpha=0.01):
+    def __init__(self, step_size, Nt=None, Nrf=None, mask=None, connections=None, alpha=0.01):
         super().__init__()
 
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
         self.inner_iter_history = []
         self.alpha = alpha
-
+        connections = [(1, 20), (16, 37), (32, 53), [(48, 64), (1, 12)]]
         if mask is not None:
             self.register_buffer('mask', mask.float())
+        elif connections is not None:
+            assert Nt is not None and Nrf is not None, \
+                "'Nt' and 'Nrf' must be provided together with 'connections'."
+            # Allows each RF chain to connect to an arbitrary (possibly overlapping
+            # and/or wrap-around) group of antennas, e.g.
+            #   connections = [(1, 20), (16, 37), (32, 53), [(48, 64), (1, 12)]]
+            template_mask = build_partial_connection_mask(Nt, Nrf, connections)
+            self.register_buffer('mask', template_mask)
         elif Nt is not None and Nrf is not None:
             assert Nt % Nrf == 0, "Number of antennas (Nt) must be perfectly divisible by RF chains (Nrf) for symmetric sub-connection."
-            # ant_per_rf = Nt // Nrf
-            ant_per_rf = 8
+            ant_per_rf = Nt // Nrf
             template_mask = torch.zeros(Nt, Nrf)
             for r in range(Nrf):
                 template_mask[r * ant_per_rf : (r + 1) * ant_per_rf, r] = 1.0
             self.register_buffer('mask', template_mask)
         else:
-            raise ValueError("You must provide either a explicit 'mask' tensor or both 'Nt' and 'Nrf' dimensions.")
+            raise ValueError("You must provide either an explicit 'mask' tensor, 'connections' with 'Nt'/'Nrf', or both 'Nt' and 'Nrf' dimensions.")
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
@@ -504,7 +511,7 @@ class PGA_Unfold_JX_partial(nn.Module):
         return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history,gradient_norm_history_W,)
     
 class PGA_Unfold_JX_partial_decay(nn.Module):
-    def __init__(self, step_size=None, Nt=None, Nrf=None, alpha=0.04, eps=1e-12, J_min=2):
+    def __init__(self, step_size=None, Nt=None, Nrf=None, mask=None, connections=None, alpha=0.04, eps=1e-12, J_min=2):
         super().__init__()
 
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
@@ -515,7 +522,14 @@ class PGA_Unfold_JX_partial_decay(nn.Module):
         # Adaptive scheduling hyperparameter
         self.alpha = alpha
 
-        if Nt is not None and Nrf is not None:
+        if mask is not None:
+            self.register_buffer('mask', mask.float())
+        elif connections is not None:
+            assert Nt is not None and Nrf is not None, \
+                "'Nt' and 'Nrf' must be provided together with 'connections'."
+            template_mask = build_partial_connection_mask(Nt, Nrf, connections)
+            self.register_buffer('mask', template_mask)
+        elif Nt is not None and Nrf is not None:
             assert Nt % Nrf == 0, "Number of antennas (Nt) must be perfectly divisible by RF chains (Nrf) for symmetric sub-connection."
             ant_per_rf = Nt // Nrf
             template_mask = torch.zeros(Nt, Nrf)
@@ -523,7 +537,7 @@ class PGA_Unfold_JX_partial_decay(nn.Module):
                 template_mask[r * ant_per_rf : (r + 1) * ant_per_rf, r] = 1.0
             self.register_buffer('mask', template_mask)
         else:
-            raise ValueError("You must provide either a explicit 'mask' tensor or both 'Nt' and 'Nrf' dimensions.")
+            raise ValueError("You must provide either an explicit 'mask' tensor, 'connections' with 'Nt'/'Nrf', or both 'Nt' and 'Nrf' dimensions.")
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):

@@ -434,6 +434,65 @@ def generage_partial_connection_mask(N, M, device=None):
     return mask
 
 
+# ========================= generate arbitrary/overlapping PC mask =====================
+def build_partial_connection_mask(Nt, Nrf, connections, device=None):
+    """Build a (Nt, Nrf) binary connection mask where each RF chain may connect to an
+    arbitrary, possibly overlapping and/or wrap-around, contiguous group of antennas.
+
+    Parameters
+    ----------
+    Nt : int
+        Number of transmit antennas.
+    Nrf : int
+        Number of RF chains.
+    connections : sequence of length Nrf
+        connections[r] describes which antennas (1-indexed, inclusive) RF chain r
+        drives. Each element can be:
+          - a single ``(start, end)`` tuple, e.g. ``(1, 20)`` -> antennas 1..20.
+            If ``end < start`` the range wraps around the array boundary,
+            e.g. ``(48, 12)`` -> antennas 48..64 followed by 1..12.
+          - a list of such tuples for chains with multiple disjoint segments,
+            e.g. ``[(48, 64), (1, 12)]``.
+    device : torch.device, optional
+
+    Returns
+    -------
+    mask : torch.FloatTensor of shape (Nt, Nrf)
+
+    Example
+    -------
+    >>> connections = [
+    ...     (1, 20),
+    ...     (16, 37),
+    ...     (32, 53),
+    ...     [(48, 64), (1, 12)],
+    ... ]
+    >>> mask = build_partial_connection_mask(Nt=64, Nrf=4, connections=connections)
+    """
+    assert len(connections) == Nrf, \
+        f"'connections' must have exactly Nrf={Nrf} entries, got {len(connections)}."
+
+    mask = torch.zeros(Nt, Nrf, device=device)
+
+    def _mark_range(rf_idx, start, end):
+        start0 = start - 1  # convert to 0-indexed
+        end0 = end - 1
+        if end0 >= start0:
+            idx = torch.arange(start0, end0 + 1)
+        else:
+            # wrap-around: e.g. start=48, end=12 (1-indexed) on a 64-antenna array
+            idx = torch.arange(start0, end0 + 1 + Nt)
+        idx = idx % Nt
+        mask[idx, rf_idx] = 1.0
+
+    for rf_idx, spec in enumerate(connections):
+        segments = [spec] if isinstance(spec, tuple) else spec
+        for start, end in segments:
+            _mark_range(rf_idx, start, end)
+
+    return mask
+
+
 # ======================== generate channels =============================================================
 def array_response(N, phi, theta):
     # Generate array response vectors

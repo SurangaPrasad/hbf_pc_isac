@@ -279,7 +279,7 @@ if run_program == 1:
         model_UPGA_partial_J5 = PGA_Unfold_JX_partial(step_size_UPGA_J5, Nt, Nrf)
         # strict=False: checkpoint comes from the non-partial model and has no 'mask' key;
         # 'mask' is deterministically built in __init__ from (Nt, Nrf), so it's fine to skip it.
-        model_UPGA_partial_J5.load_state_dict(torch.load(model_file_name_UPGA_J5, map_location=device), strict=False)
+        model_UPGA_partial_J5.load_state_dict(torch.load(model_file_name_UPGA_partial_J5, map_location=device), strict=False)
         register_step_size('UPGA (J=5, partial)', model_UPGA_partial_J5.step_size)
         sum_rate_UPGA_partial_J5, crb_UPGA_partial_J5, power_UPGA_partial_J5, F_UPGA_partial_J5, W_UPGA_partial_J5, gradient_norm_history_UPGA_partial_J5, gradient_norm_history_UPGA_partial_J5_W = model_UPGA_partial_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
