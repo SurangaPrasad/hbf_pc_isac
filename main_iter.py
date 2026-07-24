@@ -806,7 +806,7 @@ if plot_figure == 1:
 
     # =======================Plot Gradient Norms (inner iters)========================================
     
-    fig_grad = plt.figure(6, figsize=(6.5, 3.2))
+    # fig_grad = plt.figure(6, figsize=(6.5, 3.2))
     # if run_conv_PGA == 1:
     #     grad_norms_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1)
     #     plt.plot(iter_outer_x, grad_norms_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=8, label=Conv_PGA_J1)
@@ -819,55 +819,55 @@ if plot_figure == 1:
     # if run_UPGA_J1 == 1:
     #     grad_norms_UPGA_J1 = np.array(gradient_norm_history_UPGA_J1)
     #     plt.plot(iter_outer_x, grad_norms_UPGA_J1, '-d', markevery=5, color='black', linewidth=3, markersize=8, label=label_UPGA_J1)
-    if run_UPGA_J5 == 1:
-        grad_norms_UPGA_J5 = np.array(gradient_norm_history_UPGA_J5)
-        plt.plot(iter_outer_x, grad_norms_UPGA_J5, '-d', markevery=5, color='blue', linewidth=3, markersize=8, label=label_UPGA_J5)
-    if run_UPGA_J10 == 1:
-        grad_norms_UPGA_J10 = np.array(gradient_norm_history_UPGA_J10)
-        plt.plot(iter_outer_x, grad_norms_UPGA_J10, '-d', markevery=5, color='red', linewidth=3, markersize=8, label=label_UPGA_J10)
+    # if run_UPGA_J5 == 1:
+    #     grad_norms_UPGA_J5 = np.array(gradient_norm_history_UPGA_J5)
+    #     plt.plot(iter_outer_x, grad_norms_UPGA_J5, '-d', markevery=5, color='blue', linewidth=3, markersize=8, label=label_UPGA_J5)
+    # if run_UPGA_J10 == 1:
+    #     grad_norms_UPGA_J10 = np.array(gradient_norm_history_UPGA_J10)
+    #     plt.plot(iter_outer_x, grad_norms_UPGA_J10, '-d', markevery=5, color='red', linewidth=3, markersize=8, label=label_UPGA_J10)
     # if run_UPGA_J5_decay == 1:
     #     grad_norms_J5_decay = np.array(gradient_norm_history_UPGA_J5_decay)
     #     plt.plot(iter_outer_x_J5_decay, grad_norms_J5_decay, '--', markevery=5, color='green', linewidth=3, markersize=8, label=label_UPGA_J5_decay)
     # if run_UPGA_J10_decay == 1:
     #     grad_norms_J10_decay = np.array(gradient_norm_history_UPGA_J10_decay)
     #     plt.plot(iter_outer_x_J10_decay, grad_norms_J10_decay, '-*', markevery=5, color='purple', linewidth=3, markersize=8, label=label_UPGA_J10_decay)
-    plt.xlabel(r'Outer layer index $i$', fontsize=14)
-    plt.ylabel(r'Average magnitude $\vartheta^{\mathbf{F}}_{(i)}$', fontsize=14)
+    # plt.xlabel(r'Outer layer index $i$', fontsize=14)
+    # plt.ylabel(r'Average magnitude $\vartheta^{\mathbf{F}}_{(i)}$', fontsize=14)
     # plt.title("Gradient Norm vs Iterations", fontsize=14)
-    plt.grid()
-    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
-    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
-    plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
+    # plt.grid()
+    # safe_legend(loc='best', fontsize=12, labelspacing=0.15)
+    # plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
+    # plt.savefig(directory_result + 'grad_norm_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
     # ======================Plot Gradient Norms w.r.t. W========================================
 
-    fig_grad_W = plt.figure(7, figsize=(6.5, 3.2))
-    if run_conv_PGA == 1:
-        grad_norms_W_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1_W)
-        plt.plot(iter_outer_x, grad_norms_W_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=8, label=Conv_PGA_J1)
-    if run_conv_PGA_J5 == 1:
-        grad_norms_W_conv_J5 = np.array(gradient_norm_history_conv_PGA_J5_W)
-        plt.plot(iter_outer_x, grad_norms_W_conv_J5, '--', markevery=5, color='blue', linewidth=3, markersize=8, label=Conv_PGA_J5)
-    if run_conv_PGA_J10 == 1:
-        grad_norms_W_conv_J10 = np.array(gradient_norm_history_conv_PGA_J10_W)
-        plt.plot(iter_outer_x, grad_norms_W_conv_J10, '--', markevery=5, color='red', linewidth=3, markersize=8, label=Conv_PGA_J10)
-    if run_UPGA_J1 == 1:
-        grad_norms_W_UPGA_J1 = np.array(gradient_norm_history_UPGA_J1_W)
-        plt.plot(iter_outer_x, grad_norms_W_UPGA_J1, '-d', markevery=5, color='black', linewidth=3, markersize=8, label=label_UPGA_J1)
-    if run_UPGA_J5 == 1:
-        grad_norms_W_UPGA_J5 = np.array(gradient_norm_history_UPGA_J5_W)
-        plt.plot(iter_outer_x, grad_norms_W_UPGA_J5, '-d', markevery=5, color='blue', linewidth=3, markersize=8, label=label_UPGA_J5)
-    if run_UPGA_J10 == 1:
-        grad_norms_W_UPGA_J10 = np.array(gradient_norm_history_UPGA_J10_W)
-        plt.plot(iter_outer_x, grad_norms_W_UPGA_J10, '-d', markevery=5, color='red', linewidth=3, markersize=8, label=label_UPGA_J10)
+    # fig_grad_W = plt.figure(7, figsize=(6.5, 3.2))
+    # if run_conv_PGA == 1:
+    #     grad_norms_W_conv_J1 = np.array(gradient_norm_history_conv_PGA_J1_W)
+    #     plt.plot(iter_outer_x, grad_norms_W_conv_J1, '--', markevery=5, color='black', linewidth=3, markersize=8, label=Conv_PGA_J1)
+    # if run_conv_PGA_J5 == 1:
+    #     grad_norms_W_conv_J5 = np.array(gradient_norm_history_conv_PGA_J5_W)
+    #     plt.plot(iter_outer_x, grad_norms_W_conv_J5, '--', markevery=5, color='blue', linewidth=3, markersize=8, label=Conv_PGA_J5)
+    # if run_conv_PGA_J10 == 1:
+    #     grad_norms_W_conv_J10 = np.array(gradient_norm_history_conv_PGA_J10_W)
+    #     plt.plot(iter_outer_x, grad_norms_W_conv_J10, '--', markevery=5, color='red', linewidth=3, markersize=8, label=Conv_PGA_J10)
+    # if run_UPGA_J1 == 1:
+    #     grad_norms_W_UPGA_J1 = np.array(gradient_norm_history_UPGA_J1_W)
+    #     plt.plot(iter_outer_x, grad_norms_W_UPGA_J1, '-d', markevery=5, color='black', linewidth=3, markersize=8, label=label_UPGA_J1)
+    # if run_UPGA_J5 == 1:
+    #     grad_norms_W_UPGA_J5 = np.array(gradient_norm_history_UPGA_J5_W)
+    #     plt.plot(iter_outer_x, grad_norms_W_UPGA_J5, '-d', markevery=5, color='blue', linewidth=3, markersize=8, label=label_UPGA_J5)
+    # if run_UPGA_J10 == 1:
+    #     grad_norms_W_UPGA_J10 = np.array(gradient_norm_history_UPGA_J10_W)
+    #     plt.plot(iter_outer_x, grad_norms_W_UPGA_J10, '-d', markevery=5, color='red', linewidth=3, markersize=8, label=label_UPGA_J10)
     
-    plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
-    plt.ylabel(r'Avg. entry-wise magnitude of $\nabla_{\mathbf{W}}\mathcal{J}$', fontsize=14)
-    # plt.title("Gradient Norm vs Iterations", fontsize=14)
-    plt.grid()
-    # safe_legend(loc='best', fontsize=12, labelspacing=0.15)
-    plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
-    plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
+    # plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
+    # plt.ylabel(r'Avg. entry-wise magnitude of $\nabla_{\mathbf{W}}\mathcal{J}$', fontsize=14)
+    # # plt.title("Gradient Norm vs Iterations", fontsize=14)
+    # plt.grid()
+    # # safe_legend(loc='best', fontsize=12, labelspacing=0.15)
+    # plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.png', bbox_inches='tight', pad_inches=0.02)
+    # plt.savefig(directory_result + 'grad_norm_W_vs_iter_' + str(Nt) + '_' + str(OMEGA) + '.eps', bbox_inches='tight', pad_inches=0.02)
 
     # # ===================== SAVE OUTER-ITER RESULTS TO .mat FOR MATLAB =====================
     # print('Saving outer-iteration results to .mat file...')
@@ -1031,40 +1031,40 @@ if plot_figure == 1:
 
     # ===================== AVERAGE STEP SIZES ==========================================
     # Plot average over inner iterations for step_size[:,:,0] and step_size[:,:,1].
-    if len(step_size_snapshots) > 0:
-        # Index 0: analog/F update step size
-        plt.figure(8)
-        for model_label, step_tensor in step_size_snapshots:
-            avg_steps = average_step_size_by_outer(step_tensor)
-            if avg_steps is None or avg_steps.shape[1] <= 0:
-                continue
-            x_axis = np.arange(1, avg_steps.shape[0] + 1)
-            plt.plot(x_axis, avg_steps[:, 0], linewidth=3, label=model_label)
-        plt.xlabel(r'Outer iteration $I$', fontsize="13")
-        plt.ylabel(r'Average step size $[\cdot,\cdot,0]$', fontsize="13")
-        plt.title('Average Step Size Index 0 vs Outer Iteration', fontsize="13")
-        plt.grid()
-        safe_legend(loc='best', fontsize="11", labelspacing=0.15)
-        plt.tight_layout()
-        plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.png')
-        plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+    # if len(step_size_snapshots) > 0:
+    #     # Index 0: analog/F update step size
+    #     plt.figure(8)
+    #     for model_label, step_tensor in step_size_snapshots:
+    #         avg_steps = average_step_size_by_outer(step_tensor)
+    #         if avg_steps is None or avg_steps.shape[1] <= 0:
+    #             continue
+    #         x_axis = np.arange(1, avg_steps.shape[0] + 1)
+    #         plt.plot(x_axis, avg_steps[:, 0], linewidth=3, label=model_label)
+    #     plt.xlabel(r'Outer iteration $I$', fontsize="13")
+    #     plt.ylabel(r'Average step size $[\cdot,\cdot,0]$', fontsize="13")
+    #     plt.title('Average Step Size Index 0 vs Outer Iteration', fontsize="13")
+    #     plt.grid()
+    #     safe_legend(loc='best', fontsize="11", labelspacing=0.15)
+    #     plt.tight_layout()
+    #     plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.png')
+    #     plt.savefig(directory_result + 'avg_step_size_idx0_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
-        # Index 1: digital/W update step size (for K=1 this is channel 1 in last dim)
-        plt.figure(9)
-        for model_label, step_tensor in step_size_snapshots:
-            avg_steps = average_step_size_by_outer(step_tensor)
-            if avg_steps is None or avg_steps.shape[1] <= 1:
-                continue
-            x_axis = np.arange(1, avg_steps.shape[0] + 1)
-            plt.plot(x_axis, avg_steps[:, 1], linewidth=3, label=model_label)
-        plt.xlabel(r'Outer iteration $I$', fontsize="13")
-        plt.ylabel(r'Average step size $[\cdot,\cdot,1]$', fontsize="13")
-        plt.title('Average Step Size Index 1 vs Outer Iteration', fontsize="13")
-        plt.grid()
-        safe_legend(loc='best', fontsize="11", labelspacing=0.15)
-        plt.tight_layout()
-        plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.png')
-        plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.eps')
+    #     # Index 1: digital/W update step size (for K=1 this is channel 1 in last dim)
+    #     plt.figure(9)
+    #     for model_label, step_tensor in step_size_snapshots:
+    #         avg_steps = average_step_size_by_outer(step_tensor)
+    #         if avg_steps is None or avg_steps.shape[1] <= 1:
+    #             continue
+    #         x_axis = np.arange(1, avg_steps.shape[0] + 1)
+    #         plt.plot(x_axis, avg_steps[:, 1], linewidth=3, label=model_label)
+    #     plt.xlabel(r'Outer iteration $I$', fontsize="13")
+    #     plt.ylabel(r'Average step size $[\cdot,\cdot,1]$', fontsize="13")
+    #     plt.title('Average Step Size Index 1 vs Outer Iteration', fontsize="13")
+    #     plt.grid()
+    #     safe_legend(loc='best', fontsize="11", labelspacing=0.15)
+    #     plt.tight_layout()
+    #     plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.png')
+    #     plt.savefig(directory_result + 'avg_step_size_idx1_' + str(Nt) + '_' + str(OMEGA) + '.eps')
 
 
  
