@@ -418,7 +418,8 @@ class PGA_Unfold_JX_partial(nn.Module):
             self.register_buffer('mask', mask.float())
         elif Nt is not None and Nrf is not None:
             assert Nt % Nrf == 0, "Number of antennas (Nt) must be perfectly divisible by RF chains (Nrf) for symmetric sub-connection."
-            ant_per_rf = Nt // Nrf
+            # ant_per_rf = Nt // Nrf
+            ant_per_rf = 8
             template_mask = torch.zeros(Nt, Nrf)
             for r in range(Nrf):
                 template_mask[r * ant_per_rf : (r + 1) * ant_per_rf, r] = 1.0
