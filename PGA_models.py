@@ -159,7 +159,7 @@ class PGA_Unfold_JX(nn.Module):
         crb_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
-        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+        def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, ii):
 
             for jj in range(n_inner):
 
@@ -193,9 +193,9 @@ class PGA_Unfold_JX(nn.Module):
             n_inner = self.step_size.shape[0]
     
             if track_metrics:
-                F = inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt)
+                F = inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, ii)
             else:
-                F = checkpoint(inner_f_update,F,W,H,xi_0,A_dot,R_N_inv, n_inner, Pt, use_reentrant=False)
+                F = checkpoint(inner_f_update,F,W,H,xi_0,A_dot,R_N_inv, n_inner, Pt, ii, use_reentrant=False)
 
             # Projection of analog precoder
             F = project_unit_modulus(F)
@@ -449,7 +449,8 @@ class PGA_Unfold_JX_partial(nn.Module):
         power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
 
         ## Inner loop
-        def inner_f_update(F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt):
+        def inner_f_update(F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, ii):
+
 
             for jj in range(n_inner):
 
@@ -474,9 +475,9 @@ class PGA_Unfold_JX_partial(nn.Module):
             n_inner = self.step_size.shape[0]
     
             if track_metrics:
-                F_eff = inner_f_update(F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt)
+                F_eff = inner_f_update(F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, ii)
             else:
-                F_eff = checkpoint(inner_f_update, F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, use_reentrant=False)
+                F_eff = checkpoint(inner_f_update, F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, ii, use_reentrant=False)
 
             F_eff = project_unit_modulus(F_eff) * self.mask.to(F_eff.device)
 
