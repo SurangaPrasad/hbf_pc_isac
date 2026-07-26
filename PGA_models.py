@@ -500,7 +500,7 @@ class PGA_Unfold_JX_partial(nn.Module):
         rates = rate_over_iters.reshape(n_iter_outer, B).detach()
         crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
 
-        return (rates,crb_fes,F_eff,W,gradient_norm_history,gradient_norm_history_W,)
+        return (rates, crb_fes, F_eff, W, gradient_norm_history, gradient_norm_history_W)
     
 class PGA_Unfold_JX_partial_decay(nn.Module):
     def __init__(self, step_size=None, Nt=None, Nrf=None, mask=None, connections=None, alpha=0.04, eps=1e-12, J_min=2):

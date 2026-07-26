@@ -62,14 +62,14 @@ OMEGA = 0.25
 
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
-train_size = 112 * 2    # size of training set
+train_size = 112 * 4    # size of training set
 if str(device) == 'cuda':
     test_size = 50     
 else:
     test_size = 10     
 batch_size = len(snr_dB_list) * 4
-n_epoch = 20         # number of training epochs
-learning_rate = 0.0005 # learning 
+n_epoch = 30         # number of training epochs
+learning_rate = 0.005 # learning 
 # learning_rate = 0.00002
 
 n_iter_outer = 120      # Number of outer iterations (I)
