@@ -485,6 +485,7 @@ class PGA_Unfold_JX_partial(nn.Module):
 
             # Projection / normalization
             F_eff, W = normalize(F_eff, W_new, H, Pt)
+            F_eff = normalize_power(F_eff, W, H, Pt)
             F_eff = F_eff * self.mask.to(F_eff.device)
 
             # Record metrics after W-update

@@ -77,6 +77,17 @@ def run_UPGA_partial(step_size_UPGA, Nt, Nrf):
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
     torch.save(model_UPGA_partial.state_dict(), directory_model + f'UPGA_partial_J{step_size_UPGA.shape[0]}.pth')
 
+    # Plot and save loss over epochs
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, len(epoch_losses) + 1), epoch_losses, marker='o')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average Loss')
+    plt.title(f'Training Loss over Epochs (J={step_size_UPGA.shape[0]})')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(directory_model + f'UPGA_J{step_size_UPGA.shape[0]}_partial_loss.png', dpi=300)
+    plt.show()
+
 def run_UPGA_partial_decay(step_size_UPGA, Nt, Nrf):
 
     model_UPGA_partial_decay = PGA_Unfold_JX_partial_decay(step_size_UPGA, Nt, Nrf)
@@ -149,6 +160,17 @@ def run_UPGA(step_size_UPGA):
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     torch.save(model_UPGA.state_dict(), directory_model + f'UPGA_J{step_size_UPGA.shape[0]}.pth')
+
+    # Plot and save loss over epochs
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, len(epoch_losses) + 1), epoch_losses, marker='o')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average Loss')
+    plt.title(f'Training Loss over Epochs (J={step_size_UPGA.shape[0]})')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(directory_model + f'UPGA_J{step_size_UPGA.shape[0]}_loss.png', dpi=300)
+    plt.show()
 # ====================================================== Conventional PGA ====================================
 if run_conv_PGA == 1:
     # Object defining
