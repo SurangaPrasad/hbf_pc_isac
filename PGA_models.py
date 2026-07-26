@@ -155,9 +155,8 @@ class PGA_Unfold_JX(nn.Module):
         _ , F, W = initialize(H, Pt, initial_normalization)
 
         B = len(H[0])
-        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        crb_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        rate_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
 
         def inner_f_update(F, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, ii):
 
@@ -215,21 +214,18 @@ class PGA_Unfold_JX(nn.Module):
             # Record metrics after W-update
             if track_metrics:
 
-                rate_over_iters[ii, -1] = get_sum_rate(H, F, W, Pt).detach()
-                crb_over_iters[ii, -1] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                power_over_iters[ii, -1] = get_power(F, W).detach()
+                rate_over_iters[ii, :] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, :] = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
+
 
 
         # print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
 
-        rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-
-
+        rates = rate_over_iters.reshape(n_iter_outer, B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
 
         self.inner_iter_history = list(inner_iter_history)
-        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history, gradient_norm_history_W)
+        return (rates,crb_fes,F,W,gradient_norm_history, gradient_norm_history_W)
 
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
@@ -419,9 +415,6 @@ class PGA_Unfold_JX_partial(nn.Module):
         elif connections is not None:
             assert Nt is not None and Nrf is not None, \
                 "'Nt' and 'Nrf' must be provided together with 'connections'."
-            # Allows each RF chain to connect to an arbitrary (possibly overlapping
-            # and/or wrap-around) group of antennas, e.g.
-            #   connections = [(1, 20), (16, 37), (32, 53), [(48, 64), (1, 12)]]
             template_mask = build_partial_connection_mask(Nt, Nrf, connections)
             self.register_buffer('mask', template_mask)
         elif Nt is not None and Nrf is not None:
@@ -444,9 +437,8 @@ class PGA_Unfold_JX_partial(nn.Module):
         
         B = len(H[0])
 
-        rate_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        crb_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        rate_over_iters = torch.zeros(n_iter_outer,B, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer,B, device=H.device)
 
         ## Inner loop
         def inner_f_update(F_eff, W, H, xi_0, A_dot, R_N_inv, n_inner, Pt, ii):
@@ -498,18 +490,16 @@ class PGA_Unfold_JX_partial(nn.Module):
             # Record metrics after W-update
             if track_metrics:
 
-                rate_over_iters[ii, -1] = get_sum_rate(H, F_eff, W, Pt).detach()
-                crb_over_iters[ii, -1] = get_crb_fe(H, F_eff, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                power_over_iters[ii, -1] = get_power(F_eff, W).detach()
+                rate_over_iters[ii, :] = get_sum_rate(H, F_eff, W, Pt).detach()
+                crb_over_iters[ii, :] = get_crb_fe(H, F_eff, W, xi_0, A_dot, R_N_inv, Pt).detach()
 
 
         # print(f'F matrix after {n_iter_outer} outer iterations:\n{F}')
 
-        rates = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        crb_fes = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
+        rates = rate_over_iters.reshape(n_iter_outer, B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
 
-        return (rates.transpose(0, 1),crb_fes.transpose(0, 1),power_fes.transpose(0, 1),F,W,gradient_norm_history,gradient_norm_history_W,)
+        return (rates,crb_fes,F_eff,W,gradient_norm_history,gradient_norm_history_W,)
     
 class PGA_Unfold_JX_partial_decay(nn.Module):
     def __init__(self, step_size=None, Nt=None, Nrf=None, mask=None, connections=None, alpha=0.04, eps=1e-12, J_min=2):

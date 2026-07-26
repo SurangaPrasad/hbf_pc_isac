@@ -60,7 +60,7 @@ def run_UPGA_partial(step_size_UPGA, Nt, Nrf):
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
 
-            __, __, __, F, W, __, _ = model_UPGA_partial.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, step_size_UPGA.shape[0], track_metrics=False)
+            __, __, F, W, __, _ = model_UPGA_partial.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, step_size_UPGA.shape[0], track_metrics=False)
 
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
@@ -131,7 +131,7 @@ def run_UPGA(step_size_UPGA):
             snr_train = torch.tensor(10 ** (snr_dB_train / 10),
                                      dtype=torch.float32, device=device)
             
-            __, __, __, F, W, __, _ = model_UPGA.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, step_size_UPGA.shape[0], track_metrics=False)
+            __, __, F, W, __, _ = model_UPGA.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, step_size_UPGA.shape[0], track_metrics=False)
             
             loss = get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, snr_train)
             print(f"Batch [{i_batch//batch_size+1}/{len(H_train[0])//batch_size}], Loss: {loss.item():.4f}")
