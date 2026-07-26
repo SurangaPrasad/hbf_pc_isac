@@ -63,7 +63,10 @@ OMEGA = 0.25
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
 train_size = 112 * 2    # size of training set
-test_size = 50     # size of testing set
+if str(device) == 'cuda':
+    test_size = 50     
+else:
+    test_size = 10     
 batch_size = len(snr_dB_list) * 4
 n_epoch = 20         # number of training epochs
 learning_rate = 0.0005 # learning 
@@ -121,6 +124,7 @@ step_size_UPGA_J5 = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], step_size
 step_size_UPGA_J6 = torch.full([n_iter_inner_J6, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10 = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J20 = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J5_PC = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J10_PC = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # J_decay uses the same shape as J10 (max_inner=10) but the class uses fewer steps per outer iter dynamically
 step_size_UPGA_J5_decay = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
