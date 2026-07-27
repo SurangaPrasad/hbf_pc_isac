@@ -82,8 +82,6 @@ n_iter_inner_J20 = 20   # Number of inner iterations (J = 20)
 
 
 # ============================ TUNING PARAMETERS ===========================
-WEIGHT_F_RAD = OMEGA  # fixed
-WEIGHT_W_RAD = OMEGA / Nt * K
 WEIGHT_F_COM = OMEGA  
 WEIGHT_W_COM = OMEGA 
 WEIGHT_F_CRB = 1

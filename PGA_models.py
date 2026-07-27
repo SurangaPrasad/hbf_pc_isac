@@ -454,7 +454,7 @@ class PGA_Unfold_JX_partial(nn.Module):
 
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                 delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
-                delta_F_power = 0.01 * grad_F_power
+                delta_F_power = self.step_size[jj][ii][0] * grad_F_power
 
                 F_eff = ( F_eff + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB - delta_F_power * WEIGHT_F_POWER ) * self.mask.to(F_eff.device)
 
@@ -484,7 +484,7 @@ class PGA_Unfold_JX_partial(nn.Module):
             g_W = torch.abs(grad_J_w).reshape(grad_J_w.shape[0], -1).mean(dim=1)
             gradient_norm_history_W.append(g_W.mean().item())
 
-            W_new = W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB - 0.01 * grad_W_power * WEIGHT_W_POWER
+            W_new = W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB - self.step_size[0][ii][1] * grad_W_power * WEIGHT_W_POWER
 
             # Projection / normalization
             F_eff, W = normalize(F_eff, W_new, H, Pt)
@@ -966,16 +966,21 @@ def get_grad_W_rad(F, W, R):
     return grad_W
 
 # ================== Compute exponentially weighted deep-supervision loss
-def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97):
+def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, mask=None, beta=0.97):
+    if mask is None:
+        # Default to full-connected structure (all ones) for standard training
+        mask = torch.ones((Nt, Nrf), dtype=REAL_DTYPE, device=device)
 
     sum_rate = get_sum_rate(H, F, W, Pt)
-    crb = get_crb_fe(H, F, W,xi_0, A_dot, R_N_inv, Pt)
-    power = get_power(F, W)
-
+    crb = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
+    
+    # Use total power (transmit + circuit) instead of just transmit power
+    total_power = compute_total_power(F, W, mask, P_RF, P_PS, P_SW, P_o, Nt, Nrf)
+    
     mean_crb = torch.mean(crb)
+    mean_power = torch.mean(total_power)
 
-    loss = -(OMEGA * sum_rate + mean_crb - power)
-    # loss = -( sum_rate + OMEGA * mean_crb)
+    loss = -(OMEGA * sum_rate + mean_crb - mean_power)
 
     return loss
 
