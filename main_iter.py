@@ -295,6 +295,19 @@ if run_program == 1:
         crb_iter_UPGA_partial_J5   = get_outer_iter_curve(crb_UPGA_partial_J5)
 
     
+
+        # UPGA_partial_J5 with FC step sizes
+        print('Running unfolded PGA with J = 5 and partial coupling, using FC step sizes...')
+        model_UPGA_partial_J5_FCstep = PGA_Unfold_JX_partial(step_size_UPGA_J5, Nt, Nrf)
+        model_UPGA_partial_J5_FCstep.load_state_dict(torch.load(model_file_name_UPGA_J5, map_location=device))
+        register_step_size('UPGA (J=5, partial, FC step)', model_UPGA_partial_J5_FCstep.step_size)
+        sum_rate_UPGA_partial_J5_FCstep, crb_UPGA_partial_J5_FCstep, F_UPGA_partial_J5_FCstep, W_UPGA_partial_J5_FCstep, gradient_norm_history_UPGA_partial_J5_FCstep, gradient_norm_history_UPGA_partial_J5_FCstep_W = model_UPGA_partial_J5_FCstep.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+                                                                                             snr,
+                                                                                             n_iter_outer,
+                                                                                             n_iter_inner_J5)
+        rate_iter_UPGA_partial_J5_FCstep  = get_outer_iter_curve(sum_rate_UPGA_partial_J5_FCstep)
+        crb_iter_UPGA_partial_J5_FCstep   = get_outer_iter_curve(crb_UPGA_partial_J5_FCstep)
+
     if run_UPGA_partial_J10 == 1:
         print('Running unfolded PGA with J = 10 and partial coupling...')
         # Create new model and load states
@@ -763,6 +776,9 @@ if plot_figure == 1:
     if run_UPGA_partial_J5 == 1:
         obj_iter_UPGA_partial_J5 = OMEGA * rate_iter_UPGA_partial_J5 + crb_iter_UPGA_partial_J5
         plt.plot(iter_outer_x, obj_iter_UPGA_partial_J5, '--^', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_partial_J5)
+
+        obj_iter_UPGA_partial_J5_FC = OMEGA * rate_iter_UPGA_partial_J5_FCstep + crb_iter_UPGA_partial_J5_FCstep
+        plt.plot(iter_outer_x, obj_iter_UPGA_partial_J5_FC, '--p', markevery=5, color='black', linewidth=3, markersize=7, label=label_UPGA_partial_J5 + " (FC step)")
     if run_UPGA_partial_J10 == 1:
         obj_iter_UPGA_partial_J10 = OMEGA * rate_iter_UPGA_partial_J10[outer_idx_J10] + crb_iter_UPGA_partial_J10[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_partial_J10, '--v', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_partial_J10)
