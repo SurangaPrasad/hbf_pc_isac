@@ -80,12 +80,15 @@ def evaluate_configuration(D, params, H, n_iter_outer):
     PGA_models.py, negated), Eq. (10)/(11), now with the D-dependent
     circuit power included in `mean_power` via `compute_total_power`.
     """
+    import time
+    t0 = time.time()
     mask = _set_mask(params.model, D)
 
     with torch.no_grad():
         _, _, F, W, _, _ = params.model.execute_PGA(
             H, xi_0, A_dot, R_N_inv, params.Pt,
             n_iter_outer, n_iter_inner_J5, track_metrics=False)
+        t_model = time.time() - t0
 
         sum_rate = get_sum_rate(H, F, W, params.Pt)
         mean_crb = torch.mean(get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, params.Pt))
@@ -196,6 +199,7 @@ def ma_fahp(params, D_init=None, max_while_loops=100, verbose=True, rng=None):
     Call `calculate_final_precoders(D, params)` afterwards to obtain the
     corresponding (F, W) on the full evaluation batch/iteration budget.
     """
+    import time
     rng = rng or np.random.default_rng()
     D = D_init if D_init is not None else generate_random_binary_matrix(
         params.M_T, params.N_RF, params.p_i, params.q_j, rng)
@@ -203,12 +207,20 @@ def ma_fahp(params, D_init=None, max_while_loops=100, verbose=True, rng=None):
     cache = {}                        # avoids recomputing utility for repeated D
     stability_indicator = 0
     loop_count = 0
+    loop_start_time = time.time()
 
     while stability_indicator == 0 and loop_count < max_while_loops:
         loop_count += 1
         D_previous = D.copy()
+        antenna_start_time = time.time()
 
         for i in range(params.M_T):
+            if verbose and i % max(1, params.M_T // 10) == 0:  # progress every ~10% of antennas
+                elapsed = time.time() - antenna_start_time
+                antenna_rate = (i + 1) / (elapsed + 1e-6)
+                remaining = (params.M_T - i) / (antenna_rate + 1e-6)
+                print(f"    [Antenna {i:3d}/{params.M_T}] elapsed={elapsed:.1f}s, est. remaining={remaining:.1f}s")
+            
             U_current = calculate_utility(D, params, cache)
 
             # ---------------- SWAP PHASE (Eq. 30, 33) ----------------
@@ -257,8 +269,10 @@ def ma_fahp(params, D_init=None, max_while_loops=100, verbose=True, rng=None):
             stability_indicator = 1
 
         if verbose:
+            loop_elapsed = time.time() - antenna_start_time
             U = calculate_utility(D, params, cache)
-            print(f"[MA-FAHP] while-loop {loop_count}: objective = {U:.4f}, "
-                  f"active links = {int(D.sum())}")
+            print(f"[MA-FAHP] while-loop {loop_count}/{max_while_loops}: objective = {U:.4f}, "
+                  f"active links = {int(D.sum())}/{params.M_T * params.N_RF}, "
+                  f"elapsed={loop_elapsed:.1f}s, cache_size={len(cache)}")
 
     return D

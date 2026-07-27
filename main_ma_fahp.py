@@ -37,6 +37,8 @@ def full_connected_matrix():
 
 
 if run_program == 1:
+    import time
+    
     # Load test channel data
     _, H_test0 = get_data_tensor(data_source)
     H_test = H_test0[:, :test_size, :, :]
@@ -51,8 +53,12 @@ if run_program == 1:
     obj_full_connected = np.zeros(len(snr_dB_list))
     active_links_ma_fahp = np.zeros(len(snr_dB_list))
 
+    sweep_start_time = time.time()
+    
     for ss, snr_dB_val in enumerate(snr_dB_list):
+        snr_start_time = time.time()
         Pt = 10 ** (snr_dB_val / 10)
+        print(f'\n>>> SNR sweep progress: {ss+1}/{len(snr_dB_list)}')
         print(f'---------------------- SNR = {snr_dB_val} dB ----------------------')
 
         params = Params(H_search, Pt, model,
@@ -65,12 +71,21 @@ if run_program == 1:
 
         # Final, fair comparison: same (full) channel batch and outer-iteration
         # budget for both connection matrices.
+        print(f"  Evaluating MA-FAHP configuration on full test batch...")
         obj_ma_fahp[ss], *_ = evaluate_configuration(D_best, params, H_test, n_iter_outer)
+        print(f"  Evaluating full-connected configuration on full test batch...")
         obj_full_connected[ss], *_ = evaluate_configuration(D_full, params, H_test, n_iter_outer)
 
+        snr_elapsed = time.time() - snr_start_time
+        snr_completed = ss + 1
+        snr_remaining = len(snr_dB_list) - snr_completed
+        avg_time_per_snr = (time.time() - sweep_start_time) / snr_completed
+        est_total_remaining = avg_time_per_snr * snr_remaining
+        
         print(f'  MA-FAHP objective        = {obj_ma_fahp[ss]:.4f} '
               f'(active links = {int(active_links_ma_fahp[ss])}/{Nt * Nrf})')
         print(f'  Full-connected objective = {obj_full_connected[ss]:.4f}')
+        print(f'  SNR point elapsed: {snr_elapsed:.1f}s | Est. remaining: {est_total_remaining:.1f}s')
 
     scipy.io.savemat(get_ma_fahp_cache_file_name(), {
         'snr_dB_list': snr_dB_list,
@@ -78,7 +93,10 @@ if run_program == 1:
         'obj_full_connected': obj_full_connected,
         'active_links_ma_fahp': active_links_ma_fahp,
     })
-    print('Saved MA-FAHP objective-vs-SNR cache to', get_ma_fahp_cache_file_name())
+    total_elapsed = time.time() - sweep_start_time
+    print(f'\n=== SWEEP COMPLETE ===')
+    print(f'Total elapsed time: {total_elapsed/60:.1f} minutes ({total_elapsed:.1f}s)')
+    print(f'Saved MA-FAHP objective-vs-SNR cache to', get_ma_fahp_cache_file_name())
 
 if plot_figure == 1:
     if load_saved_plot_data == 1:
