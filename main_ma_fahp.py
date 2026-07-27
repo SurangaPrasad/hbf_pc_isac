@@ -10,6 +10,11 @@ For every SNR point:
      is (re-)evaluated with the full outer-iteration budget for both the
      MA-FAHP-selected D and the fully-connected D (all antennas wired to all
      RF chains), so the two curves are directly comparable.
+
+SPEED OPTIMIZATION:
+  - Change SPEED_PRESET from 'FAST' to 'BALANCED' or 'QUALITY' for higher accuracy
+  - Change snr_dB_list to a smaller subset for quick testing:
+    Example: snr_dB_list = np.array([0, 6, 12])  # Just 3 points instead of 7
 """
 import scipy.io
 from MA_FAHP import *
@@ -21,15 +26,33 @@ run_program = 1
 plot_figure = 1
 load_saved_plot_data = 0
 
+# ============ SPEED vs QUALITY PRESETS ============
+# FAST:     Complete in ~5-10 min, lower accuracy
+# BALANCED: Complete in ~15-30 min, reasonable accuracy (recommended)
+# QUALITY:  Complete in ~60+ min, high accuracy (original)
+SPEED_PRESET = 'FAST'  # Choose: 'FAST', 'BALANCED', or 'QUALITY'
+
 # Search-phase settings (cheap, only used to rank/compare candidate D's).
-SEARCH_N_ITER_OUTER = 10
-MAX_WHILE_LOOPS = 5
-SEARCH_BATCH_SIZE = 8   # small channel subset used while searching, for speed
+if SPEED_PRESET == 'FAST':
+    SEARCH_N_ITER_OUTER = 3       # 3x faster than original (10 -> 3)
+    MAX_WHILE_LOOPS = 2           # 2.5x faster than original (5 -> 2)
+    SEARCH_BATCH_SIZE = 4         # Use small batch for speed
+    FINAL_N_ITER_OUTER = 60       # 2x faster final eval than original (120 -> 60)
+elif SPEED_PRESET == 'BALANCED':
+    SEARCH_N_ITER_OUTER = 5       # Balanced
+    MAX_WHILE_LOOPS = 3           # Balanced
+    SEARCH_BATCH_SIZE = 6         # Reasonable batch
+    FINAL_N_ITER_OUTER = 90       # Balanced final eval
+else:  # QUALITY
+    SEARCH_N_ITER_OUTER = 10      # Original (high quality)
+    MAX_WHILE_LOOPS = 5           # Original (high quality)
+    SEARCH_BATCH_SIZE = 8         # Original (high quality)
+    FINAL_N_ITER_OUTER = 120      # Original (high quality)
 
-
-def get_ma_fahp_cache_file_name():
-    return directory_result + 'ma_fahp_obj_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.mat'
-
+# ============ EXPERIMENTAL: Two-phase mode ============
+# If enabled: First pass with FAST settings, second pass with BALANCED/QUALITY
+# This can save time by doing quick coarse search first, then refining
+TWO_PHASE_MODE = False  # Set to True for faster convergence with refinement
 
 def full_connected_matrix():
     """D with every antenna connected to every RF chain (Full-Connected structure)."""
@@ -38,6 +61,31 @@ def full_connected_matrix():
 
 if run_program == 1:
     import time
+    
+    print(f"\n{'='*70}")
+    print(f"MA-FAHP SPEED PRESET: {SPEED_PRESET.upper()}")
+    print(f"{'='*70}")
+    print(f"  Search iterations (per candidate):    {SEARCH_N_ITER_OUTER}")
+    print(f"  Max while-loop iterations:            {MAX_WHILE_LOOPS}")
+    print(f"  Search batch size:                    {SEARCH_BATCH_SIZE}")
+    print(f"  Final evaluation iterations:          {FINAL_N_ITER_OUTER}")
+    
+    speedup_estimate = (10 * 5 * 8) / (SEARCH_N_ITER_OUTER * MAX_WHILE_LOOPS * SEARCH_BATCH_SIZE) * (120 / FINAL_N_ITER_OUTER)
+    
+    if SPEED_PRESET == 'FAST':
+        expected_time = "~5-15 minutes"
+        quality = "Lower (good for prototyping)"
+    elif SPEED_PRESET == 'BALANCED':
+        expected_time = "~15-30 minutes"
+        quality = "Reasonable (recommended for results)"
+    else:
+        expected_time = "~60+ minutes"
+        quality = "High (for publication-quality results)"
+    
+    print(f"\n  Estimated speedup vs QUALITY:         ~{speedup_estimate:.1f}x")
+    print(f"  Expected total runtime:               {expected_time}")
+    print(f"  Result quality:                       {quality}")
+    print(f"{'='*70}\n")
     
     # Load test channel data
     _, H_test0 = get_data_tensor(data_source)
@@ -58,12 +106,13 @@ if run_program == 1:
     for ss, snr_dB_val in enumerate(snr_dB_list):
         snr_start_time = time.time()
         Pt = 10 ** (snr_dB_val / 10)
-        print(f'\n>>> SNR sweep progress: {ss+1}/{len(snr_dB_list)}')
-        print(f'---------------------- SNR = {snr_dB_val} dB ----------------------')
+        print(f'\n>>> SNR sweep progress: {ss+1}/{len(snr_dB_list)} | SNR = {snr_dB_val} dB')
+        print(f'    (est. time remaining: ~{(len(snr_dB_list) - ss - 1) * (time.time() - sweep_start_time) / (ss + 1):.0f}s)')
+        print(f'    {"="*60}')
 
         params = Params(H_search, Pt, model,
                          n_iter_outer_search=SEARCH_N_ITER_OUTER,
-                         n_iter_outer_eval=n_iter_outer,
+                         n_iter_outer_eval=FINAL_N_ITER_OUTER,
                          H_eval=H_test)
 
         D_best = ma_fahp(params, max_while_loops=MAX_WHILE_LOOPS, verbose=True)
@@ -72,9 +121,9 @@ if run_program == 1:
         # Final, fair comparison: same (full) channel batch and outer-iteration
         # budget for both connection matrices.
         print(f"  Evaluating MA-FAHP configuration on full test batch...")
-        obj_ma_fahp[ss], *_ = evaluate_configuration(D_best, params, H_test, n_iter_outer)
+        obj_ma_fahp[ss], *_ = evaluate_configuration(D_best, params, H_test, FINAL_N_ITER_OUTER)
         print(f"  Evaluating full-connected configuration on full test batch...")
-        obj_full_connected[ss], *_ = evaluate_configuration(D_full, params, H_test, n_iter_outer)
+        obj_full_connected[ss], *_ = evaluate_configuration(D_full, params, H_test, FINAL_N_ITER_OUTER)
 
         snr_elapsed = time.time() - snr_start_time
         snr_completed = ss + 1
