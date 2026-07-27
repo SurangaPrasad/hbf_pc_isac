@@ -86,8 +86,8 @@ WEIGHT_F_COM = OMEGA
 WEIGHT_W_COM = OMEGA 
 WEIGHT_F_CRB = 1
 WEIGHT_W_CRB = 1
-WEIGHT_F_POWER = 1
-WEIGHT_W_POWER = 1
+WEIGHT_F_POWER = 0.1
+WEIGHT_W_POWER = 0.1
 
 # ========================= HARDWARE POWER CONSUMPTION PARAMETERS (Watts) =========================
 P_RF = 0.3          # power consumption of a single active RF chain

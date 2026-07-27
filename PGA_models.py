@@ -980,7 +980,7 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, mask=None, beta=0.97):
     mean_crb = torch.mean(crb)
     mean_power = torch.mean(total_power)
 
-    loss = -(OMEGA * sum_rate + mean_crb - mean_power)
+    loss = -(WEIGHT_F_COM * sum_rate + WEIGHT_F_CRB * mean_crb - WEIGHT_F_POWER * mean_power)
 
     return loss
 
