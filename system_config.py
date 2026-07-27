@@ -88,10 +88,14 @@ WEIGHT_F_COM = OMEGA
 WEIGHT_W_COM = OMEGA 
 WEIGHT_F_CRB = 1
 WEIGHT_W_CRB = 1
+WEIGHT_F_POWER = 1
+WEIGHT_W_POWER = 1
 
 # ========================= HARDWARE POWER CONSUMPTION PARAMETERS (Watts) =========================
 P_RF = 0.3          # power consumption of a single active RF chain
 P_PS = 0.04         # power consumption of a single active phase shifter
+P_SW = 0.01         # power consumption of a single active antenna/RF-chain switch, Eq. (9)
+P_o  = 0.5          # fixed (baseband + other) circuit power, Eq. (9)
 PA_EFFICIENCY = 1.0 # power amplifier efficiency (0, 1], 1.0 = ideal amplifier
 
 # ========================= CRB PARAMETERS =========================
@@ -165,7 +169,7 @@ model_file_name_UPGA_J5 = directory_model + 'UPGA_J5.pth'
 model_file_name_UPGA_J10 = directory_model + 'UPGA_J10.pth'
 model_file_name_UPGA_J10_PRCDN = directory_model + 'UPGA_J10_PRCDN.pth'
 model_file_name_UPGA_J20 = directory_model + 'UPGA_J20.pth'
-model_file_name_UPGA_partial_J5 = directory_model + 'UPGA_partial_J5_new_mask.pth'
+model_file_name_UPGA_partial_J5 = directory_model + 'UPGA_partial_J5.pth'
 model_file_name_UPGA_partial_J10 = directory_model + 'UPGA_partial_J10_new_mask.pth'
 model_file_name_UPGA_J5_decay = directory_model + 'UPGA_J5_decay.pth'
 model_file_name_UPGA_J10_decay = directory_model + 'UPGA_J10_decay.pth'

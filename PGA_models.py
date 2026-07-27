@@ -409,7 +409,7 @@ class PGA_Unfold_JX_partial(nn.Module):
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
         self.inner_iter_history = []
         self.alpha = alpha
-        connections = [(1, 20), (16, 37), (32, 53), [(48, 64), (1, 12)]]
+        # connections = [(1, 20), (16, 37), (32, 53), [(48, 64), (1, 12)]]
         if mask is not None:
             self.register_buffer('mask', mask.float())
         elif connections is not None:
@@ -448,13 +448,15 @@ class PGA_Unfold_JX_partial(nn.Module):
 
                 grad_F_com = self.mask.to(F.device) * get_grad_F_com(H, F_eff, W)
                 grad_F_crb = self.mask.to(F.device) * get_grad_F_crb(F_eff, W, xi_0, A_dot, R_N_inv)
+                grad_F_power = self.mask.to(F.device) * grad_F_P(F_eff, W)
                 if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                     print('Error NaN gradients!!!!!!!!!!!!!!!')
 
                 delta_F_com = self.step_size[jj][ii][0] * grad_F_com
                 delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb
+                delta_F_power = 0.01 * grad_F_power
 
-                F_eff = ( F_eff + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB )
+                F_eff = ( F_eff + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB - delta_F_power * WEIGHT_F_POWER ) * self.mask.to(F_eff.device)
 
                 F_eff = normalize_power(F_eff, W, H, Pt)
 
@@ -475,13 +477,14 @@ class PGA_Unfold_JX_partial(nn.Module):
 
             grad_W_k_com = get_grad_W_com(H, F_eff, W)
             grad_W_k_crb = get_grad_W_crb(F_eff, W, xi_0, A_dot, R_N_inv)
-            grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
+            grad_W_power = grad_W_P(F_eff, W)
+            grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB + grad_W_power * WEIGHT_W_POWER
             
             # Average entry-wise magnitude of ∇_W J
             g_W = torch.abs(grad_J_w).reshape(grad_J_w.shape[0], -1).mean(dim=1)
             gradient_norm_history_W.append(g_W.mean().item())
 
-            W_new = W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB
+            W_new = W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB - 0.01 * grad_W_power * WEIGHT_W_POWER
 
             # Projection / normalization
             F_eff, W = normalize(F_eff, W_new, H, Pt)
@@ -967,10 +970,11 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97):
 
     sum_rate = get_sum_rate(H, F, W, Pt)
     crb = get_crb_fe(H, F, W,xi_0, A_dot, R_N_inv, Pt)
+    power = get_power(F, W)
 
     mean_crb = torch.mean(crb)
 
-    loss = -(OMEGA * sum_rate + mean_crb)
+    loss = -(OMEGA * sum_rate + mean_crb - power)
     # loss = -( sum_rate + OMEGA * mean_crb)
 
     return loss

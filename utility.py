@@ -750,3 +750,57 @@ def safe_legend(**kwargs):
     # Use opaque legend frame to keep EPS exports warning-free.
     kwargs.setdefault('framealpha', 1.0)
     ax.legend(valid_handles, valid_labels, **kwargs)
+
+
+
+
+### power related functions
+
+def compute_circuit_power(mask, P_RF, P_PS, P_SW, P_o, Nt, Nrf):
+    """
+    Circuit power consumption P_c(D), Eq. (9).
+
+    mask : (Nt, Nrf) real 0/1 connection-state matrix D (torch tensor).
+    Returns a 0-d (scalar) tensor -- D is common to every batch sample.
+    """
+    mask = mask.to(dtype=REAL_DTYPE)
+    N_RF_work = torch.amax(mask, dim=0).sum()                    # sum_j max_i D(i,j)
+    P_PS_term = torch.linalg.matrix_norm(mask, ord='fro') ** 2 * P_PS
+    P_SW_term = Nt * Nrf * P_SW
+    return N_RF_work * P_RF + P_PS_term + P_SW_term + P_o
+
+
+def compute_total_power(F, W, mask, P_RF, P_PS, P_SW, P_o, Nt, Nrf):
+    """
+    Total power consumption P(W, F, D) = ||(F∘D)W||_F^2 + P_c(D), Eq. (10).
+
+    F    : (K, B, Nt, Nrf)  complex analog precoder, already masked (F == F∘D)
+    W    : (K, B, Nrf, L_s) complex digital precoder
+    mask : (Nt, Nrf)        real 0/1 connection-state matrix D
+
+    Returns a (K, B) tensor (transmit power per sample + the scalar circuit power).
+    """
+    P_t = get_power(F, W)                                        # (K, B), Eq. (6)
+    P_c = compute_circuit_power(mask, P_RF, P_PS, P_SW, P_o, Nt, Nrf)
+    return P_t + P_c
+
+
+def grad_F_P(F, W):
+    """
+    Wirtinger gradient of the transmit power ||FW||_F^2 w.r.t. F*:  ∇_{F*} = F (W W^H).
+
+    F, W are batched (K, B, ·, ·) complex tensors following the codebase's
+    Hermitian-transpose convention (`.conj().transpose(-2, -1)`). `F` is expected
+    to already be the masked analog precoder (F == F∘D); the caller re-applies
+    the mask to the result so inactive connections get exactly zero gradient.
+    """
+    W_H = W.conj().transpose(-2, -1)
+    return F @ (W @ W_H)
+
+
+def grad_W_P(F, W):
+    """
+    Wirtinger gradient of the transmit power ||FW||_F^2 w.r.t. W*:  ∇_{W*} = (F^H F) W.
+    """
+    F_H = F.conj().transpose(-2, -1)
+    return (F_H @ F) @ W
