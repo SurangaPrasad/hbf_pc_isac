@@ -409,7 +409,7 @@ class PGA_Unfold_JX_partial(nn.Module):
         self.step_size = nn.Parameter(step_size)  # parameters = (mu, lambda)
         self.inner_iter_history = []
         self.alpha = alpha
-        # connections = [(1, 20), (16, 37), (32, 53), [(48, 64), (1, 12)]]
+        connections = [(1, 20), (16, 37), (32, 53), [(48, 64), (1, 12)]]
         if mask is not None:
             self.register_buffer('mask', mask.float())
         elif connections is not None:
