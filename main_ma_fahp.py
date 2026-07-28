@@ -59,6 +59,11 @@ def full_connected_matrix():
     return np.ones((Nt, Nrf), dtype=int)
 
 
+def get_ma_fahp_cache_file_name():
+    """Generate the cache filename for saving/loading MA-FAHP results."""
+    return directory_result + 'ma_fahp_obj_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.mat'
+
+
 if run_program == 1:
     import time
     
