@@ -86,14 +86,14 @@ WEIGHT_F_COM = OMEGA
 WEIGHT_W_COM = OMEGA 
 WEIGHT_F_CRB = 1
 WEIGHT_W_CRB = 1
-WEIGHT_F_POWER = 0.1
-WEIGHT_W_POWER = 0.1
+WEIGHT_F_POWER = 1
+WEIGHT_W_POWER = 1
 
 # ========================= HARDWARE POWER CONSUMPTION PARAMETERS (Watts) =========================
-P_RF = 0.3          # power consumption of a single active RF chain
-P_PS = 0.04         # power consumption of a single active phase shifter
-P_SW = 0.01         # power consumption of a single active antenna/RF-chain switch, Eq. (9)
-P_o  = 0.5          # fixed (baseband + other) circuit power, Eq. (9)
+P_RF = 0.2          # power consumption of a single active RF chain
+P_PS = 0.02         # power consumption of a single active phase shifter
+P_SW = 0.005        # power consumption of a single active antenna/RF-chain switch, Eq. (9)
+P_o  = 0.3          # fixed (baseband + other) circuit power, Eq. (9)
 PA_EFFICIENCY = 1.0 # power amplifier efficiency (0, 1], 1.0 = ideal amplifier
 
 # ========================= CRB PARAMETERS =========================
