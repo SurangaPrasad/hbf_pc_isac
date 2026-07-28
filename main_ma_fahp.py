@@ -100,6 +100,14 @@ if run_program == 1:
     obj_ma_fahp = np.zeros(len(snr_dB_list))
     obj_full_connected = np.zeros(len(snr_dB_list))
     active_links_ma_fahp = np.zeros(len(snr_dB_list))
+    
+    # Store components for plotting
+    sum_rate_ma_fahp = np.zeros(len(snr_dB_list))
+    sum_rate_full = np.zeros(len(snr_dB_list))
+    crb_inv_log_ma_fahp = np.zeros(len(snr_dB_list))
+    crb_inv_log_full = np.zeros(len(snr_dB_list))
+    power_ma_fahp = np.zeros(len(snr_dB_list))
+    power_full = np.zeros(len(snr_dB_list))
 
     sweep_start_time = time.time()
     
@@ -121,9 +129,12 @@ if run_program == 1:
         # Final, fair comparison: same (full) channel batch and outer-iteration
         # budget for both connection matrices.
         print(f"  Evaluating MA-FAHP configuration on full test batch...")
-        obj_ma_fahp[ss], *_ = evaluate_configuration(D_best, params, H_test, FINAL_N_ITER_OUTER)
+        obj_ma_fahp[ss], sum_rate_ma_fahp[ss], crb_mean_ma, power_ma_fahp[ss] = evaluate_configuration(D_best, params, H_test, FINAL_N_ITER_OUTER)
+        crb_inv_log_ma_fahp[ss] = np.log10(1.0 / crb_mean_ma) if crb_mean_ma > 0 else 0
+        
         print(f"  Evaluating full-connected configuration on full test batch...")
-        obj_full_connected[ss], *_ = evaluate_configuration(D_full, params, H_test, FINAL_N_ITER_OUTER)
+        obj_full_connected[ss], sum_rate_full[ss], crb_mean_full, power_full[ss] = evaluate_configuration(D_full, params, H_test, FINAL_N_ITER_OUTER)
+        crb_inv_log_full[ss] = np.log10(1.0 / crb_mean_full) if crb_mean_full > 0 else 0
 
         snr_elapsed = time.time() - snr_start_time
         snr_completed = ss + 1
@@ -131,9 +142,14 @@ if run_program == 1:
         avg_time_per_snr = (time.time() - sweep_start_time) / snr_completed
         est_total_remaining = avg_time_per_snr * snr_remaining
         
-        print(f'  MA-FAHP objective        = {obj_ma_fahp[ss]:.4f} '
-              f'(active links = {int(active_links_ma_fahp[ss])}/{Nt * Nrf})')
+        print(f'  MA-FAHP objective        = {obj_ma_fahp[ss]:.4f} (active links = {int(active_links_ma_fahp[ss])}/{Nt * Nrf})')
+        print(f'    ├─ Sum Rate           = {sum_rate_ma_fahp[ss]:.4f}')
+        print(f'    ├─ log10(CRB^-1)      = {crb_inv_log_ma_fahp[ss]:.4f}')
+        print(f'    └─ Power              = {power_ma_fahp[ss]:.4f}')
         print(f'  Full-connected objective = {obj_full_connected[ss]:.4f}')
+        print(f'    ├─ Sum Rate           = {sum_rate_full[ss]:.4f}')
+        print(f'    ├─ log10(CRB^-1)      = {crb_inv_log_full[ss]:.4f}')
+        print(f'    └─ Power              = {power_full[ss]:.4f}')
         print(f'  SNR point elapsed: {snr_elapsed:.1f}s | Est. remaining: {est_total_remaining:.1f}s')
 
     scipy.io.savemat(get_ma_fahp_cache_file_name(), {
@@ -141,6 +157,12 @@ if run_program == 1:
         'obj_ma_fahp': obj_ma_fahp,
         'obj_full_connected': obj_full_connected,
         'active_links_ma_fahp': active_links_ma_fahp,
+        'sum_rate_ma_fahp': sum_rate_ma_fahp,
+        'sum_rate_full': sum_rate_full,
+        'crb_inv_log_ma_fahp': crb_inv_log_ma_fahp,
+        'crb_inv_log_full': crb_inv_log_full,
+        'power_ma_fahp': power_ma_fahp,
+        'power_full': power_full,
     })
     total_elapsed = time.time() - sweep_start_time
     print(f'\n=== SWEEP COMPLETE ===')
@@ -153,17 +175,130 @@ if plot_figure == 1:
         snr_dB_list = np.asarray(cache['snr_dB_list'])
         obj_ma_fahp = np.asarray(cache['obj_ma_fahp'])
         obj_full_connected = np.asarray(cache['obj_full_connected'])
+        sum_rate_ma_fahp = np.asarray(cache.get('sum_rate_ma_fahp', np.zeros_like(snr_dB_list)))
+        sum_rate_full = np.asarray(cache.get('sum_rate_full', np.zeros_like(snr_dB_list)))
+        crb_inv_log_ma_fahp = np.asarray(cache.get('crb_inv_log_ma_fahp', np.zeros_like(snr_dB_list)))
+        crb_inv_log_full = np.asarray(cache.get('crb_inv_log_full', np.zeros_like(snr_dB_list)))
+        power_ma_fahp = np.asarray(cache.get('power_ma_fahp', np.zeros_like(snr_dB_list)))
+        power_full = np.asarray(cache.get('power_full', np.zeros_like(snr_dB_list)))
 
-    plt.figure(figsize=(8, 4.2))
+    # ========== Plot 1: Objective Function ==========
+    plt.figure(figsize=(10, 5))
     plt.plot(snr_dB_list, obj_ma_fahp, '-o', color='red', linewidth=3, markersize=8,
-             label='MA-FAHP (adaptive connections)')
+             label='MA-FAHP (adaptive)')
     plt.plot(snr_dB_list, obj_full_connected, '--s', color='black', linewidth=3, markersize=8,
-             label='Full-connected structure')
-    plt.xlabel('SNR [dB]', fontsize=14)
-    plt.ylabel('Objective value', fontsize=14)
-    plt.grid()
-    safe_legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), fontsize=11, ncol=2, frameon=False)
-    plt.savefig(directory_result + 'ma_fahp_obj_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png',
+             label='Full-connected')
+    plt.xlabel('SNR [dB]', fontsize=12)
+    plt.ylabel('Objective value', fontsize=12)
+    plt.title('Objective Function vs SNR', fontsize=13, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    safe_legend(loc='best', fontsize=11, frameon=True)
+    plt.tight_layout()
+    plt.savefig(directory_result + 'ma_fahp_objective_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png',
+                bbox_inches='tight', pad_inches=0.02, dpi=150)
+    plt.savefig(directory_result + 'ma_fahp_objective_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps',
                 bbox_inches='tight', pad_inches=0.02)
-    plt.savefig(directory_result + 'ma_fahp_obj_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps',
+    
+    # ========== Plot 2: Sum Rate ==========
+    plt.figure(figsize=(10, 5))
+    plt.plot(snr_dB_list, sum_rate_ma_fahp, '-o', color='red', linewidth=3, markersize=8,
+             label='MA-FAHP (adaptive)')
+    plt.plot(snr_dB_list, sum_rate_full, '--s', color='black', linewidth=3, markersize=8,
+             label='Full-connected')
+    plt.xlabel('SNR [dB]', fontsize=12)
+    plt.ylabel('Sum Rate [bits/s/Hz]', fontsize=12)
+    plt.title('Sum Rate vs SNR', fontsize=13, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    safe_legend(loc='best', fontsize=11, frameon=True)
+    plt.tight_layout()
+    plt.savefig(directory_result + 'ma_fahp_sum_rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png',
+                bbox_inches='tight', pad_inches=0.02, dpi=150)
+    plt.savefig(directory_result + 'ma_fahp_sum_rate_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps',
                 bbox_inches='tight', pad_inches=0.02)
+    
+    # ========== Plot 3: log10(CRB^-1) ==========
+    plt.figure(figsize=(10, 5))
+    plt.plot(snr_dB_list, crb_inv_log_ma_fahp, '-o', color='red', linewidth=3, markersize=8,
+             label='MA-FAHP (adaptive)')
+    plt.plot(snr_dB_list, crb_inv_log_full, '--s', color='black', linewidth=3, markersize=8,
+             label='Full-connected')
+    plt.xlabel('SNR [dB]', fontsize=12)
+    plt.ylabel('log₁₀(CRB⁻¹)', fontsize=12)
+    plt.title('Sensing Performance (log10(CRB Inverse)) vs SNR', fontsize=13, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    safe_legend(loc='best', fontsize=11, frameon=True)
+    plt.tight_layout()
+    plt.savefig(directory_result + 'ma_fahp_crb_inv_log_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png',
+                bbox_inches='tight', pad_inches=0.02, dpi=150)
+    plt.savefig(directory_result + 'ma_fahp_crb_inv_log_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps',
+                bbox_inches='tight', pad_inches=0.02)
+    
+    # ========== Plot 4: Power Consumption ==========
+    plt.figure(figsize=(10, 5))
+    plt.plot(snr_dB_list, power_ma_fahp, '-o', color='red', linewidth=3, markersize=8,
+             label='MA-FAHP (adaptive)')
+    plt.plot(snr_dB_list, power_full, '--s', color='black', linewidth=3, markersize=8,
+             label='Full-connected')
+    plt.xlabel('SNR [dB]', fontsize=12)
+    plt.ylabel('Total Power [W]', fontsize=12)
+    plt.title('Power Consumption vs SNR', fontsize=13, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    safe_legend(loc='best', fontsize=11, frameon=True)
+    plt.tight_layout()
+    plt.savefig(directory_result + 'ma_fahp_power_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png',
+                bbox_inches='tight', pad_inches=0.02, dpi=150)
+    plt.savefig(directory_result + 'ma_fahp_power_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps',
+                bbox_inches='tight', pad_inches=0.02)
+    
+    # ========== Plot 5: All metrics in one figure (subplots) ==========
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle(f'MA-FAHP Performance Comparison (Nt={Nt}, OMEGA={OMEGA})', fontsize=14, fontweight='bold')
+    
+    # Objective
+    axes[0, 0].plot(snr_dB_list, obj_ma_fahp, '-o', color='red', linewidth=2.5, markersize=7, label='MA-FAHP')
+    axes[0, 0].plot(snr_dB_list, obj_full_connected, '--s', color='black', linewidth=2.5, markersize=7, label='Full-connected')
+    axes[0, 0].set_xlabel('SNR [dB]', fontsize=11)
+    axes[0, 0].set_ylabel('Objective', fontsize=11)
+    axes[0, 0].set_title('Objective Function', fontsize=12, fontweight='bold')
+    axes[0, 0].grid(True, alpha=0.3)
+    axes[0, 0].legend(fontsize=10)
+    
+    # Sum Rate
+    axes[0, 1].plot(snr_dB_list, sum_rate_ma_fahp, '-o', color='red', linewidth=2.5, markersize=7, label='MA-FAHP')
+    axes[0, 1].plot(snr_dB_list, sum_rate_full, '--s', color='black', linewidth=2.5, markersize=7, label='Full-connected')
+    axes[0, 1].set_xlabel('SNR [dB]', fontsize=11)
+    axes[0, 1].set_ylabel('Sum Rate [bits/s/Hz]', fontsize=11)
+    axes[0, 1].set_title('Communication: Sum Rate', fontsize=12, fontweight='bold')
+    axes[0, 1].grid(True, alpha=0.3)
+    axes[0, 1].legend(fontsize=10)
+    
+    # log10(CRB^-1)
+    axes[1, 0].plot(snr_dB_list, crb_inv_log_ma_fahp, '-o', color='red', linewidth=2.5, markersize=7, label='MA-FAHP')
+    axes[1, 0].plot(snr_dB_list, crb_inv_log_full, '--s', color='black', linewidth=2.5, markersize=7, label='Full-connected')
+    axes[1, 0].set_xlabel('SNR [dB]', fontsize=11)
+    axes[1, 0].set_ylabel('log₁₀(CRB⁻¹)', fontsize=11)
+    axes[1, 0].set_title('Sensing: log10(CRB Inverse)', fontsize=12, fontweight='bold')
+    axes[1, 0].grid(True, alpha=0.3)
+    axes[1, 0].legend(fontsize=10)
+    
+    # Power
+    axes[1, 1].plot(snr_dB_list, power_ma_fahp, '-o', color='red', linewidth=2.5, markersize=7, label='MA-FAHP')
+    axes[1, 1].plot(snr_dB_list, power_full, '--s', color='black', linewidth=2.5, markersize=7, label='Full-connected')
+    axes[1, 1].set_xlabel('SNR [dB]', fontsize=11)
+    axes[1, 1].set_ylabel('Total Power [W]', fontsize=11)
+    axes[1, 1].set_title('Power Efficiency', fontsize=12, fontweight='bold')
+    axes[1, 1].grid(True, alpha=0.3)
+    axes[1, 1].legend(fontsize=10)
+    
+    plt.tight_layout()
+    plt.savefig(directory_result + 'ma_fahp_all_metrics_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.png',
+                bbox_inches='tight', pad_inches=0.02, dpi=150)
+    plt.savefig(directory_result + 'ma_fahp_all_metrics_vs_SNR_' + str(Nt) + '_' + str(OMEGA) + '.eps',
+                bbox_inches='tight', pad_inches=0.02)
+    
+    print(f"\n✓ Plots saved to {directory_result}")
+    print(f"  - ma_fahp_objective_vs_SNR_*.{{'png','eps'}}")
+    print(f"  - ma_fahp_sum_rate_vs_SNR_*.{{'png','eps'}}")
+    print(f"  - ma_fahp_crb_inv_log_vs_SNR_*.{{'png','eps'}}")
+    print(f"  - ma_fahp_power_vs_SNR_*.{{'png','eps'}}")
+    print(f"  - ma_fahp_all_metrics_vs_SNR_*.{{'png','eps'}} (combined 2x2 subplot)")
