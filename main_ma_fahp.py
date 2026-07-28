@@ -130,11 +130,11 @@ if run_program == 1:
         # budget for both connection matrices.
         print(f"  Evaluating MA-FAHP configuration on full test batch...")
         obj_ma_fahp[ss], sum_rate_ma_fahp[ss], crb_mean_ma, power_ma_fahp[ss] = evaluate_configuration(D_best, params, H_test, FINAL_N_ITER_OUTER)
-        crb_inv_log_ma_fahp[ss] = np.log10(1.0 / crb_mean_ma) if crb_mean_ma > 0 else 0
+        crb_inv_log_ma_fahp[ss] = crb_mean_ma
         
         print(f"  Evaluating full-connected configuration on full test batch...")
         obj_full_connected[ss], sum_rate_full[ss], crb_mean_full, power_full[ss] = evaluate_configuration(D_full, params, H_test, FINAL_N_ITER_OUTER)
-        crb_inv_log_full[ss] = np.log10(1.0 / crb_mean_full) if crb_mean_full > 0 else 0
+        crb_inv_log_full[ss] = crb_mean_full
 
         snr_elapsed = time.time() - snr_start_time
         snr_completed = ss + 1

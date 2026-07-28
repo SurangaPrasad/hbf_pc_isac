@@ -94,7 +94,7 @@ def evaluate_configuration(D, params, H, n_iter_outer):
         mean_crb = torch.mean(get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, params.Pt))
         mean_power = torch.mean(compute_total_power(F, W, mask, P_RF, P_PS, P_SW, P_o, Nt, Nrf))
 
-        utility = (OMEGA * sum_rate + mean_crb - mean_power).item()
+        utility = (WEIGHT_F_COM * sum_rate + WEIGHT_F_CRB * mean_crb - WEIGHT_F_POWER * mean_power).item()
 
     return utility, sum_rate.item(), mean_crb.item(), mean_power.item()
 
