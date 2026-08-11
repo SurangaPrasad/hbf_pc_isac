@@ -552,7 +552,8 @@ def save_data(data_train, data_test):
 # =================================== load data generated in Matlab ==================================================
 def load_data_matlab():
     data_train = scipy.io.loadmat(data_path_train)
-    data_train_array = data_train['H_train']
+    # data_train_array = data_train['H_train']
+    data_train_array = data_train['H']
     data_test = scipy.io.loadmat(data_path_test)
     data_test_array = data_test['H_test']
     return data_train_array, data_test_array
