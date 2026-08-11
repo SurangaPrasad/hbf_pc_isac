@@ -150,7 +150,8 @@ if data_source == 'python':
     train_data_file_name = "train_data.mat"
     test_data_file_name = "test_data.mat"
 else:  # matlab
-    train_data_file_name = "train_data_matlab.mat"
+    # train_data_file_name = "train_data_matlab.mat"
+    train_data_file_name = "H_train.mat"
     test_data_file_name = "test_data_matlab.mat"
 
 data_path_train = directory_data + train_data_file_name
