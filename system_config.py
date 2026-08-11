@@ -64,7 +64,7 @@ OMEGA = 0.25
 
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
-train_size = 112 * 4    # size of training set
+train_size = 112 * 4 * 10    # size of training set
 if str(device) == 'cuda':
     test_size = 50     
 else:
