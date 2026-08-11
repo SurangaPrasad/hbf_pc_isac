@@ -58,6 +58,18 @@ Step by step:
 5. **Sanity check.** A hard-mode (`hard=True`) forward on a small batch prints the
    number of antennas assigned to each RF chain and verifies the total equals `Nt`.
 
+6. **Objective-vs-SNR evaluation.** `plot_selectionnet_objective_vs_snr()` sweeps the
+   SNR points in `snr_dB_list` and plots the physics objective
+   `J = OMEGA * R + mean(log CRLB)` for three schemes that share the *same* frozen
+   UPGA J5 beamformer (F, W) and differ only in the antenna→RF-chain mask applied to F:
+   - **SelectionNet** — per-sample learned mask `S_hard` from the trained network
+     (hard one-hot mode).
+   - **Fixed sub-connected** — the uniform block mask `generage_partial_connection_mask`
+     (`Nt/Nrf` antennas per RF chain).
+   - **Full-connected** — no mask at all (F is used directly).
+   The figure is written to
+   `sim_results/64TX_4UE_4RF/objective_vs_SNR_SelectionNet_64_0.25.png/.eps`.
+
 ### Gradient flow (why it works)
 
 ```
@@ -111,6 +123,9 @@ Requirements: Python 3.10+, PyTorch 2.x, and the existing repo data
 4. **Outputs.**
    - `model/64TX_4UE_4RF/SelectionNet_J5.pth` — trained weights (state dict)
    - `model/64TX_4UE_4RF/SelectionNet_loss.png` — loss curve
+   - `sim_results/64TX_4UE_4RF/objective_vs_SNR_SelectionNet_64_0.25.png/.eps` —
+     post-training objective-vs-SNR comparison (SelectionNet vs fixed
+     sub-connected vs full-connected)
    - `selection_train.log` — console output (if you used the `tee` command)
 
 ## Files involved

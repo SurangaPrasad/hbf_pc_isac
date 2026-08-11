@@ -165,6 +165,93 @@ def run_selectionnet():
         print(f"Hard assignment antenna load per RF chain: {loads[0].tolist()} "
               f"(sum = {loads[0].sum().item():.0f} antennas, expected {Nt})")
 
+    # ---- Post-training evaluation: objective vs SNR for the three connection schemes.
+    plot_selectionnet_objective_vs_snr()
+
+
+def plot_selectionnet_objective_vs_snr():
+    """Sweep SNR and plot the physics objective J = OMEGA*R + mean(log CRLB) for:
+
+      1. the trained SelectionNet (per-sample learned sub-connected mask),
+      2. a fixed hand-built sub-connected mask,
+      3. the full-connected version (no mask).
+
+    All three share the same frozen UPGA J5 beamformer (F, W), so the only
+    difference is the antenna->RF-chain mask applied to F — exactly the same
+    protocol used during SelectionNet training.
+    """
+    torch.manual_seed(3407)
+
+    # ---- Test data: (K, B_test, M, Nt)
+    _, H_test0 = get_data_tensor(data_source)
+    H_test = H_test0[:, :test_size, :, :]
+    B_test = H_test.shape[1]
+
+    # ---- Frozen beamformer + trained SelectionNet
+    upga = load_pretrained_upga(model_file_name_UPGA_J5, n_iter_inner_J5, device)
+    selnet = SelectionNet(n_antennas=Nt, n_rf_chains=Nrf, n_users=M).to(device)
+    selnet.load_state_dict(torch.load(
+        directory_model + f'SelectionNet_J{n_iter_inner_J5}.pth', map_location=device))
+    selnet.eval()
+
+    # ---- Fixed sub-connected mask (uniform block: Nt/Nrf antennas per RF chain).
+    fixed_mask = generage_partial_connection_mask(Nt, Nrf).real.to(device)  # (Nt, Nrf)
+
+    # ---- SelectionNet mask: depends only on H (and psi0), so compute once.
+    H_sel = H_test[0].transpose(1, 2)                               # (B, Nt, M)
+    psi0 = torch.full((B_test,), desired_angle_rad_torch, device=device)
+    with torch.no_grad():
+        S_hard, _ = selnet(H_sel, psi0, tau=0.05, hard=True)        # (B, Nt, Nrf)
+
+    obj_selnet = np.zeros(len(snr_dB_list))
+    obj_sub = np.zeros(len(snr_dB_list))
+    obj_full = np.zeros(len(snr_dB_list))
+
+    for ss, snr_dB in enumerate(snr_dB_list):
+        snr_ss = 10 ** (snr_dB / 10)
+        print(f'Evaluating SelectionNet objective at SNR = {snr_dB} dB ...')
+
+        # Frozen UPGA gives F (K, B, Nt, Nrf), W (K, B, Nrf, M) under no_grad.
+        with torch.no_grad():
+            _, _, F, W, _, _ = upga.execute_PGA(
+                H_test, xi_0, A_dot, R_N_inv,
+                torch.tensor(snr_ss, dtype=torch.float32, device=device),
+                n_iter_outer, n_iter_inner_J5, track_metrics=False)
+
+            def objective(F_eff, W_eff):
+                rate = get_sum_rate(H_test, F_eff, W_eff, snr_ss)
+                crb = torch.mean(get_crb_fe(H_test, F_eff, W_eff, xi_0, A_dot, R_N_inv, snr_ss))
+                return OMEGA * rate + crb
+
+            obj_selnet[ss] = objective(F * S_hard.unsqueeze(0), W).item()
+            obj_sub[ss] = objective(F * fixed_mask, W).item()
+            obj_full[ss] = objective(F, W).item()
+
+        print(f'  J(SelectionNet) = {obj_selnet[ss]:.4f}, '
+              f'J(sub-connected) = {obj_sub[ss]:.4f}, '
+              f'J(full-connected) = {obj_full[ss]:.4f}')
+
+    # ---- Plot objective vs SNR
+    plt.figure(figsize=(8, 5))
+    plt.plot(snr_dB_list, obj_selnet, '-o', color='red', linewidth=3, markersize=8,
+             label='SelectionNet (learned mask)')
+    plt.plot(snr_dB_list, obj_sub, '--s', color='blue', linewidth=3, markersize=8,
+             label='Fixed sub-connected')
+    plt.plot(snr_dB_list, obj_full, '-d', color='black', linewidth=3, markersize=8,
+             label='Full-connected')
+    plt.xlabel('SNR [dB]', fontsize=14)
+    plt.ylabel(r'$J = \omega R + \log(\mathrm{CRLB}^{-1})$', fontsize=14)
+    plt.title('Objective vs SNR: SelectionNet vs fixed sub-connected vs full-connected')
+    plt.grid()
+    safe_legend(loc='best', fontsize=12, labelspacing=0.15)
+    plt.tight_layout()
+    plt.savefig(directory_result + 'objective_vs_SNR_SelectionNet_' + str(Nt) + '_' + str(OMEGA) + '.png',
+                dpi=300, bbox_inches='tight', pad_inches=0.02)
+    plt.savefig(directory_result + 'objective_vs_SNR_SelectionNet_' + str(Nt) + '_' + str(OMEGA) + '.eps',
+                bbox_inches='tight', pad_inches=0.02)
+    plt.show()
+    print('Saved objective-vs-SNR figure to ' + directory_result)
+
 
 # ============================================================== main =================================
 if __name__ == "__main__":
