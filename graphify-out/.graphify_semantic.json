@@ -1,0 +1,638 @@
+{
+  "nodes": [
+    {
+      "id": "selectionnet_training_md",
+      "label": "Training SelectionNet (doc)",
+      "file_type": "document",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L1-L124",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "selectionnet_py",
+      "label": "SelectionNet.py",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "selectionnet_py_selectionnet",
+      "label": "SelectionNet (MLP)",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L7-L11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "MLP mapping channel H and sensing direction psi0 to a connection matrix S of shape (batch, Nt, Nrf); replaces the fixed hand-built sub-connected mask with a learned, per-sample mask because no ground-truth assignment exists."
+    },
+    {
+      "id": "selectionnet_py_column_load",
+      "label": "SelectionNet.column_load()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L51",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "main_selection_py",
+      "label": "main_selection.py",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "main_selection_py_run_selectionnet",
+      "label": "run_selectionnet()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L22-L59",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "main_selection_py_load_pretrained_upga",
+      "label": "load_pretrained_upga()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L28-L31",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "main_selection_py_anneal_tau",
+      "label": "anneal_tau()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L39-L40",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "system_config_py",
+      "label": "system_config.py",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L82-L96",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pga_models_py",
+      "label": "PGA_models.py",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pga_models_py_pga_unfold_jx",
+      "label": "PGA_Unfold_JX (frozen UPGA beamformer)",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L28-L31, L41-L44",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Beamformer is frozen during SelectionNet training (requires_grad_(False), eval()); only the assignment network learns, so the network only reshuffles which antennas connect to which RF chains."
+    },
+    {
+      "id": "pga_models_py_execute_pga",
+      "label": "execute_PGA()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L41-L42",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pga_models_py_get_sum_loss",
+      "label": "get_sum_loss()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L16-L18, L45-L46",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pga_models_py_subconnected_mask",
+      "label": "Hand-built sub-connected mask template (PGA_models.py:406-428)",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L10-L11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utility_py",
+      "label": "utility.py",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utility_py_get_data_tensor",
+      "label": "get_data_tensor()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L25-L26",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utility_py_get_sum_rate",
+      "label": "get_sum_rate()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utility_py_get_crb_fe",
+      "label": "get_crb_fe()",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "matlab_comm_data_m",
+      "label": "matlab/comm_data.m",
+      "file_type": "code",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L25-L26",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "selectionnet_training_md_unsupervised_physics_loss",
+      "label": "Unsupervised physics loss: -(OMEGA * sum_rate + mean_CRB)",
+      "file_type": "rationale",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L13-L18",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "There is no ground-truth antenna-to-RF-chain assignment, so SelectionNet is trained with the same unsupervised physics loss used for the UPGA step sizes (get_sum_loss = -(OMEGA * sum_rate + mean_CRB))."
+    },
+    {
+      "id": "selectionnet_training_md_gumbel_softmax",
+      "label": "Gumbel-softmax discretization",
+      "file_type": "rationale",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L37-L40, L69-L70",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Makes the discrete antenna-to-RF-chain assignment differentiable via the reparameterization trick (Gumbel noise added to logits, then row-wise softmax); during training hard=False so gradients can flow to selnet."
+    },
+    {
+      "id": "selectionnet_training_md_tau_annealing",
+      "label": "Gumbel temperature annealing (tau 2.0 -> 0.1)",
+      "file_type": "rationale",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L39-L40, L91-L92",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "tau decays exponentially over epochs so the soft mask sharpens toward one-hot as training progresses (exploration at high tau, sharpening at low tau)."
+    },
+    {
+      "id": "selectionnet_training_md_straight_through_estimator",
+      "label": "Straight-through estimator",
+      "file_type": "rationale",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L71-L72",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "In hard mode the forward pass returns one-hot values but the backward pass keeps soft-probability gradients, making the discrete mask differentiable."
+    },
+    {
+      "id": "selectionnet_training_md_load_balancing_regularizer",
+      "label": "Load-balancing regularizer",
+      "file_type": "concept",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L50-L52",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Optional term loss += SELNET_LOAD_BALANCE_WEIGHT * selnet.column_load(S).std(dim=-1).mean(); off by default (weight 0.0)."
+    },
+    {
+      "id": "selectionnet_training_md_learned_mask",
+      "label": "Learned per-sample sub-connected mask",
+      "file_type": "rationale",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L7-L11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "SelectionNet maps H and psi0 to connection matrix S; each row is a soft/hard distribution over RF chains and antenna n is assigned to the RF chain with the largest entry, replacing the fixed hand-built sub-connected mask."
+    },
+    {
+      "id": "selectionnet_training_md_gradient_path",
+      "label": "Gradient flow: loss -> get_sum_loss -> F_eff=F*S -> S -> gumbel_softmax -> logits -> selnet",
+      "file_type": "rationale",
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L47-L49, L61-L74",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Only selnet.parameters() are updated; F and W are detached by the no_grad block; F_eff = F * S.unsqueeze(0) broadcasts the mask over the K dimension, zeroing unselected antenna-to-RF-chain paths."
+    }
+  ],
+  "edges": [
+    {
+      "source": "selectionnet_training_md",
+      "target": "selectionnet_py",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L120",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md",
+      "target": "main_selection_py",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L121",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md",
+      "target": "system_config_py",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L122",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md",
+      "target": "pga_models_py",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L123",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md",
+      "target": "utility_py",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L124",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md",
+      "target": "matlab_comm_data_m",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L25-L26",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_run_selectionnet",
+      "target": "main_selection_py_load_pretrained_upga",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L28-L31",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_run_selectionnet",
+      "target": "selectionnet_py_selectionnet",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L37-L38",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_run_selectionnet",
+      "target": "pga_models_py_execute_pga",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L41-L42",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_run_selectionnet",
+      "target": "pga_models_py_get_sum_loss",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L45-L46",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_run_selectionnet",
+      "target": "main_selection_py_anneal_tau",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L39-L40",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_run_selectionnet",
+      "target": "selectionnet_py_column_load",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L50-L52",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_run_selectionnet",
+      "target": "utility_py_get_data_tensor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L25-L26",
+      "weight": 1.0
+    },
+    {
+      "source": "main_selection_py_load_pretrained_upga",
+      "target": "pga_models_py_pga_unfold_jx",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L28-L31",
+      "weight": 1.0
+    },
+    {
+      "source": "pga_models_py_get_sum_loss",
+      "target": "utility_py_get_sum_rate",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L16-L18",
+      "weight": 1.0
+    },
+    {
+      "source": "pga_models_py_get_sum_loss",
+      "target": "utility_py_get_crb_fe",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L16-L18",
+      "weight": 1.0
+    },
+    {
+      "source": "pga_models_py_pga_unfold_jx",
+      "target": "pga_models_py_execute_pga",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L41-L44",
+      "weight": 1.0
+    },
+    {
+      "source": "pga_models_py_subconnected_mask",
+      "target": "selectionnet_training_md_learned_mask",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L10-L11",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_tau_annealing",
+      "target": "selectionnet_training_md_gumbel_softmax",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L37-L40",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_straight_through_estimator",
+      "target": "selectionnet_training_md_gumbel_softmax",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L69-L72",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_load_balancing_regularizer",
+      "target": "selectionnet_py_column_load",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L50-L52",
+      "weight": 1.0
+    },
+    {
+      "source": "pga_models_py_get_sum_loss",
+      "target": "selectionnet_training_md_unsupervised_physics_loss",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L16-L18",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_learned_mask",
+      "target": "selectionnet_py_selectionnet",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L7-L11",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_unsupervised_physics_loss",
+      "target": "main_selection_py_run_selectionnet",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L13-L18",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_gumbel_softmax",
+      "target": "selectionnet_py_selectionnet",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L37-L38, L69-L70",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_straight_through_estimator",
+      "target": "selectionnet_py_selectionnet",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L58-L59, L71-L72",
+      "weight": 1.0
+    },
+    {
+      "source": "pga_models_py_pga_unfold_jx",
+      "target": "selectionnet_py_selectionnet",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L41-L44",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_gradient_path",
+      "target": "main_selection_py_run_selectionnet",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L47-L49, L61-L67",
+      "weight": 1.0
+    },
+    {
+      "source": "selectionnet_training_md_gradient_path",
+      "target": "selectionnet_training_md_gumbel_softmax",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md",
+      "source_location": "L61-L67",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "selectionnet_training_pipeline_modules",
+      "label": "SelectionNet training pipeline modules (Files involved)",
+      "nodes": [
+        "selectionnet_py",
+        "main_selection_py",
+        "system_config_py",
+        "pga_models_py",
+        "utility_py"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md"
+    },
+    {
+      "id": "selectionnet_training_gradient_path",
+      "label": "SelectionNet backprop gradient path",
+      "nodes": [
+        "main_selection_py_run_selectionnet",
+        "pga_models_py_get_sum_loss",
+        "selectionnet_py_selectionnet",
+        "selectionnet_training_md_gumbel_softmax"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md"
+    },
+    {
+      "id": "selectionnet_discretization_stack",
+      "label": "Differentiable discrete-assignment stack",
+      "nodes": [
+        "selectionnet_py_selectionnet",
+        "selectionnet_training_md_gumbel_softmax",
+        "selectionnet_training_md_straight_through_estimator",
+        "selectionnet_training_md_tau_annealing"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/swengapp23/OneDrive/PHD Thesis/hbf_pc_isac/SELECTIONNET_TRAINING.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

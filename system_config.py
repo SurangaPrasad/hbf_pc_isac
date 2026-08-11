@@ -36,6 +36,8 @@ run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gr
 run_UPGA_partial_decay_J5 = 0   # Unfolded PGA with J=5 and partial coupling and decaying inner iterations (J_max=5 → 1)
 run_UPGA_partial_decay_J10 = 0  # Unfolded PGA with J=10 and partial coupling and decaying inner iterations (J_max=10 → 1)
 
+run_SelectionNet = 1            # Learnable antenna-to-RF-chain assignment (SelectionNet)
+
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
 M = 4                   # Num of Users
