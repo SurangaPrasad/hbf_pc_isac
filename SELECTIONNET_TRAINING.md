@@ -17,6 +17,51 @@ Because there is no ground-truth assignment, the network is trained with the sam
 loss = get_sum_loss(F, W, H, ...) = -(OMEGA * sum_rate + mean_CRB)
 ```
 
+## Block diagram
+
+```mermaid
+flowchart TB
+    DATA["H_train (K, B, M, Nt)<br/>get_data_tensor(data_source)"]
+
+    subgraph UPGA_B["FIXED UPGA J5 — frozen branch (torch.no_grad)"]
+        direction TB
+        UPR["load_pretrained_upga(UPGA_J5.pth)<br/>requires_grad_(False), eval()"]
+        UP["execute_PGA(H, xi_0, A_dot, R_N_inv, snr)<br/>I = 120 outer x J = 5 inner iterations"]
+        UPR --> UP
+        UP --> FF["F (K, B, Nt, Nrf) — analog precoder"]
+        UP --> WW["W (K, B, Nrf, M) — digital precoder"]
+    end
+
+    subgraph SEL_B["SelectionNet — trainable branch (Adam)"]
+        direction TB
+        SX["H_sel (B, Nt, M) = H[0].transpose(1, 2)<br/>psi0 (B,) = desired_angle_rad_torch"]
+        MLP["MLP encoder + logits head<br/>features: [Re, Im, |H|] + [sin, cos psi0]"]
+        GS["Gumbel-softmax (soft)<br/>tau: 2.0 -> 0.1 via anneal_tau"]
+        SX --> MLP --> GS --> SS["S (B, Nt, Nrf)<br/>row-stochastic connection matrix"]
+    end
+
+    DATA --> UPR
+    DATA --> SX
+
+    FF --> FEFF["F_eff = F * S.unsqueeze(0)<br/>broadcast mask over K dim"]
+    SS --> FEFF
+    FEFF --> LOSS["get_sum_loss(F_eff, W, H, ...)<br/>loss = -(OMEGA * R + mean(log CRLB))"]
+    WW --> LOSS
+
+    LOSS --> BP["loss.backward()<br/>grad path: loss -> F_eff -> S -> Gumbel-softmax -> logits -> selnet"]
+    BP --> OPT["clip_gradients() + optimizer.step()<br/>(UPGA params stay frozen — only selnet updates)"]
+    OPT --> MLP
+
+    OPT --> SAVE["Save SelectionNet_J5.pth"]
+    SAVE --> EVAL["plot_selectionnet_objective_vs_snr()<br/>objective vs SNR comparison"]
+```
+
+Rendered image: ![SelectionNet training block diagram](SelectionNet_training_block_diagram.png)
+
+Key idea: the **UPGA is fixed** first — it only supplies F and W for the loss.
+Only the mask S comes from a trainable path, so backprop reshuffles the antenna→RF-chain
+assignment without touching the beamformer.
+
 ## The training flow (main_selection.py)
 
 The training loop lives in `main_selection.py`, function `run_selectionnet()`.

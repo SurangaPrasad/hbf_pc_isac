@@ -16,3 +16,4 @@ model/
 *.eps
 
 graphify-out/*
+*.svg

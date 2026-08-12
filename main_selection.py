@@ -257,3 +257,4 @@ def plot_selectionnet_objective_vs_snr():
 if __name__ == "__main__":
     if run_SelectionNet == 1:
         run_selectionnet()
+        # plot_selectionnet_objective_vs_snr()
