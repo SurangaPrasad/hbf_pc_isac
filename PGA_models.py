@@ -887,10 +887,10 @@ def get_grad_W_rad(F, W, R):
     return grad_W
 
 # ================== Compute exponentially weighted deep-supervision loss
-def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97):
+def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97, skip_unit_modulus=False):
 
-    sum_rate = get_sum_rate(H, F, W, Pt)
-    crb = get_crb_fe(H, F, W,xi_0, A_dot, R_N_inv, Pt)
+    sum_rate = get_sum_rate(H, F, W, Pt, skip_unit_modulus=skip_unit_modulus)
+    crb = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt, skip_unit_modulus=skip_unit_modulus)
 
     mean_crb = torch.mean(crb)
 

@@ -18,7 +18,8 @@ TRAIN_GRAD_CLIP_MAX_NORM = 1.0
 SELNET_LR = 1e-3                    # Adam LR for the assignment network
 SELNET_TAU_START = 2.0              # Gumbel temperature at epoch 0 (high = explore)
 SELNET_TAU_END = 0.1                # Gumbel temperature at the last epoch (low = sharpen)
-SELNET_LOAD_BALANCE_WEIGHT = 0.0    # optional column_load regularizer; 0 = off for now
+SELNET_LOAD_BALANCE_WEIGHT = 0.05   # column_load regularizer keeps the sub-connected
+                                    # assignment uniform (Nt/Nrf antennas per RF chain)
 
 
 def build_optimizer_and_scheduler(model):
@@ -103,8 +104,12 @@ def run_selectionnet():
             H_sel = H_batch[0].transpose(1, 2)                     # (B, Nt, M) complex
             psi0 = torch.full((cur_bs,), desired_angle_rad_torch, device=device)
 
-            # ---- SelectionNet forward: soft S for training
-            S, logits = selnet(H_sel, psi0, tau=tau, hard=False)   # (B, Nt, Nrf)
+            # ---- SelectionNet forward: straight-through hard S for training.
+            # hard=True matches the evaluation protocol exactly (forward uses the
+            # discrete one-hot argmax; backward flows through the soft Gumbel-softmax).
+            # Training with soft masks then scoring hard masks at eval would leave a
+            # train/test gap that shows up as a small realized gain.
+            S, logits = selnet(H_sel, psi0, tau=tau, hard=True)   # (B, Nt, Nrf)
 
             # ---- Frozen UPGA gives the beamformer under no_grad
             with torch.no_grad():
@@ -117,10 +122,17 @@ def run_selectionnet():
             # ---- Apply the learnable sub-connected mask, then physics loss.
             # S is (B, Nt, Nrf); unsqueeze(0) -> (1, B, Nt, Nrf) to broadcast
             # against the K=1 dimension of F.
+            # skip_unit_modulus=True is CRITICAL: the loss' internal normalize()
+            # divides F by |F|; with unit-modulus F the division F*S/(|F*S|) = F*S/S
+            # erases the mask S and its gradient (~1e-9), so the network cannot learn
+            # and the loss curve stays flat. Skipping it keeps the masked amplitude
+            # (and the power constraint is still enforced via W).
             F_eff = F * S.unsqueeze(0)
-            loss = get_sum_loss(F_eff, W, H_batch, xi_0, A_dot, R_N_inv, snr_train)
+            loss = get_sum_loss(F_eff, W, H_batch, xi_0, A_dot, R_N_inv, snr_train,
+                                skip_unit_modulus=True)
 
-            # ---- Optional load-balancing regularizer (off by default)
+            # ---- Load-balancing regularizer: penalizes uneven antenna loads across
+            # RF chains so the learned assignment stays uniform (16 per chain).
             if SELNET_LOAD_BALANCE_WEIGHT > 0:
                 loads = selnet.column_load(S)                      # (B, Nrf)
                 load_penalty = loads.std(dim=-1).mean()
@@ -219,8 +231,12 @@ def plot_selectionnet_objective_vs_snr():
                 n_iter_outer, n_iter_inner_J5, track_metrics=False)
 
             def objective(F_eff, W_eff):
-                rate = get_sum_rate(H_test, F_eff, W_eff, snr_ss)
-                crb = torch.mean(get_crb_fe(H_test, F_eff, W_eff, xi_0, A_dot, R_N_inv, snr_ss))
+                # skip_unit_modulus=True for the same reason as in training: the
+                # internal normalize() would otherwise collapse the mask and make
+                # all three schemes score identically (tiny gain in the figure).
+                rate = get_sum_rate(H_test, F_eff, W_eff, snr_ss, skip_unit_modulus=True)
+                crb = torch.mean(get_crb_fe(H_test, F_eff, W_eff, xi_0, A_dot, R_N_inv,
+                                            snr_ss, skip_unit_modulus=True))
                 return OMEGA * rate + crb
 
             obj_selnet[ss] = objective(F * S_hard.unsqueeze(0), W).item()
