@@ -16,10 +16,15 @@ TRAIN_GRAD_CLIP_MAX_NORM = 1.0
 
 # SelectionNet-specific training hyper-parameters
 SELNET_LR = 1e-3                    # Adam LR for the assignment network
-SELNET_TAU_START = 1.0              # Gumbel temperature at epoch 0 (high = explore)
+SELNET_TAU_START = 2.0              # Gumbel temperature at epoch 0 (high = explore)
 SELNET_TAU_END = 0.1                # Gumbel temperature at the last epoch (low = sharpen)
-SELNET_LOAD_BALANCE_WEIGHT = 0.05   # column_load regularizer keeps the sub-connected
-                                    # assignment uniform (Nt/Nrf antennas per RF chain)
+SELNET_LOAD_BALANCE_WEIGHT = 0.0    # column_load regularizer (0 = disabled; the standard
+                                    # Gumbel-softmax anneal + soft masks naturally stay
+                                    # near the 16-antennas-per-chain baseline unless the
+                                    # network discovers a genuinely better unbalanced layout)
+SELNET_HARD_FINAL = 5               # last N epochs with hard=True STE to close the
+                                    # train/eval discretisation gap
+SELNET_SCHEDULER_STEP = 10          # StepLR interval for the Adam scheduler
 
 # Re-derive the digital precoder W (ridge-ZF) for the masked analog network F_eff.
 # A W frozen from the full-connected UPGA is structurally mismatched to the masked
@@ -89,6 +94,7 @@ def run_selectionnet():
     upga = load_pretrained_upga(model_file_name_UPGA_J5, n_iter_inner_J5, device)
     selnet = SelectionNet(n_antennas=Nt, n_rf_chains=Nrf, n_users=M).to(device)
     optimizer = torch.optim.Adam(selnet.parameters(), lr=SELNET_LR)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=SELNET_SCHEDULER_STEP, gamma=0.5)
 
     epoch_losses = []
 
@@ -96,7 +102,15 @@ def run_selectionnet():
         batch_losses = []
         batch_rates = []
         batch_crbs = []
+
+        # ---- Soft mode (hard=False) for most epochs: smooth gradients keep the
+        #      exploration/exploitation balance while annealing shrinks toward
+        #      the discrete assignment.  The last SELNET_HARD_FINAL epochs use
+        #      hard STE (hard=True) to match the evaluation protocol exactly.
         tau = anneal_tau(i_epoch, n_epoch)
+        hard_mode = (i_epoch >= n_epoch - SELNET_HARD_FINAL)
+        if hard_mode:
+            tau = SELNET_TAU_END   # freeze tau at the sharp value during hard STE
 
         # Shuffle along the batch axis, same pattern as main_train.py
         H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
@@ -113,12 +127,10 @@ def run_selectionnet():
             H_sel = H_batch[0].transpose(1, 2)                     # (B, Nt, M) complex
             psi0 = torch.full((cur_bs,), desired_angle_rad_torch, device=device)
 
-            # ---- SelectionNet forward: straight-through hard S for training.
-            # hard=True matches the evaluation protocol exactly (forward uses the
-            # discrete one-hot argmax; backward flows through the soft Gumbel-softmax).
-            # Training with soft masks then scoring hard masks at eval would leave a
-            # train/test gap that shows up as a small realized gain.
-            S, logits = selnet(H_sel, psi0, tau=tau, hard=True)   # (B, Nt, Nrf)
+            # ---- SelectionNet forward: soft Gumbel (hard=False) during exploration and
+            # annealing; hard STE (hard=True) during the final fine-tune epochs so the
+            # forward mask matches the evaluation discretisation exactly.
+            S, logits = selnet(H_sel, psi0, tau=tau, hard=hard_mode)   # (B, Nt, Nrf)
 
             # ---- Frozen UPGA gives the beamformer under no_grad
             with torch.no_grad():
@@ -174,6 +186,7 @@ def run_selectionnet():
                 grad_norm += p.grad.norm().item() ** 2
         grad_norm = grad_norm ** 0.5
         epoch_losses.append(avg_loss)
+        scheduler.step()
         print(f"Epoch [{i_epoch + 1}/{n_epoch}], Avg Loss: {avg_loss:.4f}, "
               f"R: {avg_rate:.3f}, CRB: {avg_crb:.3f}, |grad|: {grad_norm:.3e}, tau: {tau:.3f}")
 

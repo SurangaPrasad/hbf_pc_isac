@@ -148,6 +148,7 @@ Requirements: Python 3.10+, PyTorch 2.x, and the existing repo data
    SELNET_TAU_START = 2.0  # Gumbel temperature at epoch 0 (exploration)
    SELNET_TAU_END = 0.1    # Gumbel temperature at the last epoch (sharpen)
    SELNET_LOAD_BALANCE_WEIGHT = 0.0  # >0 enables the load-balancing regularizer
+   SELNET_HARD_FINAL = 5   # last N epochs use hard STE to match evaluation
    ```
    Epochs, batch size, learning rate etc. come from `system_config.py`
    (`n_epoch`, `batch_size`, `learning_rate`).

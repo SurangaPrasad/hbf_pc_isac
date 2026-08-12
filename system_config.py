@@ -68,7 +68,7 @@ train_size = 112 * 4 * 10    # size of training set
 if str(device) == 'cuda':
     test_size = 50     
 else:
-    test_size = 10     
+    test_size = 30     
 batch_size = len(snr_dB_list) * 4 * 10
 n_epoch = 30         # number of training epochs
 learning_rate = 0.005 # learning 
