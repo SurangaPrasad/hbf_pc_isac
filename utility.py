@@ -429,6 +429,31 @@ def normalize_power(F, W, H, Pt):
     F = normalize_factor * F
     return F
 
+# ========================= re-derive digital precoder for a masked analog F =====================
+def compute_digital_precoder(H, F_eff, ridge=1e-2):
+    """Differentiable ridge-ZF digital precoder W for the effective channel H F_eff.
+
+    In sub-connected hybrid beamforming the analog F is frozen but only a subset of
+    its entries are active (F_eff = F*S). A digital W that was designed for the
+    FULL-connected array is structurally mismatched to the masked F_eff, and after
+    power normalization the objective becomes (nearly) independent of the mask S —
+    which leaves SelectionNet with no learning signal. Re-deriving W for the masked
+    effective channel makes the achievable rate/CRB genuinely depend on S.
+
+    H     : (K, B, M, Nt) complex channel
+    F_eff : (K, B, Nt, Nrf) masked analog precoder (requires grad through S)
+    ridge : relative Tikhonov regularization of the M x M Gram matrix
+
+    Returns W : (K, B, Nrf, M) satisfying H_eff @ W ~ I (ZF property).
+    """
+    H_eff = torch.einsum('kmn,kbnj->kbmj', H, F_eff)            # (K, B, M, Nrf)
+    G = H_eff @ H_eff.conj().transpose(-1, -2)                  # (K, B, M, M)
+    lam = ridge * torch.diagonal(G, dim1=-2, dim2=-1).real.mean().detach()
+    I_m = torch.eye(M, dtype=G.dtype, device=G.device)
+    W = H_eff.conj().transpose(-1, -2) @ torch.linalg.inv(G + lam * I_m)
+    return W
+
+
 # ========================= generate PC mask =====================
 def generage_partial_connection_mask(N, M, device=None):
     mask = torch.zeros((N, M), dtype=COMPLEX_DTYPE, device=device)

@@ -16,10 +16,17 @@ TRAIN_GRAD_CLIP_MAX_NORM = 1.0
 
 # SelectionNet-specific training hyper-parameters
 SELNET_LR = 1e-3                    # Adam LR for the assignment network
-SELNET_TAU_START = 2.0              # Gumbel temperature at epoch 0 (high = explore)
+SELNET_TAU_START = 1.0              # Gumbel temperature at epoch 0 (high = explore)
 SELNET_TAU_END = 0.1                # Gumbel temperature at the last epoch (low = sharpen)
 SELNET_LOAD_BALANCE_WEIGHT = 0.05   # column_load regularizer keeps the sub-connected
                                     # assignment uniform (Nt/Nrf antennas per RF chain)
+
+# Re-derive the digital precoder W (ridge-ZF) for the masked analog network F_eff.
+# A W frozen from the full-connected UPGA is structurally mismatched to the masked
+# array, and after power normalization the objective becomes nearly independent of
+# the mask S (flat training loss, tiny gain). Re-deriving W makes the achievable
+# rate/CRB genuinely depend on the learned assignment.
+REDERIVE_DIGITAL_W = True
 
 
 def build_optimizer_and_scheduler(model):
@@ -87,6 +94,8 @@ def run_selectionnet():
 
     for i_epoch in range(n_epoch):
         batch_losses = []
+        batch_rates = []
+        batch_crbs = []
         tau = anneal_tau(i_epoch, n_epoch)
 
         # Shuffle along the batch axis, same pattern as main_train.py
@@ -122,14 +131,21 @@ def run_selectionnet():
             # ---- Apply the learnable sub-connected mask, then physics loss.
             # S is (B, Nt, Nrf); unsqueeze(0) -> (1, B, Nt, Nrf) to broadcast
             # against the K=1 dimension of F.
-            # skip_unit_modulus=True is CRITICAL: the loss' internal normalize()
-            # divides F by |F|; with unit-modulus F the division F*S/(|F*S|) = F*S/S
-            # erases the mask S and its gradient (~1e-9), so the network cannot learn
-            # and the loss curve stays flat. Skipping it keeps the masked amplitude
-            # (and the power constraint is still enforced via W).
+            # skip_unit_modulus=True: the loss' internal normalize() divides F by
+            # |F|; with unit-modulus F that would erase the mask S and its gradient.
             F_eff = F * S.unsqueeze(0)
-            loss = get_sum_loss(F_eff, W, H_batch, xi_0, A_dot, R_N_inv, snr_train,
-                                skip_unit_modulus=True)
+
+            # Re-derive the digital precoder for the masked analog network. With a
+            # frozen full-connected W the objective is (nearly) invariant to the mask
+            # after power normalization, so SelectionNet sees no gradient. A matched
+            # W makes the rate/CRB genuinely depend on the learned assignment.
+            W_eff = compute_digital_precoder(H_batch, F_eff) if REDERIVE_DIGITAL_W else W
+
+            # Decompose the loss into rate and CRB so we can watch which term moves.
+            sum_rate = get_sum_rate(H_batch, F_eff, W_eff, snr_train, skip_unit_modulus=True)
+            crb = get_crb_fe(H_batch, F_eff, W_eff, xi_0, A_dot, R_N_inv, snr_train,
+                             skip_unit_modulus=True)
+            loss = -(OMEGA * sum_rate + torch.mean(crb))
 
             # ---- Load-balancing regularizer: penalizes uneven antenna loads across
             # RF chains so the learned assignment stays uniform (16 per chain).
@@ -144,12 +160,22 @@ def run_selectionnet():
             optimizer.step()
 
             batch_losses.append(loss.item())
+            batch_rates.append(sum_rate.item())
+            batch_crbs.append(torch.mean(crb).item())
             print(f"Batch [{i_batch // batch_size + 1}/{len(H_train[0]) // batch_size}], "
                   f"Loss: {loss.item():.4f}, tau: {tau:.3f}")
 
         avg_loss = sum(batch_losses) / len(batch_losses)
+        avg_rate = sum(batch_rates) / len(batch_rates)
+        avg_crb = sum(batch_crbs) / len(batch_crbs)
+        grad_norm = 0.0
+        for p in selnet.parameters():
+            if p.grad is not None:
+                grad_norm += p.grad.norm().item() ** 2
+        grad_norm = grad_norm ** 0.5
         epoch_losses.append(avg_loss)
-        print(f"Epoch [{i_epoch + 1}/{n_epoch}], Average Loss: {avg_loss:.4f}, tau: {tau:.3f}")
+        print(f"Epoch [{i_epoch + 1}/{n_epoch}], Avg Loss: {avg_loss:.4f}, "
+              f"R: {avg_rate:.3f}, CRB: {avg_crb:.3f}, |grad|: {grad_norm:.3e}, tau: {tau:.3f}")
 
     # ---- Save
     torch.save(selnet.state_dict(), directory_model + f'SelectionNet_J{n_iter_inner_J5}.pth')
@@ -231,11 +257,13 @@ def plot_selectionnet_objective_vs_snr():
                 n_iter_outer, n_iter_inner_J5, track_metrics=False)
 
             def objective(F_eff, W_eff):
-                # skip_unit_modulus=True for the same reason as in training: the
-                # internal normalize() would otherwise collapse the mask and make
-                # all three schemes score identically (tiny gain in the figure).
-                rate = get_sum_rate(H_test, F_eff, W_eff, snr_ss, skip_unit_modulus=True)
-                crb = torch.mean(get_crb_fe(H_test, F_eff, W_eff, xi_0, A_dot, R_N_inv,
+                # Matched digital precoder: with the frozen full-connected W the
+                # objective is nearly invariant to the mask, so the learned /
+                # fixed / full schemes would all score alike. Re-deriving W for
+                # the masked F_eff makes the gain visible and fair.
+                W_matched = compute_digital_precoder(H_test, F_eff) if REDERIVE_DIGITAL_W else W_eff
+                rate = get_sum_rate(H_test, F_eff, W_matched, snr_ss, skip_unit_modulus=True)
+                crb = torch.mean(get_crb_fe(H_test, F_eff, W_matched, xi_0, A_dot, R_N_inv,
                                             snr_ss, skip_unit_modulus=True))
                 return OMEGA * rate + crb
 
