@@ -446,7 +446,7 @@ def compute_digital_precoder(H, F_eff, ridge=1e-2):
 
     Returns W : (K, B, Nrf, M) satisfying H_eff @ W ~ I (ZF property).
     """
-    H_eff = torch.einsum('kmn,kbnj->kbmj', H, F_eff)            # (K, B, M, Nrf)
+    H_eff = torch.einsum('kbmn,kbnj->kbmj', H, F_eff)            # (K, B, M, Nrf)
     G = H_eff @ H_eff.conj().transpose(-1, -2)                  # (K, B, M, M)
     lam = ridge * torch.diagonal(G, dim1=-2, dim2=-1).real.mean().detach()
     I_m = torch.eye(M, dtype=G.dtype, device=G.device)
