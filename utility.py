@@ -247,10 +247,10 @@ def get_mat_G_SVD(H,fre_indx,snr_dB):
     G = torch.transpose(G, 1, 2)
     return G
 # ==================================== compute sum rate of MU-MISO system for each subcarrier ===========================
-def get_sum_rate(H, F, W, Pt):
+def get_sum_rate(H, F, W, Pt, skip_unit_modulus=False):
 
     # Normalize
-    F, W = normalize(F, W, H, Pt)
+    F, W = normalize(F, W, H, Pt, skip_unit_modulus=skip_unit_modulus)
 
     # ================= Power constraint check =================
     power_high_threshold = Pt + 1e-3
@@ -326,8 +326,8 @@ def get_beam_error(H, F, W, R, Pt):
     return sum_error
 
 # ==================================== compute CRB  fishery equation function ===========================
-def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt):
-    F, W = normalize(F, W, H, Pt)
+def get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt, skip_unit_modulus=False):
+    F, W = normalize(F, W, H, Pt, skip_unit_modulus=skip_unit_modulus)
     
     A_dot = A_dot.unsqueeze(0).unsqueeze(0) # [1, 1, Nt, Nt]
     R_N_inv = R_N_inv.unsqueeze(0).unsqueeze(0) # [1, 1, Nr, Nr]
@@ -378,11 +378,17 @@ def get_trace(A):
 
 
 # ======== normalization to meet constant modulus and power constraint ===========================
-def normalize(F, W, H, Pt):
+def normalize(F, W, H, Pt, skip_unit_modulus=False):
     B = len(H[0])
 
     # ================= Constant modulus =================
-    F = F / (torch.abs(F) + 1e-12)
+    # NOTE: when F already carries a real-valued selection mask S (sub-connected
+    # structure F_eff = F*S with |F| = 1), the division F/|F| collapses the mask
+    # because |F*S| = S, so F*S/(S+eps) ~ F — the mask's amplitude and its
+    # gradient are erased. skip_unit_modulus keeps the masked magnitudes so the
+    # physics loss stays sensitive to S (required for SelectionNet training).
+    if not skip_unit_modulus:
+        F = F / (torch.abs(F) + 1e-12)
 
     # ================= Power computation =================
     power = torch.linalg.matrix_norm(F @ W, dim=(-2, -1)) ** 2  # (K, B)
@@ -422,6 +428,31 @@ def normalize_power(F, W, H, Pt):
     normalize_factor = torch.sqrt(Pt_vec / sum_norm_power).view(B, 1, 1)
     F = normalize_factor * F
     return F
+
+# ========================= re-derive digital precoder for a masked analog F =====================
+def compute_digital_precoder(H, F_eff, ridge=1e-2):
+    """Differentiable ridge-ZF digital precoder W for the effective channel H F_eff.
+
+    In sub-connected hybrid beamforming the analog F is frozen but only a subset of
+    its entries are active (F_eff = F*S). A digital W that was designed for the
+    FULL-connected array is structurally mismatched to the masked F_eff, and after
+    power normalization the objective becomes (nearly) independent of the mask S —
+    which leaves SelectionNet with no learning signal. Re-deriving W for the masked
+    effective channel makes the achievable rate/CRB genuinely depend on S.
+
+    H     : (K, B, M, Nt) complex channel
+    F_eff : (K, B, Nt, Nrf) masked analog precoder (requires grad through S)
+    ridge : relative Tikhonov regularization of the M x M Gram matrix
+
+    Returns W : (K, B, Nrf, M) satisfying H_eff @ W ~ I (ZF property).
+    """
+    H_eff = torch.einsum('kbmn,kbnj->kbmj', H, F_eff)            # (K, B, M, Nrf)
+    G = H_eff @ H_eff.conj().transpose(-1, -2)                  # (K, B, M, M)
+    lam = ridge * torch.diagonal(G, dim1=-2, dim2=-1).real.mean().detach()
+    I_m = torch.eye(M, dtype=G.dtype, device=G.device)
+    W = H_eff.conj().transpose(-1, -2) @ torch.linalg.inv(G + lam * I_m)
+    return W
+
 
 # ========================= generate PC mask =====================
 def generage_partial_connection_mask(N, M, device=None):
@@ -552,7 +583,8 @@ def save_data(data_train, data_test):
 # =================================== load data generated in Matlab ==================================================
 def load_data_matlab():
     data_train = scipy.io.loadmat(data_path_train)
-    data_train_array = data_train['H_train']
+    # data_train_array = data_train['H_train']
+    data_train_array = data_train['H']
     data_test = scipy.io.loadmat(data_path_test)
     data_test_array = data_test['H_test']
     return data_train_array, data_test_array

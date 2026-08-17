@@ -36,6 +36,8 @@ run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gr
 run_UPGA_partial_decay_J5 = 0   # Unfolded PGA with J=5 and partial coupling and decaying inner iterations (J_max=5 → 1)
 run_UPGA_partial_decay_J10 = 0  # Unfolded PGA with J=10 and partial coupling and decaying inner iterations (J_max=10 → 1)
 
+run_SelectionNet = 1            # Learnable antenna-to-RF-chain assignment (SelectionNet)
+
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
 M = 4                   # Num of Users
@@ -62,12 +64,12 @@ OMEGA = 0.25
 
 
 # ////////////////////////////////////////////// MODEL PARAMS //////////////////////////////////////////////
-train_size = 112 * 4    # size of training set
+train_size = 112 * 4 * 10    # size of training set
 if str(device) == 'cuda':
     test_size = 50     
 else:
-    test_size = 10     
-batch_size = len(snr_dB_list) * 4
+    test_size = 30     
+batch_size = len(snr_dB_list) * 4 * 10
 n_epoch = 30         # number of training epochs
 learning_rate = 0.005 # learning 
 # learning_rate = 0.00002
@@ -148,7 +150,8 @@ if data_source == 'python':
     train_data_file_name = "train_data.mat"
     test_data_file_name = "test_data.mat"
 else:  # matlab
-    train_data_file_name = "train_data_matlab.mat"
+    # train_data_file_name = "train_data_matlab.mat"
+    train_data_file_name = "H_train.mat"
     test_data_file_name = "test_data_matlab.mat"
 
 data_path_train = directory_data + train_data_file_name
