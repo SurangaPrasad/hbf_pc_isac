@@ -338,11 +338,32 @@ class JointUnfoldedLayer(nn.Module):
 #                             TASK 3: FULL UNFOLDED NETWORK
 # /////////////////////////////////////////////////////////////////////////////////////////
 
-class JointUPGANet(nn.Module):
-    """Full joint deep-unfolding network: SelectionNet for S_0 + I unfolded layers.
+def build_fixed_subconnected_mask(n_antennas: int, n_rf_chains: int) -> torch.Tensor:
+    """Build the fixed block sub-connected mask (N_antennas, N_rf).
 
-    ``SelectionNet`` produces the initial connection matrix ``S_0`` from the
-    channel and sensing direction; a stack of ``JointUnfoldedLayer`` modules
+    Every RF chain is connected to a contiguous block of
+    ``n_antennas // n_rf_chains`` antennas, so each row has exactly one 1 and
+    the rows sum to one.  Used as the S_0 initialisation of the ``fixed``
+    variant of JointUPGANet.
+    """
+    if n_antennas % n_rf_chains != 0:
+        raise ValueError(
+            f"n_antennas ({n_antennas}) must be divisible by n_rf_chains ({n_rf_chains})"
+        )
+    mask = torch.zeros(n_antennas, n_rf_chains)
+    antennas_per_rf = n_antennas // n_rf_chains
+    for r in range(n_rf_chains):
+        mask[r * antennas_per_rf:(r + 1) * antennas_per_rf, r] = 1.0
+    return mask
+
+
+class JointUPGANet(nn.Module):
+    """Full joint deep-unfolding network: initial S_0 + I unfolded layers.
+
+    The initial connection matrix ``S_0`` is either produced by ``SelectionNet``
+    from the channel and sensing direction (``s_init='selection'``) or taken as
+    the fixed block sub-connected mask (``s_init='fixed'``, every RF chain serves
+    ``N_antennas / N_rf`` antennas).  A stack of ``JointUnfoldedLayer`` modules
     then refines ``(F, S, W)`` jointly over ``n_outer`` outer iterations.
     """
 
@@ -353,18 +374,28 @@ class JointUPGANet(nn.Module):
         n_antennas: int,
         n_rf_chains: int,
         n_users: int,
+        s_init: str = "selection",
     ) -> None:
         super().__init__()
+
+        assert s_init in ("selection", "fixed"), \
+            f"s_init must be 'selection' or 'fixed', got {s_init!r}"
 
         self.n_outer = n_outer
         self.n_inner = n_inner
         self.n_antennas = n_antennas
         self.n_rf_chains = n_rf_chains
         self.n_users = n_users
+        self.s_init = s_init
 
         self.selection_net = SelectionNet(
             n_antennas=n_antennas, n_rf_chains=n_rf_chains, n_users=n_users
         )
+        if s_init == "fixed":
+            self.register_buffer(
+                "fixed_s0",
+                build_fixed_subconnected_mask(n_antennas, n_rf_chains),
+            )
         self.layers = nn.ModuleList(
             [
                 JointUnfoldedLayer(
@@ -396,7 +427,7 @@ class JointUPGANet(nn.Module):
         F0 : (B, N_antennas, N_rf) complex initial analog precoder.
         W0 : (B, N_rf, N_users) complex initial digital precoder.
         H : (B, N_antennas, N_users) complex channel.
-        psi0 : (B,) sensing direction (feeding SelectionNet).
+        psi0 : (B,) sensing direction (feeding SelectionNet when ``s_init='selection'``).
         M_matrix : (B, N_antennas, N_antennas) Hermitian PSD sensing Fisher-like
             matrix (``A_dot^H R_N_inv A_dot``).
         omega : float comm/sensing weighting.
@@ -408,9 +439,13 @@ class JointUPGANet(nn.Module):
         -------
         F, S, W : final (F, S, W) after all outer iterations.
         """
-        S0, _ = self.selection_net(H, psi0, tau=tau, hard=hard)
-        # Defensive re-projection in case the Gumbel-softmax output drifts.
-        S = project_to_simplex_rows(S0)
+        if self.s_init == "fixed":
+            # Fixed block sub-connected mask, shared across the batch.
+            S = self.fixed_s0.expand(H.shape[0], -1, -1).clone()  # (B, Nt, Nrf)
+        else:
+            S0, _ = self.selection_net(H, psi0, tau=tau, hard=hard)
+            # Defensive re-projection in case the Gumbel-softmax output drifts.
+            S = project_to_simplex_rows(S0)
 
         F, W = F0, W0
         for layer in self.layers:

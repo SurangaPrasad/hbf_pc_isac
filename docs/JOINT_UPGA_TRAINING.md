@@ -41,15 +41,24 @@ F_eff = F ⊙ S      (Hadamard product)
 
 ## Architecture
 
+Two initial-connection schemes are supported (chosen via the ``s_init``
+constructor argument):
+
 ```
-JointUPGANet
-├── selection_net (SelectionNet)            ── produces S_0 = SelectionNet(H, psi0)
+JointUPGANet (s_init = 'selection' | 'fixed')
+├── selection_net (SelectionNet)
+│     └── used when s_init='selection': S_0 = SelectionNet(H, psi0)
+├── fixed_s0  (buffer, built when s_init='fixed')
+│     └── the block-diagonal mask (every RF chain serves N_antennas/N_rf antennas)
 └── layers : nn.ModuleList of I = n_outer JointUnfoldedLayer
       each layer owns learnable step sizes
         ├── mu     : (J,)  per-inner-step step size for F
         ├── kappa  : (J,)  per-inner-step step size for S
         └── lambda_: ()    one scalar step size for W (once per outer iteration)
 ```
+
+Both schemes run the same I×J unfolding after S_0 is set; only the source of the
+initial connection matrix differs.
 
 ### One JointUnfoldedLayer (one outer iteration, `joint_upganet.py:221`)
 
@@ -80,8 +89,11 @@ After the inner loop, the digital precoder is updated once:
 
 ```
 forward(F0, W0, H, psi0, M_matrix, omega, P_BS, tau=1.0, hard=False)
-  S0, _ = selection_net(H, psi0, tau=tau, hard=hard)   # Gumbel-softmax connection matrix
-  S     = project_to_simplex_rows(S0)                  # defensive re-projection
+  if s_init == 'fixed':
+      S = fixed_s0.expand(B, -1, -1)        # block sub-connected mask, shared over batch
+  else:
+      S0, _ = selection_net(H, psi0, tau=tau, hard=hard)   # Gumbel-softmax connection matrix
+      S     = project_to_simplex_rows(S0)                  # defensive re-projection
   (F, W) = (F0, W0)
   for layer in layers:  F, S, W = layer(F, S, W, H, psi0, M_matrix, omega, P_BS)
   return F, S, W
@@ -246,21 +258,22 @@ It also sanity-checks `project_to_simplex_rows`. Current output: `grad_F` diff
 Requirements: Python 3.10+, PyTorch 2.x, existing repo data
 (`dataset/64TX_4UE_4RF/H_train.mat`).
 
-1. **(Re)build a trained model:**
+1. **(Re)build the trained models** (selection-init and fixed-init variants):
    ```bash
-   python main_train_joint.py
+   python main_train_joint.py            # selection init
+   python main_train_joint.py fixed      # fixed block-mask init
    ```
    Training runs the full unfolded network per batch (120 outer × 5 inner steps),
    so it is expensive — on CPU reduce `n_epoch`, `batch_size`, `n_iter_outer`, or
    `n_iter_inner_J5` in `system_config.py`.
 
-2. **Plot objective vs SNR:**
+2. **Plot objective vs SNR** (both variants + the three baselines):
    ```bash
    python main_SNR_joint.py
    ```
-   (Requires the checkpoint from step 1.)
+   (Requires the checkpoints from step 1.)
 
-3. **Plot convergence vs iterations:**
+3. **Plot convergence vs iterations** (both variants):
    ```bash
    python main_iter_joint.py
    ```

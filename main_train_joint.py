@@ -1,15 +1,24 @@
 """Train the JointUPGANet (joint deep-unfolding of F, S and W).
 
-The SelectionNet produces the initial connection matrix S_0 and the unfolded
-layers refine (F, S, W) jointly.  Only the per-layer step sizes (mu, kappa,
-lambda) and the SelectionNet weights are learnable; F_0 and W_0 are
-re-initialised from the channel for every sample/batch, exactly as the legacy
-PGA re-initialises F, W inside ``execute_PGA``.
+Two initialisation schemes for the connection matrix S_0 are supported:
 
-Run:  python main_train_joint.py
+  * ``selection`` (default) — S_0 comes from SelectionNet (a Gumbel-softmax MLP
+    that maps the channel and sensing direction to a row-stochastic mask).
+  * ``fixed``            — S_0 is the fixed block sub-connected mask (every RF
+    chain serves N_antennas/N_rf antennas); the unfolding then refines S the
+    same way as the selection variant.
+
+Only the per-layer step sizes (mu, kappa, lambda) and (for ``selection``) the
+SelectionNet weights are learnable; F_0 and W_0 are re-initialised from the
+channel for every batch.
+
+Run:
+    python main_train_joint.py              # selection variant
+    python main_train_joint.py fixed        # fixed-mask variant
 """
 
 import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -32,6 +41,12 @@ N_OUTER = n_iter_outer        # I outer iterations
 N_INNER = n_iter_inner_J5     # J inner steps per outer iteration
 
 
+def model_filename(s_init: str) -> str:
+    """Checkpoint path for a given S_0 initialisation scheme."""
+    tag = "" if s_init == "selection" else f"_{s_init}"
+    return directory_model + f'JointUPGANet{tag}_I{N_OUTER}_J{N_INNER}.pth'
+
+
 def anneal_tau(epoch, n_epoch, tau_start=JOINT_TAU_START, tau_end=JOINT_TAU_END):
     """Exponential Gumbel temperature decay over epochs."""
     return tau_start * (tau_end / tau_start) ** (epoch / max(1, n_epoch - 1))
@@ -42,11 +57,12 @@ def to_joint_channel(H_kb: torch.Tensor) -> torch.Tensor:
     return H_kb[0].transpose(1, 2)   # strip K, swap users<->antennas
 
 
-def main():
+def main(s_init: str = "selection"):
+    assert s_init in ("selection", "fixed")
     torch.manual_seed(3407)
 
     H_train, _ = get_data_tensor(data_source)
-    print(f"H_train (K, B, M, Nt): {tuple(H_train.shape)}")
+    print(f"H_train (K, B, M, Nt): {tuple(H_train.shape)}  (s_init={s_init})")
 
     # ---- Sensing Fisher-like matrix in antenna space (shared across batch).
     M_matrix = (A_dot.conj().T @ R_N_inv @ A_dot).to(H_train.device)   # (Nt, Nt)
@@ -54,6 +70,7 @@ def main():
     model = JointUPGANet(
         n_outer=N_OUTER, n_inner=N_INNER,
         n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
+        s_init=s_init,
     ).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=JOINT_LR)
@@ -88,6 +105,7 @@ def main():
             # Re-initialise F0 / W0 from the channel (per batch).
             F0, W0 = initialize_joint(H_joint, snr_train, Nrf)
 
+            # tau/hard only affect the 'selection' variant (ignored for 'fixed').
             F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_train,
                             tau=tau, hard=hard_mode)
 
@@ -109,18 +127,21 @@ def main():
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     # ---- Save model + loss curve
-    torch.save(model.state_dict(), directory_model + f'JointUPGANet_I{N_OUTER}_J{N_INNER}.pth')
+    torch.save(model.state_dict(), model_filename(s_init))
 
     plt.figure(figsize=(8, 5))
     plt.plot(range(1, len(epoch_losses) + 1), epoch_losses, marker='o')
     plt.xlabel('Epoch')
     plt.ylabel('Average Loss')
-    plt.title(f'JointUPGANet Training Loss (I={N_OUTER}, J={N_INNER})')
+    plt.title(f'JointUPGANet ({s_init}) Training Loss (I={N_OUTER}, J={N_INNER})')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(directory_result + f'JointUPGANet_loss_I{N_OUTER}_J{N_INNER}.png', dpi=300)
+    plt.savefig(directory_result + f'JointUPGANet_{s_init}_loss_I{N_OUTER}_J{N_INNER}.png', dpi=300)
     print(f"Saved loss curve to {directory_result}")
 
 
 if __name__ == "__main__":
-    main()
+    s_init = sys.argv[1] if len(sys.argv) > 1 else "selection"
+    if s_init not in ("selection", "fixed"):
+        raise SystemExit(f"usage: python main_train_joint.py [selection|fixed], got {s_init!r}")
+    main(s_init)
