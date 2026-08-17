@@ -1,0 +1,254 @@
+\documentclass[a4paper]{article}
+\usepackage[T1]{fontenc}
+% \usepackage{lmodern}
+% \IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+%Template version as of 6/27/2024
+\usepackage{array}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{algorithm}
+% \usepackage{subcaption}
+\usepackage[caption=false,font=footnotesize]{subfig}
+\usepackage{tikz}
+
+\usepackage{amsthm}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}{\textbf{Remark}}
+
+\usepackage{algpseudocode}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Low-Complexity Dynamic Deep Unfolding for Adaptive Sub-connected ISAC Beamforming}
+
+\maketitle
+
+\begin{abstract}
+
+
+
+
+\end{abstract}
+
+\section{System model and problem formulation}
+
+\subsection{Communications signal model}
+
+We consider a sub-connected mmWave massive MIMO system with a base station that has $N_{\mathrm{t}}$ transmit antennas, $N_{\mathrm{rf}}$ RF chains and serves $K$ single-antenna users. In the sub-connected structure every antenna is connected to one, and only one, RF chain, so only a small part of the analog precoder is active. We describe these connections with a real matrix $\mathbf{S} \in [0,1]^{N_{\mathrm{t}}\times N_{\mathrm{rf}}}$ whose rows add up to one. In this way $\mathbf{S}(i,j)$ can be read as the strength of the connection between antenna $i$ and RF chain $j$, and when $\mathbf{S}$ becomes a 0-1 matrix we recover the classical hard sub-connected selection. The effective analog precoder is
+
+\begin{equation}
+\label{eq:effective_F}
+    \mathbf{F}_{\mathrm{eff}} = \mathbf{F}\circ\mathbf{S},
+\end{equation}
+
+where $\mathbf{F}$ is the analog precoder with unit-modulus entries and $\circ$ is the elementwise (Hadamard) product. The digital precoder is $\mathbf{W}$, and the received signal of user $k$ is
+
+\begin{align}
+\label{eq:received_signal}
+    y_k =
+    \mathbf{h}_k^H \mathbf{F}_{\mathrm{eff}}\mathbf{w}_k s_k
+    +
+    \sum_{k' \neq k}^{K}
+    \mathbf{h}_k^H \mathbf{F}_{\mathrm{eff}}\mathbf{w}_{k'} s_{k'}
+    +
+    n_k.
+\end{align}
+
+With Gaussian signalling the achievable sum rate of the system is
+
+\begin{align}
+\label{eq:rate}
+    R(\mathbf{F},\mathbf{W}, \mathbf{S}) =
+    \sum_{k=1}^{K}\log_2\left( 1 +
+    \frac{|\mathbf{h}_k^H\mathbf{F}_{\mathrm{eff}}\mathbf{w}_k|^2}{
+    \sum_{k' \neq k}^{K}|\mathbf{h}_k^H\mathbf{F}_{\mathrm{eff}}\mathbf{w}_{k'}|^2 + \sigma_n^2}
+    \right).
+\end{align}
+
+\subsection{Radar signal model}
+
+The base station works as a monostatic radar at the same time. The received echo at the sensing direction $\psi_0$ is
+
+\begin{align}
+\label{eq:radar}
+    \mathbf{Y}
+    =
+    \xi_0 \dot{\mathbf{A}}(\psi_0)\mathbf{x}
+    +
+    \sum_{l=1}^{L}\xi_l \mathbf{A}(\psi_l)\mathbf{x}
+    +
+    \mathbf{z},
+\end{align}
+
+where $\mathbf{x} = \mathbf{F}_{\mathrm{eff}}\mathbf{W}\mathbf{s}$ is the transmitted signal. The sensing accuracy is measured with the Cram\'er-Rao lower bound (CRLB), which takes the form
+
+\begin{align}
+\label{eq:crlb}
+\mathrm{CRLB}(\mathbf{F},\mathbf{W}, \mathbf{S})
+=
+\frac{1}{2|\xi_0|^2} \left( \mathrm{Tr} \left( \mathbf{W}^H \mathbf{F}_{\mathrm{eff}}^H \dot{\mathbf{A}}^H
+\mathbf{R}_{\mathsf{z}}^{-1} \dot{\mathbf{A}} \mathbf{F}_{\mathrm{eff}} \mathbf{W} \right) \right)^{-1}.
+\end{align}
+
+\subsection{Problem Formulation}
+
+We want to design the analog precoder, the connection matrix and the digital precoder at the same time. The joint design problem is written as
+
+\begin{subequations}
+\label{eq:optimization_problem}
+\begin{align}
+    \label{eq:prob_obj}
+    \max_{\mathbf{F},\mathbf{W},\mathbf{S}}\quad & g(\mathbf{F},\mathbf{W}, \mathbf{S}) \triangleq \omega R(\mathbf{F},\mathbf{W}, \mathbf{S}) + \log\left(\mathsf{CRLB}(\mathbf{F},\mathbf{W}, \mathbf{S})^{-1}\right),
+    \\
+    \label{eq:prob_const1}
+    \text{s.t.} \quad & |[\mathbf{F}]_{n,m}| = 1, \quad \forall n,m,
+    \\
+    \label{eq:prob_const2}
+    & \|\mathbf{F}_{\mathrm{eff}}\mathbf{W}\|_{\mathcal{F}}^2 = P_{\mathsf{BS}},
+    \\
+    \label{eq:prob_const3}
+    & \mathbf{S}(i, j) \in [0,1],\quad \sum\nolimits_{j} \mathbf{S}(i,j) = 1, \quad \forall i,j.
+\end{align}
+\end{subequations}
+
+The weight $\omega$ balances the communication rate against the sensing performance. Because (P1) is non-convex and coupled, a direct solution is hard. In the next section we unfold a projected-gradient-ascent algorithm into a deep network and learn its step sizes, while at the same time optimizing the connection matrix $\mathbf{S}$ inside the same iterations.
+
+\section{Proposed Solution}
+
+\subsection{Gradient of the Sum Rate $R$}
+
+The gradient of the sum rate with respect to the effective precoder is
+
+\begin{align}
+\label{eq:grad_Feff_R}
+\nabla_{\mathbf{F}_{\mathrm{eff}}} R
+=
+\sum_{k=1}^{K}
+\left[
+\frac{\xi\tilde{\mathbf{H}}_k\mathbf{F}_{\mathrm{eff}}\mathbf{V}}
+{\mathrm{Tr}\left(\mathbf{F}_{\mathrm{eff}}\mathbf{V}\mathbf{F}_{\mathrm{eff}}^H\tilde{\mathbf{H}}_k\right)+\sigma_n^2}
+-
+\frac{\xi\tilde{\mathbf{H}}_k\mathbf{F}_{\mathrm{eff}}\bar{\mathbf{V}}_k}
+{\mathrm{Tr}\left(\mathbf{F}_{\mathrm{eff}}\bar{\mathbf{V}}_k\mathbf{F}_{\mathrm{eff}}^H\tilde{\mathbf{H}}_k\right)+\sigma_n^2}
+\right],
+\end{align}
+
+where $\mathbf{V}\triangleq\mathbf{W}\mathbf{W}^H$, $\bar{\mathbf{V}}_k\triangleq\bar{\mathbf{W}}_k\bar{\mathbf{W}}_k^H$ ($\bar{\mathbf{W}}_k$ is $\mathbf{W}$ with its $k$-th column set to zero), $\tilde{\mathbf{H}}_k\triangleq\mathbf{h}_k\mathbf{h}_k^H$ and $\xi = 1/\ln 2$. Since $\mathbf{F}_{\mathrm{eff}} = \mathbf{F}\circ\mathbf{S}$, the chain rule gives the update directions for $\mathbf{F}$ and $\mathbf{S}$ as
+
+\begin{align}
+\label{eq:grad_F_S_R}
+\nabla_{\mathbf{F}} R = \mathbf{S}\circ\nabla_{\mathbf{F}_{\mathrm{eff}}} R,
+\qquad
+\nabla_{\mathbf{S}} R =
+\mathrm{Re}\!\left(\mathrm{conj}(\mathbf{F})\circ\nabla_{\mathbf{F}_{\mathrm{eff}}} R\right).
+\end{align}
+
+The gradient of the rate with respect to the digital precoder is
+
+\begin{align}
+\label{eq:grad_W_R}
+\nabla_{\mathbf{W}} R
+=
+\sum_{k=1}^{K}
+\left[
+\frac{\xi\bar{\mathbf{H}}_k\mathbf{W}}
+{\mathrm{Tr}\left(\mathbf{W}\mathbf{W}^H\bar{\mathbf{H}}_k\right)+\sigma_n^2}
+-
+\frac{\xi\bar{\mathbf{H}}_k\bar{\mathbf{W}}_k}
+{\mathrm{Tr}\left(\bar{\mathbf{W}}_k\bar{\mathbf{W}}_k^H\bar{\mathbf{H}}_k\right)+\sigma_n^2}
+\right],
+\end{align}
+
+with $\bar{\mathbf{H}}_k \triangleq \mathbf{F}_{\mathrm{eff}}^H\tilde{\mathbf{H}}_k\mathbf{F}_{\mathrm{eff}}$.
+
+\subsection{Gradient of the CRLB Term}
+
+The gradient of the sensing term with respect to the effective precoder is
+
+\begin{align}
+\label{eq:grad_Feff_crlb}
+\nabla_{\mathbf{F}_{\mathrm{eff}}} \log\left(\mathrm{CRLB}(\mathbf{F},\mathbf{W},\mathbf{S})^{-1}\right)
+=
+\frac{\mathbf{M}\mathbf{F}_{\mathrm{eff}}\mathbf{W}\mathbf{W}^H}
+{\mathrm{Tr}\left(\mathbf{W}^H\mathbf{F}_{\mathrm{eff}}^H\mathbf{M}\mathbf{F}_{\mathrm{eff}}\mathbf{W}\right)},
+\end{align}
+
+where $\mathbf{M}\triangleq\dot{\mathbf{A}}^H\mathbf{R}_{\mathsf{z}}^{-1}\dot{\mathbf{A}}$. Again, the chain rule gives the updates for $\mathbf{F}$ and $\mathbf{S}$
+
+\begin{align}
+\nabla_{\mathbf{F}} \log\left(\mathrm{CRLB}^{-1}\right)
+=
+\mathbf{S}\circ\nabla_{\mathbf{F}_{\mathrm{eff}}} \log\left(\mathrm{CRLB}^{-1}\right),
+\qquad
+\nabla_{\mathbf{S}} \log\left(\mathrm{CRLB}^{-1}\right)
+=
+\mathrm{Re}\!\left(\mathrm{conj}(\mathbf{F})\circ\nabla_{\mathbf{F}_{\mathrm{eff}}} \log\left(\mathrm{CRLB}^{-1}\right)\right).
+\end{align}
+
+The gradient with respect to the digital precoder is
+
+\begin{align}
+\label{eq:grad_w_crlb}
+\nabla_{\mathbf{W}}\log\left(\mathrm{CRLB}(\mathbf{F},\mathbf{W},\mathbf{S})^{-1}\right)
+=
+\frac{\mathbf{F}_{\mathrm{eff}}^H\mathbf{M}\mathbf{F}_{\mathrm{eff}}\mathbf{W}}
+{\mathrm{Tr}\left(\mathbf{W}^H\mathbf{F}_{\mathrm{eff}}^H\mathbf{M}\mathbf{F}_{\mathrm{eff}}\mathbf{W}\right)}.
+\end{align}
+
+\subsection{Joint Deep Unfolding Network}
+
+We unfold the projected-gradient-ascent (PGA) updates into a deep network and learn their step sizes. Different from a separate front-end that decides the connections first, our network optimizes the connection matrix $\mathbf{S}$ together with $\mathbf{F}$ and $\mathbf{W}$ inside the same unfolded iterations. We call this network \emph{JointUPGANet}. It has two parts.
+
+The first part is a small front-end network (\emph{SelectionNet}) that takes the channel $\mathbf{H}$ and the sensing direction $\psi_0$ and produces an initial connection matrix $\mathbf{S}_0$ with a Gumbel-softmax. This keeps every row normalized, so $\mathbf{S}_0$ already satisfies the row-sum constraint of (P1) and gives the unfolded iterations a good starting point for the connectivity.
+
+The second part is a stack of $I$ outer layers. Each outer layer runs $J$ inner steps that update $\mathbf{F}$ and $\mathbf{S}$, followed by a single update of $\mathbf{W}$. Inside every inner step:
+
+\begin{enumerate}
+    \item compute the gradient of the objective with respect to the effective precoder,
+        \[
+        \nabla_{\mathbf{F}_{\mathrm{eff}}} g =
+        \omega \nabla_{\mathbf{F}_{\mathrm{eff}}} R + \nabla_{\mathbf{F}_{\mathrm{eff}}} \log(\mathrm{CRLB}^{-1}),
+        \]
+    \item split it into an update direction for $\mathbf{F}$ and one for $\mathbf{S}$ with the chain rule,
+    \item move $\mathbf{F}_{\mathrm{hat}}$ and $\mathbf{S}_{\mathrm{hat}}$ along these directions with the learned step sizes $\boldsymbol{\mu}$ and $\boldsymbol{\kappa}$,
+    \item project $\mathbf{F}_{\mathrm{hat}}$ back to unit modulus, and project each row of $\mathbf{S}_{\mathrm{hat}}$ onto the probability simplex so that the connection constraints stay satisfied.
+\end{enumerate}
+
+After the $J$ inner steps, $\mathbf{W}$ is updated once with the step size $\lambda$ and rescaled so that the total transmit power equals $P_{\mathsf{BS}}$.
+
+The learnable parameters are the per-inner-step step sizes of every outer layer and the weights of SelectionNet. Since (P1) has no labels, the whole network is trained end to end with the unsupervised loss $L = -g(\mathbf{F},\mathbf{W},\mathbf{S})$. After training, the network is used directly: given a channel it outputs the analog precoder, the connection matrix and the digital precoder in one forward pass. Because every row of $\mathbf{S}$ sums to one, the learned soft assignment can be rounded to a hard sub-connected mask at evaluation time.
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{1_16.png}
+    \caption{Each RF chain is connected with 16 antennas}
+    \label{fig:placeholder}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{1_20.png}
+    \caption{Each RF chain is connected with 20 antennas}
+    \label{fig:placeholder}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{objective_function_ma_fahp.png}
+    \caption{Objective function}
+    \label{fig:placeholder}
+\end{figure}
+
+\bibliographystyle{IEEEtran}
+\bibliography{IEEEabrv, Bibliography}
+
+
+\end{document}

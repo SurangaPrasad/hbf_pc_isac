@@ -78,11 +78,17 @@ def main():
     with torch.no_grad():
         S_hard, _ = selnet(H_sel, psi0, tau=0.05, hard=True)   # (B, Nt, Nrf)
 
-    def baseline_objective(F_eff, W_eff, snr_ss):
-        """Physics objective for a baseline layout (legacy 4-D tensors)."""
-        W_matched = compute_digital_precoder(H_test, F_eff) if REDERIVE_DIGITAL_W else W_eff
-        rate = get_sum_rate(H_test, F_eff, W_matched, snr_ss, skip_unit_modulus=True)
-        crb = torch.mean(get_crb_fe(H_test, F_eff, W_matched, xi_0, A_dot, R_N_inv,
+    def baseline_metrics(F_eff, W, snr_ss):
+        """Objective / rate / CRB for a given (F_eff, W) using the legacy physics.
+
+        Note: this does NOT re-derive W.  The caller decides which W to use (the
+        UPGA's own optimized W for the full-connected case, or a matched W for a
+        masked array).  Re-deriving W for the *full-connected* array with
+        ``compute_digital_precoder`` (ridge-ZF) discards the UPGA's optimized W
+        and makes the full-connected curve look artificially low.
+        """
+        rate = get_sum_rate(H_test, F_eff, W, snr_ss, skip_unit_modulus=True)
+        crb = torch.mean(get_crb_fe(H_test, F_eff, W, xi_0, A_dot, R_N_inv,
                                     snr_ss, skip_unit_modulus=True))
         return OMEGA * rate + crb, rate, crb
 
@@ -122,9 +128,17 @@ def main():
                 torch.tensor(snr_ss, dtype=torch.float32, device=device),
                 n_iter_outer, n_iter_inner_J5, track_metrics=False)
 
-            o_f, r_f, c_f = baseline_objective(F_up, W_up, snr_ss)
-            o_s, r_s, c_s = baseline_objective(F_up * fixed_mask, W_up, snr_ss)
-            o_l, r_l, c_l = baseline_objective(F_up * S_hard.unsqueeze(0), W_up, snr_ss)
+            # Full-connected: use the UPGA's own optimized W (already matched to
+            # the full-connected F).  This is the upper bound of the comparison.
+            o_f, r_f, c_f = baseline_metrics(F_up, W_up, snr_ss)
+
+            # Sub-connected: W_up is mismatched to the masked array, so re-derive
+            # a matched digital precoder (ridge-ZF) for the masked F_eff.
+            W_sub = compute_digital_precoder(H_test, F_up * fixed_mask) if REDERIVE_DIGITAL_W else W_up
+            o_s, r_s, c_s = baseline_metrics(F_up * fixed_mask, W_sub, snr_ss)
+
+            W_sel = compute_digital_precoder(H_test, F_up * S_hard.unsqueeze(0)) if REDERIVE_DIGITAL_W else W_up
+            o_l, r_l, c_l = baseline_metrics(F_up * S_hard.unsqueeze(0), W_sel, snr_ss)
 
             obj_full[ss], rate_full[ss], crlb_full[ss] = o_f.item(), r_f.item(), float(np.exp(-c_f.item()))
             obj_sub[ss], rate_sub[ss], crlb_sub[ss] = o_s.item(), r_s.item(), float(np.exp(-c_s.item()))
