@@ -179,11 +179,19 @@ Step by step:
 
 ### Objective / rate / CRLB vs SNR (`main_SNR_joint.py`)
 
-1. Loads the trained checkpoint, sweeps `snr_dB_list`.
-2. For each SNR: re-initialises `F0, W0`, runs the full network with
-   `tau=0.05, hard=True` (evaluation protocol), then computes
-   `R` (`get_sum_rate_joint`) and `CRLB = exp(-log(CRLB^-1))`.
-3. Writes three figures to `sim_results/64TX_4UE_4RF/`:
+1. Loads the trained JointUPGANet checkpoint and the baseline models (frozen
+   UPGA `UPGA_J5.pth` and trained `SelectionNet_J5.pth`), then sweeps `snr_dB_list`.
+2. For each SNR:
+   - **JointUPGANet**: re-initialises `F0, W0`, runs the full network with
+     `tau=0.05, hard=True`, then computes `R` (`get_sum_rate_joint`) and
+     `CRLB = exp(-log(CRLB^-1))`.
+   - **Baselines** (frozen UPGA beamformer `F`, `W` re-derived via
+     `compute_digital_precoder`, `skip_unit_modulus=True` — same protocol as
+     `main_selection.py`):
+     - *Full-connected HBF*: `F_eff = F` (no mask).
+     - *Fixed sub-connected*: `F_eff = F * fixed_mask` (uniform block mask).
+     - *Adaptive connected*: `F_eff = F * S_hard` (trained SelectionNet mask).
+3. Writes four curves per figure to `sim_results/64TX_4UE_4RF/`:
    - `JointUPGANet_obj_vs_SNR_64_0.25.png`  — `J = OMEGA*R + log(CRLB^-1)`
    - `JointUPGANet_rate_vs_SNR_64_0.25.png` — sum rate
    - `JointUPGANet_CRB_vs_SNR_64_0.25.png`  — CRLB
