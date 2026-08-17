@@ -859,32 +859,13 @@ def get_grad_W_com(H, F, W):
     grad_W = grad_W / K
     return grad_W
 
+def get_grad_S_com(H, F, W):
+    grad_S = True  # dummy value
+    return grad_S
+
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             RADAR GRADIENTS
 # /////////////////////////////////////////////////////////////////////////////////////////
-
-# ==================================== gradient of tau w.r.t. F ===========================
-def get_grad_F_rad(F, W, R):
-    F_H = torch.transpose(F, 2, 3).conj()
-    W_H = torch.transpose(W, 2, 3).conj()
-    if normalize_tau == 1:
-        grad_F_K = 2 * (F @ W @ W_H @ F_H - R) @ F @ W @ W_H / torch.linalg.matrix_norm(R[:, 0, :, :], ord='fro') ** 2
-    else:
-        grad_F_K = 2 * (F @ W @ W_H @ F_H - R) @ F @ W @ W_H
-    grad_F_sum = sum(grad_F_K)
-    grad_F = grad_F_sum / K
-    return grad_F
-
-# ==================================== gradient of tau w.r.t. W ===========================
-def get_grad_W_rad(F, W, R):
-    F_H = torch.transpose(F, 2, 3).conj()
-    W_H = torch.transpose(W, 2, 3).conj()
-    if normalize_tau == 1:
-        grad_W = 2 * F_H @ (F @ W @ W_H @ F_H - R) @ F @ W / torch.linalg.matrix_norm(R[:, 0, :, :], ord='fro') ** 2
-    else:
-        grad_W = 2 * F_H @ (F @ W @ W_H @ F_H - R) @ F @ W
-    grad_W = grad_W / K
-    return grad_W
 
 # ================== Compute exponentially weighted deep-supervision loss
 def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97, skip_unit_modulus=False):
@@ -941,3 +922,7 @@ def get_grad_W_crb(F, W, xi_0, A_dot, R_N_inv):
     denominator = batch_trace.view(1, -1, 1, 1)
     grad_W_crb = numerator / denominator
     return grad_W_crb
+
+def get_grad_S_crb(F, W, xi_0, A_dot, R_N_inv):
+    grad_S_crb = True  # dummy value
+    return grad_S_crb
