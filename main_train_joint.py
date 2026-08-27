@@ -52,6 +52,28 @@ def anneal_tau(epoch, n_epoch, tau_start=JOINT_TAU_START, tau_end=JOINT_TAU_END)
     return tau_start * (tau_end / tau_start) ** (epoch / max(1, n_epoch - 1))
 
 
+def warm_start_fw_from_upga(model, upga_path, J, I):
+    """Warm-start the joint model's F (mu) and W (lambda_) step sizes from a
+    pre-trained UPGA checkpoint.
+
+    The dedicated UPGA learns large F step sizes (~0.42 mean) that let it
+    optimise the analog precoder quickly, while the joint model's ``mu`` is
+    initialised at 1e-2 and only grows to ~0.1 — so the joint model's F/W
+    optimisation is ~4x too weak and it under-performs the fixed sub-connected
+    baseline. Copying the UPGA's per-(outer, inner) F step into ``mu`` and its
+    per-outer W step into ``lambda_`` gives the joint model the same strong
+    F/W optimisation; only the mask step ``kappa`` is left at its default init
+    and learned from scratch.
+    """
+    state = torch.load(upga_path, map_location=device)
+    step_size = state['step_size']            # (J, I, 2): [inner, outer, F|W]
+    with torch.no_grad():
+        for ii in range(min(I, model.n_outer)):
+            model.layers[ii].mu.data.copy_(step_size[:, ii, 0])      # F step
+            model.layers[ii].lambda_.data.copy_(step_size[0, ii, 1])  # W step
+    return model
+
+
 def to_joint_channel(H_kb: torch.Tensor) -> torch.Tensor:
     """(K, B, M, Nt) -> (B, Nt, M) using the single frequency band."""
     return H_kb[0].transpose(1, 2)   # strip K, swap users<->antennas
@@ -68,6 +90,12 @@ def main(s_init: str = "selection"):
     M_matrix = (A_dot.conj().T @ R_N_inv @ A_dot).to(H_train.device)   # (Nt, Nt)
 
     model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
+
+    # Warm-start F/W step sizes from the pre-trained fixed sub-connected UPGA
+    # so the joint model's analog/digital optimisation matches the baseline,
+    # and only the mask step (kappa) is learned from scratch.
+    if s_init == 'fixed':
+        model = warm_start_fw_from_upga(model, model_file_name_UPGA_partial_J5, N_INNER, N_OUTER)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=JOINT_LR)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
