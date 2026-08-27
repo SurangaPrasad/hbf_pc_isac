@@ -442,11 +442,16 @@ class JointUPGANet(nn.Module):
         # sub-connected result. Hardening restores the sub-connected structure
         # the network is meant to produce (mirrors the ``selection`` variant's
         # ``hard=True`` eval protocol).
+        #
+        # Straight-through estimator (STE): the forward value is the hard
+        # one-hot, but the gradient flows through the soft S (argmax is
+        # non-differentiable, so without this the mask would get zero gradient
+        # during the hard training epochs and never learn a good hard mask).
         if hard:
             winners = S.argmax(dim=-1)                 # (B, Nt)
             S_hard = torch.zeros_like(S)
             S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-            S = S_hard
+            S = S_hard - S.detach() + S                # STE: hard value, soft grad
 
         return F, S, W
 
