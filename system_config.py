@@ -12,17 +12,17 @@ print(f"Using device: {device}")
 
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
-run_conv_PGA_J5 = 0        # Conventional PGA with setting J = 5
-run_conv_PGA_J10 = 0       # Conventional PGA with setting J = 10
+run_conv_PGA_J5 = 1        # Conventional PGA with setting J = 5
+run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
 run_UPGA_J4 = 0
-run_UPGA_J5 = 0            # Unfolded PGA with setting J = 5
+run_UPGA_J5 = 1            # Unfolded PGA with setting J = 5
 run_UPGA_J6 = 0            # Unfolded PGA with setting J = 6 (for ablation on inner iteration number)
 run_UPGA_J10 = 0           # Unfolded PGA with setting J = 10
 run_UPGA_J20 = 0           # Unfolded PGA with setting J = 20
-run_UPGA_partial_J5 = 1    # Unfolded PGA with J = 5 and partial coupling
+run_UPGA_partial_J5 = 0    # Unfolded PGA with J = 5 and partial coupling
 run_UPGA_partial_J10 = 0   # Unfolded PGA with J = 10 and partial coupling
 run_UPGA_J10_PRCDN = 0 
 
@@ -36,7 +36,7 @@ run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gr
 run_UPGA_partial_decay_J5 = 0   # Unfolded PGA with J=5 and partial coupling and decaying inner iterations (J_max=5 → 1)
 run_UPGA_partial_decay_J10 = 0  # Unfolded PGA with J=10 and partial coupling and decaying inner iterations (J_max=10 → 1)
 
-run_SelectionNet = 1            # Learnable antenna-to-RF-chain assignment (SelectionNet)
+run_SelectionNet = 0            # Learnable antenna-to-RF-chain assignment (SelectionNet)
 
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
@@ -150,8 +150,8 @@ if data_source == 'python':
     train_data_file_name = "train_data.mat"
     test_data_file_name = "test_data.mat"
 else:  # matlab
-    # train_data_file_name = "train_data_matlab.mat"
-    train_data_file_name = "H_train.mat"
+    train_data_file_name = "train_data_matlab.mat"
+    # train_data_file_name = "H_train.mat"
     test_data_file_name = "test_data_matlab.mat"
 
 data_path_train = directory_data + train_data_file_name

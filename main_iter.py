@@ -154,27 +154,25 @@ if run_program == 1:
         print('Running conventional PGA with J = 5...')
         model_conv_PGA_J5 = PGA_Unfold_JX(step_size_UPGA_J5)  # Reuse the same shape of step sizes as J5
         register_step_size('Conv PGA (J=5)', model_conv_PGA_J5.step_size)
-        rate_conv_PGA_J5, crb_conv_PGA_J5, power_conv_PGA_J5, F_conv_PGA_J5, W_conv_PGA_J5, gradient_norm_history_conv_PGA_J5, gradient_norm_history_conv_PGA_J5_W = model_conv_PGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J5, crb_conv_PGA_J5, F_conv_PGA_J5, W_conv_PGA_J5, gradient_norm_history_conv_PGA_J5, gradient_norm_history_conv_PGA_J5_W = model_conv_PGA_J5.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J5)  # Use n_iter_inner_J5 as J=5
-        rate_iter_conv_PGA_J5  = rate_conv_PGA_J5.mean(0).cpu().numpy()
-        crb_iter_conv_PGA_J5   = crb_conv_PGA_J5.mean(0).cpu().numpy()
-        power_iter_conv_PGA_J5 = power_conv_PGA_J5.mean(0).cpu().numpy()
+        rate_iter_conv_PGA_J5  = get_outer_iter_curve(rate_conv_PGA_J5)
+        crb_iter_conv_PGA_J5   = get_outer_iter_curve(crb_conv_PGA_J5)
 
     # ====================================================== Conv. PGA with J = 10 ====================================
     if run_conv_PGA_J10 == 1:
         print('Running conventional PGA with J = 10...')
         model_conv_PGA_J10 = PGA_Unfold_JX(step_size_UPGA_J10)
         register_step_size('Conv PGA (J=10)', model_conv_PGA_J10.step_size)
-        rate_conv_PGA_J10, crb_conv_PGA_J10, power_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10, gradient_norm_history_conv_PGA_J10, gradient_norm_history_conv_PGA_J10_W = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
+        rate_conv_PGA_J10, crb_conv_PGA_J10, F_conv_PGA_J10, W_conv_PGA_J10, gradient_norm_history_conv_PGA_J10, gradient_norm_history_conv_PGA_J10_W = model_conv_PGA_J10.execute_PGA(H_test, xi_0, A_dot, R_N_inv,
                                                                                              snr,
                                                                                              n_iter_outer,
                                                                                              n_iter_inner_J10)
         # rate_conv_PGA_J10: (B, n_outer*(J+1))  — average over batch
-        rate_iter_conv_PGA_J10  = rate_conv_PGA_J10.mean(0).cpu().numpy()
-        crb_iter_conv_PGA_J10   = crb_conv_PGA_J10.mean(0).cpu().numpy()
-        power_iter_conv_PGA_J10 = power_conv_PGA_J10.mean(0).cpu().numpy()
+        rate_iter_conv_PGA_J10  = get_outer_iter_curve(rate_conv_PGA_J10)
+        crb_iter_conv_PGA_J10   = get_outer_iter_curve(crb_conv_PGA_J10)
 
     # ====================================================== Conv. PGA with J = 20 ====================================
     if run_conv_PGA_J20 == 1:
@@ -603,10 +601,10 @@ if plot_figure == 1:
     #     plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_conv_PGA_J5 == 1:
         obj_iter_conv_PGA_J5 = OMEGA * rate_iter_conv_PGA_J5 + crb_iter_conv_PGA_J5
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J5[outer_idx_J5], ':d', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J5, ':d', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
     if run_conv_PGA_J10 == 1:
         obj_iter_conv_PGA_J10 = OMEGA * rate_iter_conv_PGA_J10 + crb_iter_conv_PGA_J10
-        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10[outer_idx_J10], ':o', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J10)
+        plt.plot(iter_outer_x, obj_iter_conv_PGA_J10, ':o', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J10)
     # if run_conv_PGA_J20 == 1:
     #     obj_iter_conv_PGA_J20 = OMEGA * rate_iter_conv_PGA_J20 + crb_iter_conv_PGA_J20[outer_idx_J20]
     #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J20[outer_idx_J20], '.-', markevery=5, color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J20)

@@ -184,8 +184,7 @@ def run_UPGA(step_size_UPGA):
             H = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H.shape[1]
             snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]  # balanced per-SNR
-            snr_train = torch.tensor(10 ** (snr_dB_train / 10),
-                                     dtype=torch.float32, device=device)
+            snr_train = torch.tensor(10 ** (snr_dB_train / 10),dtype=torch.float32, device=device)
             
             __, __, F, W, __, _ = model_UPGA.execute_PGA(H, xi_0, A_dot, R_N_inv, snr_train, n_iter_outer, step_size_UPGA.shape[0], track_metrics=False)
             

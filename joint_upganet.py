@@ -233,12 +233,7 @@ class JointUnfoldedLayer(nn.Module):
     lambda_: ()   single scalar step size for W (once per outer iteration).
     """
 
-    def __init__(
-        self,
-        n_antennas: int,
-        n_rf_chains: int,
-        n_users: int,
-        n_inner_steps: int,
+    def __init__(self, n_antennas: int, n_rf_chains: int, n_users: int, n_inner_steps: int,
     ) -> None:
         super().__init__()
 
@@ -251,18 +246,12 @@ class JointUnfoldedLayer(nn.Module):
         self.mu = nn.Parameter(torch.full((n_inner_steps,), 1e-2))
         self.kappa = nn.Parameter(torch.full((n_inner_steps,), 1e-2))
         # One scalar step size for W, applied once per outer iteration.
-        self.lambda_ = nn.Parameter(torch.tensor(1e-2))
+        # Initialised larger (0.1) than the legacy 1e-2 so the W update is
+        # comparable in magnitude to the fixed sub-connected baseline's
+        # per-outer-iteration W step (mean ~0.4), avoiding slow W convergence.
+        self.lambda_ = nn.Parameter(torch.tensor(1e-1))
 
-    def forward(
-        self,
-        F: torch.Tensor,
-        S: torch.Tensor,
-        W: torch.Tensor,
-        H: torch.Tensor,
-        psi0: torch.Tensor,
-        M_matrix: torch.Tensor,
-        omega: float,
-        P_BS: torch.Tensor,
+    def forward(self, F: torch.Tensor, S: torch.Tensor, W: torch.Tensor, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float, P_BS: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Run one unfolded outer iteration.
 
@@ -292,8 +281,7 @@ class JointUnfoldedLayer(nn.Module):
 
             # Objective gradient w.r.t. the effective precoder, computed once and
             # reused for both the F and S updates below.
-            grad_F_eff = omega * get_grad_F_com(H, F_eff, W) \
-                + get_grad_F_crb(F_eff, W, M_matrix)
+            grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
 
             # Chain rule through F_eff = F * S (S real).  Both gradients use the
             # same convention as grad_F_eff (PyTorch's conjugate-Wirtinger / half
@@ -316,8 +304,7 @@ class JointUnfoldedLayer(nn.Module):
 
         # ---- W update (once per outer iteration) ------------------------------
         F_eff_new = F_new * S_new
-        grad_W = omega * get_grad_W_com(H, F_eff_new, W) \
-            + get_grad_W_crb(F_eff_new, W, M_matrix)
+        grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)
 
         W_new = W + self.lambda_ * grad_W
 
@@ -388,14 +375,10 @@ class JointUPGANet(nn.Module):
         self.n_users = n_users
         self.s_init = s_init
 
-        self.selection_net = SelectionNet(
-            n_antennas=n_antennas, n_rf_chains=n_rf_chains, n_users=n_users
-        )
+        self.selection_net = SelectionNet(n_antennas=n_antennas, n_rf_chains=n_rf_chains, n_users=n_users)
+
         if s_init == "fixed":
-            self.register_buffer(
-                "fixed_s0",
-                build_fixed_subconnected_mask(n_antennas, n_rf_chains),
-            )
+            self.register_buffer("fixed_s0",build_fixed_subconnected_mask(n_antennas, n_rf_chains))
         self.layers = nn.ModuleList(
             [
                 JointUnfoldedLayer(
@@ -451,6 +434,20 @@ class JointUPGANet(nn.Module):
         for layer in self.layers:
             F, S, W = layer(F, S, W, H, psi0, M_matrix, omega, P_BS)
 
+        # Hard sub-connected mask at evaluation: round each row of S to a
+        # one-hot (one RF chain per antenna). Without this, the soft
+        # row-stochastic S makes F_eff = F*S behave like a (partially)
+        # full-connected precoder, so the joint model's objective collapses
+        # onto the full-connected curve instead of showing a genuine
+        # sub-connected result. Hardening restores the sub-connected structure
+        # the network is meant to produce (mirrors the ``selection`` variant's
+        # ``hard=True`` eval protocol).
+        if hard:
+            winners = S.argmax(dim=-1)                 # (B, Nt)
+            S_hard = torch.zeros_like(S)
+            S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+            S = S_hard
+
         return F, S, W
 
 
@@ -472,12 +469,7 @@ def normalize_power_joint(F_eff: torch.Tensor, W: torch.Tensor, Pt) -> torch.Ten
     return scale.view(-1, 1, 1) * W
 
 
-def get_sum_rate_joint(
-    H: torch.Tensor,
-    F_eff: torch.Tensor,
-    W: torch.Tensor,
-    Pt,
-    skip_unit_modulus: bool = True,
+def get_sum_rate_joint(H: torch.Tensor, F_eff: torch.Tensor, W: torch.Tensor, Pt, skip_unit_modulus: bool = True,
 ) -> torch.Tensor:
     """Scalar sum rate for the effective (masked) precoder F_eff = F * S.
 
@@ -511,12 +503,7 @@ def get_sum_rate_joint(
     return rate.mean()
 
 
-def get_crb_joint(
-    F_eff: torch.Tensor,
-    W: torch.Tensor,
-    M_matrix: torch.Tensor,
-    xi_0,
-    Pt = None,
+def get_crb_joint(F_eff: torch.Tensor, W: torch.Tensor, M_matrix: torch.Tensor, xi_0, Pt = None,
 ) -> torch.Tensor:
     """Per-sample ``log(CRLB^-1)`` for the effective precoder F_eff.
 
@@ -533,15 +520,7 @@ def get_crb_joint(
     return torch.log(fim + 1e-12) + const
 
 
-def get_joint_loss(
-    F: torch.Tensor,
-    S: torch.Tensor,
-    W: torch.Tensor,
-    H: torch.Tensor,
-    M_matrix: torch.Tensor,
-    omega: float,
-    xi_0,
-    Pt,
+def get_joint_loss(F: torch.Tensor, S: torch.Tensor, W: torch.Tensor, H: torch.Tensor, M_matrix: torch.Tensor, omega: float, xi_0, Pt,
 ) -> torch.Tensor:
     """Scalar unsupervised loss = -(omega * R + mean(log CRLB^-1))."""
     F_eff = F * S
@@ -553,11 +532,24 @@ def get_joint_loss(
 def initialize_joint(H: torch.Tensor, Pt, n_rf_chains: int):
     """Initial (F0, W0) for the joint network.
 
-    F0 is a random unit-modulus analog precoder; W0 is a ridge-ZF digital
+    F0 is an SVD-based unit-modulus analog precoder (the top ``n_rf_chains``
+    right-singular vectors of the channel, matching the legacy ``init_scheme =
+    'svd'`` used by the fixed sub-connected baseline); W0 is a ridge-ZF digital
     precoder matched to the effective channel ``H^T F0``, power-normalised.
+
+    Using the SVD init (instead of a random unit-modulus F0) gives the joint
+    network the same strong starting point as the fixed sub-connected baseline,
+    so the comparison in ``main_iter_joint.py`` is fair and the joint model's
+    mask optimisation is not handicapped by a weak initialisation.
     """
     B, N_antennas, _ = H.shape
-    F0 = torch.randn(B, N_antennas, n_rf_chains, dtype=H.dtype, device=H.device)
+
+    # SVD-based F0: top n_rf_chains right-singular vectors, unit modulus.
+    # H is (B, N_antennas, N_users); svd of H^T (B, N_users, N_antennas) gives
+    # V_H of shape (B, N_antennas, N_antennas) whose leading rows are the
+    # dominant right-singular vectors (matching legacy init_scheme='svd').
+    _, _, V_H = torch.linalg.svd(H.transpose(-2, -1))
+    F0 = V_H[:, :n_rf_chains, :].transpose(-2, -1)     # (B, N_antennas, N_rf)
     F0 = F0 / F0.abs().clamp_min(1e-8)
 
     H_u = H.transpose(-2, -1)                          # (B, N_users, N_antennas)

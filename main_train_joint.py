@@ -67,11 +67,7 @@ def main(s_init: str = "selection"):
     # ---- Sensing Fisher-like matrix in antenna space (shared across batch).
     M_matrix = (A_dot.conj().T @ R_N_inv @ A_dot).to(H_train.device)   # (Nt, Nt)
 
-    model = JointUPGANet(
-        n_outer=N_OUTER, n_inner=N_INNER,
-        n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
-        s_init=s_init,
-    ).to(device)
+    model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=JOINT_LR)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
@@ -94,8 +90,7 @@ def main(s_init: str = "selection"):
             cur_bs = H_batch.shape[1]
 
             # Balanced per-SNR draw, as in main_train.py.
-            snr_dB_train = np.random.permutation(
-                np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]
+            snr_dB_train = np.random.permutation(np.tile(snr_dB_list, batch_size // len(snr_dB_list)))[:cur_bs]
             snr_train = torch.tensor(10 ** (snr_dB_train / 10), dtype=torch.float32, device=device)
 
             # Channel in (B, Nt, M) layout + fixed sensing direction.
@@ -106,8 +101,7 @@ def main(s_init: str = "selection"):
             F0, W0 = initialize_joint(H_joint, snr_train, Nrf)
 
             # tau/hard only affect the 'selection' variant (ignored for 'fixed').
-            F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_train,
-                            tau=tau, hard=hard_mode)
+            F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_train,tau=tau, hard=hard_mode)
 
             loss = get_joint_loss(F, S, W, H_joint, M_matrix, OMEGA, xi_0, snr_train)
 

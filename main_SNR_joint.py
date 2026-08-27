@@ -68,8 +68,7 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test):
         snr_t = torch.full((B_test,), snr_ss, dtype=torch.float32, device=device)
         with torch.no_grad():
             F0, W0 = initialize_joint(H_joint, snr_t, Nrf)
-            F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_t,
-                            tau=0.05, hard=True)
+            F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_t, tau=0.05, hard=True)
             F_eff = F * S
             r = get_sum_rate_joint(H_joint, F_eff, W, snr_t)
             c = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0, snr_t))
@@ -77,7 +76,6 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test):
             crlb[ss] = float(np.exp(-c.item()))
             obj[ss] = OMEGA * r.item() + c.item()
     return obj, rate, crlb
-
 
 def main():
     torch.manual_seed(3407)
@@ -93,10 +91,8 @@ def main():
     psi0 = torch.full((B_test,), desired_angle_rad_torch, device=device)
 
     # -- Joint models (two S_0 initialisation schemes) ----------------------
-    obj_sel, rate_sel, crlb_sel = evaluate_joint('selection', H_joint, psi0,
-                                                 M_matrix, snr_dB_list, B_test)
-    obj_fix, rate_fix, crlb_fix = evaluate_joint('fixed', H_joint, psi0,
-                                                 M_matrix, snr_dB_list, B_test)
+    obj_sel, rate_sel, crlb_sel = evaluate_joint('selection', H_joint, psi0, M_matrix, snr_dB_list, B_test)
+    obj_fix, rate_fix, crlb_fix = evaluate_joint('fixed', H_joint, psi0, M_matrix, snr_dB_list, B_test)
 
     # -- Baselines (frozen UPGA beamformer + connectivity masks) -------------
     upga = load_pretrained_upga(model_file_name_UPGA_J5, n_iter_inner_J5, device)

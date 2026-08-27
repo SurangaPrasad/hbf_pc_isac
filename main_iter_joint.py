@@ -69,7 +69,13 @@ def unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True):
         F, W = F0, W0
         for ii, layer in enumerate(model.layers):
             F, S, W = layer(F, S, W, H_joint, psi0, M_matrix, OMEGA, snr_t)
-            F_eff = F * S
+            # Report the objective with a HARD one-hot sub-connected mask
+            # (one RF chain per antenna), matching the eval protocol. The soft
+            # S is kept for the next layer (the network is trained with soft S);
+            # only the tracked objective uses the hardened mask.
+            S_hard = torch.zeros_like(S)
+            S_hard.scatter_(-1, S.argmax(dim=-1).unsqueeze(-1), 1.0)
+            F_eff = F * S_hard
             r = get_sum_rate_joint(H_joint, F_eff, W, snr_t)
             c = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0, snr_t))
             obj_iter[ii] = OMEGA * r.item() + c.item()
@@ -111,8 +117,8 @@ def unroll_upga(H_test, mask=None, trained=True):
 def main():
     torch.manual_seed(3407)
 
-    _, H_test0 = get_data_tensor(data_source)
-    H_test = H_test0[:, :test_size, :, :]                     # (K, B, M, Nt)
+    H_Train0, H_test0 = get_data_tensor(data_source)
+    H_test = H_Train0[:, :test_size, :, :]                     # (K, B, M, Nt)
     B_test = H_test.shape[1]
     print(f'H_test (K, B, M, Nt): {tuple(H_test.shape)}')
 
@@ -143,18 +149,14 @@ def main():
 
     # ---- Objective vs outer iterations ------------------------------------
     plt.figure(figsize=(8, 5))
-    plt.plot(iter_x, obj_joint_tr, '-^', color='purple', linewidth=3, markersize=6,
-             label='JointUPGANet (fixed init), trained')
-    plt.plot(iter_x, obj_joint_un, '--^', color='orchid', linewidth=3, markersize=6,
-             label='JointUPGANet (fixed init), untrained')
-    plt.plot(iter_x, obj_sub_tr, '-s', color='darkblue', linewidth=3, markersize=6,
-             label='Fixed sub-connected, trained')
-    plt.plot(iter_x, obj_sub_un, '--s', color='cornflowerblue', linewidth=3, markersize=6,
-             label='Fixed sub-connected, untrained')
-    plt.plot(iter_x, obj_full_tr, '-d', color='black', linewidth=3, markersize=6,
-             label='Full-connected, trained')
-    plt.plot(iter_x, obj_full_un, '--d', color='gray', linewidth=3, markersize=6,
-             label='Full-connected, untrained')
+    plt.plot(iter_x, obj_joint_tr, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), trained')
+    # plt.plot(iter_x, obj_joint_un, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), untrained')
+    plt.plot(iter_x, obj_sub_tr, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, trained')
+    # plt.plot(iter_x, obj_sub_un, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, untrained')
+    plt.plot(iter_x, obj_full_tr, '--d', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, trained')
+    # plt.plot(iter_x, obj_full_un, '--d', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, untrained')
+
+
     plt.xlabel(r'Number of outer iterations $(I)$', fontsize=14)
     plt.ylabel(r'$\omega R + \log(\mathrm{CRLB}^{-1})$', fontsize=14)
     plt.grid()

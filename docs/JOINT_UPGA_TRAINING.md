@@ -96,12 +96,22 @@ forward(F0, W0, H, psi0, M_matrix, omega, P_BS, tau=1.0, hard=False)
       S     = project_to_simplex_rows(S0)                  # defensive re-projection
   (F, W) = (F0, W0)
   for layer in layers:  F, S, W = layer(F, S, W, H, psi0, M_matrix, omega, P_BS)
+  if hard:  S = one_hot(S)                  # hard sub-connected mask at eval
   return F, S, W
 ```
 
 Only the step sizes (`mu`, `kappa`, `lambda_` of every layer) and the
 `SelectionNet` weights are learnable; `F0` / `W0` are re-initialised from the
 channel per batch (same philosophy as the legacy `initialize()`).
+
+> **Hard sub-connected mask at evaluation.** The unfolded layers refine `S` as a
+> *soft* row-stochastic matrix (rows sum to 1). If that soft `S` is used directly
+> at evaluation, `F_eff = F ⊙ S` behaves like a (partially) full-connected
+> precoder and the joint model's objective collapses onto the full-connected
+> curve. Passing `hard=True` rounds each row of `S` to a one-hot (one RF chain
+> per antenna), restoring the genuine sub-connected structure the network is
+> meant to produce. This mirrors the `selection` variant's `hard=True` eval
+> protocol and is what `main_SNR_joint.py` / `main_iter_joint.py` use.
 
 ## Physics
 
@@ -118,7 +128,7 @@ adaptations of the legacy `PGA_models.py` / `utility.py` code (verified to agree
 | `get_sum_rate_joint`                   | `utility.get_sum_rate` (K = 1)         | `H (B, Nt, M)`                               |
 | `get_crb_joint`                        | `utility.get_crb_fe` (K = 1)           | + `M_matrix (Nt, Nt)`, `xi_0`                |
 | `get_joint_loss`                       | `PGA_models.get_sum_loss`              | `-(omega * R + mean(log CRLB^-1))`           |
-| `initialize_joint`                     | `utility.initialize` (svd-ish)         | random unit-modulus F0 + ridge-ZF W0         |
+| `initialize_joint`                     | `utility.initialize` (svd)             | SVD-based unit-modulus F0 + ridge-ZF W0      |
 
 Important conventions:
 
@@ -146,7 +156,7 @@ flowchart TB
 
     subgraph MODEL["JointUPGANet — trainable (Adam + StepLR)"]
         direction TB
-        INIT["initialize_joint(H, Pt, Nrf)<br/>F0 unit-modulus random, W0 ridge-ZF power-normalised"]
+        INIT["initialize_joint(H, Pt, Nrf)<br/>F0 SVD-based unit-modulus, W0 ridge-ZF power-normalised"]
         SEL["SelectionNet(H, psi0)<br/>tau annealed 2.0 -> 0.1<br/>hard=True (STE) in last JOINT_HARD_FINAL epochs"]
         SEL --> S0["S0 (B, Nt, Nrf) -> project_to_simplex_rows"]
         INIT --> L0["(F, S, W) = (F0, S0, W0)"]
