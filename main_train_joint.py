@@ -83,9 +83,9 @@ def main(s_init: str = "selection"):
         batch_losses = []
 
         # Shuffle along the batch axis (same pattern as main_train.py).
-        H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train[0]))]
+        H_shuffled = torch.transpose(H_train, 0, 1)[np.random.permutation(len(H_train))]
 
-        for i_batch in range(0, len(H_train[0]), batch_size):
+        for i_batch in range(0, len(H_train), batch_size):
             H_batch = torch.transpose(H_shuffled[i_batch:i_batch + batch_size], 0, 1)
             cur_bs = H_batch.shape[1]
 
