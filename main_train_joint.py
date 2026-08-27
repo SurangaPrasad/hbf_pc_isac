@@ -76,9 +76,19 @@ def main(s_init: str = "selection"):
 
     for i_epoch in range(n_epoch):
         tau = anneal_tau(i_epoch, n_epoch)
-        hard_mode = (i_epoch >= n_epoch - JOINT_HARD_FINAL)
-        if hard_mode:
-            tau = JOINT_TAU_END
+        # For the 'fixed' variant the mask S is refined by the unfolded layers
+        # (no Gumbel-softmax), so we train with a hard one-hot S (via the
+        # straight-through estimator) from epoch 0. This keeps the training
+        # objective consistent with evaluation and avoids the abrupt loss jump
+        # that a late soft->hard switch causes. The 'selection' variant still
+        # anneals tau and only hardens S in the final epochs (its S comes from
+        # the differentiable Gumbel-softmax).
+        if s_init == 'fixed':
+            hard_mode = True
+        else:
+            hard_mode = (i_epoch >= n_epoch - JOINT_HARD_FINAL)
+            if hard_mode:
+                tau = JOINT_TAU_END
 
         batch_losses = []
 
