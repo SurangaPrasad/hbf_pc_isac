@@ -55,7 +55,7 @@ def unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True):
     """JointUPGANet (fixed init); optionally loads the trained state_dict."""
     model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init='fixed', step_size=step_size_joint).to(device)
     if trained:
-        model.load_state_dict(torch.load(joint_model_path('fixed'), map_location=device), strict=False)
+        model.load_state_dict(torch.load(joint_model_path('fixed'), map_location=device))
     model.eval()
 
     obj_iter = np.zeros(N_OUTER)
@@ -145,12 +145,12 @@ def main():
 
     # ---- Objective vs outer iterations ------------------------------------
     plt.figure(figsize=(8, 5))
-    # plt.plot(iter_x, obj_joint_tr, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), trained')
+    plt.plot(iter_x, obj_joint_tr, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), trained')
     plt.plot(iter_x, obj_joint_un, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), untrained')
-    # plt.plot(iter_x, obj_sub_tr, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, trained')
+    plt.plot(iter_x, obj_sub_tr, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, trained')
     plt.plot(iter_x, obj_sub_un, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, untrained')
     plt.plot(iter_x, obj_full_tr, '--d', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, trained')
-    # plt.plot(iter_x, obj_full_un, '--d', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, untrained')
+    plt.plot(iter_x, obj_full_un, '--d', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, untrained')
 
 
     plt.xlabel(r'Number of outer iterations $(I)$', fontsize=14)

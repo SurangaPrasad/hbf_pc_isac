@@ -51,10 +51,12 @@ JointUPGANet (s_init = 'selection' | 'fixed')
 ├── fixed_s0  (buffer, built when s_init='fixed')
 │     └── the block-diagonal mask (every RF chain serves N_antennas/N_rf antennas)
 └── layers : nn.ModuleList of I = n_outer JointUnfoldedLayer
-      each layer owns learnable step sizes
-        ├── mu     : (J,)  per-inner-step step size for F
-        ├── kappa  : (J,)  per-inner-step step size for S
-        └── lambda_: ()    one scalar step size for W (once per outer iteration)
+      each layer owns a learnable step_size : (J, 3) slice
+        ├── step_size[j, 0] : per-inner-step step size for F
+        ├── step_size[0, 1] : step size for S (once per outer iteration)
+        └── step_size[0, 2] : step size for W (once per outer iteration)
+      (the full [J, I, 3] tensor is defined in system_config.step_size_joint and
+       passed into the constructor, mirroring PGA_Unfold_JX's step_size tensor)
 ```
 
 Both schemes run the same I×J unfolding after S_0 is set; only the source of the
@@ -76,13 +78,19 @@ of the inner loop):
    Both use PyTorch's conjugate-Wirtinger convention, so there is **no factor 2** on
    `grad_S` (an earlier factor-2 was dropped after the gradient check — see
    [Gradient correctness test](#gradient-correctness-test-test_gradientspy)).
-4. `F_hat ← F_hat + mu[j] * grad_F` ;  `S_hat ← S_hat + kappa[j] * grad_S`.
-5. Project: `F_hat ← F_hat / |F_hat|` (unit modulus), `S_hat ← project_to_simplex_rows(S_hat)`.
+4. `F_hat ← F_hat + step_size[j, 0] * grad_F`.
+5. Project: `F_hat ← F_hat / |F_hat|` (unit modulus).
 
-After the inner loop, the digital precoder is updated once:
+After the inner F loop, the connection matrix is updated **once** per outer
+iteration (not inside the inner loop):
 
-6. `grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)`.
-7. `W_new ← W + lambda_ * grad_W`, then power projection so
+6. `S_hat ← S_hat + step_size[0, 1] * grad_S` (gradient from the last inner step),
+   then `S_hat ← project_to_simplex_rows(S_hat)`.
+
+Finally the digital precoder is updated once:
+
+7. `grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)`.
+8. `W_new ← W + step_size[0, 2] * grad_W`, then power projection so
    `||F_eff_new @ W_new||_F^2 == P_BS`.
 
 ### The full network forward (`joint_upganet.py:380`)
@@ -100,7 +108,7 @@ forward(F0, W0, H, psi0, M_matrix, omega, P_BS, tau=1.0, hard=False)
   return F, S, W
 ```
 
-Only the step sizes (`mu`, `kappa`, `lambda_` of every layer) and the
+Only the step sizes (`step_size` of every layer) and the
 `SelectionNet` weights are learnable; `F0` / `W0` are re-initialised from the
 channel per batch (same philosophy as the legacy `initialize()`).
 
@@ -112,6 +120,47 @@ channel per batch (same philosophy as the legacy `initialize()`).
 > per antenna), restoring the genuine sub-connected structure the network is
 > meant to produce. This mirrors the `selection` variant's `hard=True` eval
 > protocol and is what `main_SNR_joint.py` / `main_iter_joint.py` use.
+
+### Soft vs. hard `S` during training
+
+Inside every `JointUnfoldedLayer`, `S` is **always soft** (row-stochastic,
+refined by gradient ascent). Whether the `S` *returned by `forward`* is soft or
+hard depends on the `hard` flag, which is applied **once at the end of `forward`**
+via a straight-through estimator (STE):
+
+```python
+if hard:
+    winners = S.argmax(dim=-1)          # (B, Nt)
+    S_hard = torch.zeros_like(S)
+    S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+    S = S_hard - S.detach() + S         # STE: hard value, soft grad
+```
+
+The STE makes the **forward value** of the returned `S` a hard one-hot, while the
+**gradient still flows through the soft `S`** (argmax is non-differentiable, so
+without this the mask would get zero gradient and never learn a good hard mask).
+
+`main_train_joint.py` sets `hard_mode` as follows:
+
+- **`fixed` variant**: `hard_mode = True` from **epoch 0** — the returned `S` is
+  hard (one-hot, via STE) for the whole training run. This keeps the training
+  objective consistent with evaluation and avoids an abrupt soft→hard loss jump.
+- **`selection` variant**: `hard_mode = False` for most epochs (returned `S` is
+  soft), then `hard=True` in the last `JOINT_HARD_FINAL = 5` epochs (with `tau`
+  pinned to `JOINT_TAU_END`).
+
+So the statement "S is always soft during training" is only true *inside the
+unfolded layers*; the final `S` handed to the loss is hard (one-hot) for the
+`fixed` variant throughout, and for the `selection` variant only in the final
+epochs.
+
+**Is the argmax hardening at evaluation correct?** Yes. `main_iter_joint.py`
+(line 73) and `main_SNR_joint.py` harden the soft `S` with the same
+`argmax → one-hot` operation the model's own `forward` applies with `hard=True`,
+so the evaluation protocol is exactly consistent with training. In
+`main_iter_joint.py` the manual unroll hardens `S` **only for the tracked
+objective** while keeping the soft `S` for the next layer — mirroring the STE
+training path (hard forward value, soft gradient).
 
 ## Physics
 
@@ -171,7 +220,7 @@ flowchart TB
     MM --> LAYERS
 
     OUT --> LOSS["loss = get_joint_loss(F, S, W, H, M_matrix, OMEGA, xi_0, Pt)<br/>= -(OMEGA * R + mean(log CRLB^-1))<br/>skip_unit_modulus semantics"]
-    LOSS --> BP["loss.backward()<br/>grad: loss -> (rate|crb) -> F_eff=F*S -> F, S, W<br/>-> layers' mu/kappa/lambda + selection_net"]
+    LOSS --> BP["loss.backward()<br/>grad: loss -> (rate|crb) -> F_eff=F*S -> F, S, W<br/>-> layers' step_size + selection_net"]
     BP --> OPT["clip_grad_norm_(1.0) + optimizer.step()"]
     OPT --> LAYERS
     OPT --> SEL
@@ -252,7 +301,7 @@ It also sanity-checks `project_to_simplex_rows`. Current output: `grad_F` diff
 > The original hand-derived formula `2*real(conj(F)*grad_F_eff)` is the *true*
 > gradient `∂g/∂S` and does **not** match autograd; the test caught this and the
 > factor was dropped to keep `grad_F` and `grad_S` on the same scale (the learned
-> `kappa` absorbs any residual scaling).
+> `step_size[0, 1]` absorbs any residual scaling).
 
 ## Verification
 
@@ -311,6 +360,6 @@ Requirements: Python 3.10+, PyTorch 2.x, existing repo data
 | `main_SNR_joint.py`     | SNR sweep + plots (objective / rate / CRLB vs SNR)                     |
 | `main_iter_joint.py`    | Layer-by-layer unroll + convergence plots                              |
 | `test_gradients.py`     | Chain-rule gradient cross-check + simplex projection check             |
-| `system_config.py`      | System + training hyper-parameters, `A_dot`, `R_N_inv`, `OMEGA`        |
+| `system_config.py`      | System + training hyper-parameters, `A_dot`, `R_N_inv`, `OMEGA`, `step_size_joint` |
 | `SelectionNet.py`       | MLP + Gumbel-softmax used to produce `S_0`                             |
 | `PGA_models.py` / `utility.py` | Legacy physics sources that the B-only gradients are adapted from |
