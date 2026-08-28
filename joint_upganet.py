@@ -228,12 +228,21 @@ class JointUnfoldedLayer(nn.Module):
 
     Learnable parameters
     ---------------------
-    mu     : (J,) per-inner-step step size for the analog precoder F.
-    kappa  : (J,) per-inner-step step size for the connection matrix S.
-    lambda_: ()   single scalar step size for W (once per outer iteration).
+    step_size : (J, 3) per-inner-step step sizes, mirroring the ``step_size``
+        tensor of ``PGA_models.PGA_Unfold_JX`` (which is ``[J, I, K+1]``; here
+        each layer is one outer iteration, so the outer dim is dropped).  The
+        tensor is defined in ``system_config.py`` (``step_size_joint``) and
+        passed into the constructor, exactly like ``PGA_Unfold_JX``.  The three
+        columns are:
+            step_size[j, 0] : step size for the analog precoder F at inner step j.
+            step_size[0, 1] : step size for the connection matrix S (once per
+                              outer iteration, so only row 0 is used).
+            step_size[0, 2] : step size for the digital precoder W (once per
+                              outer iteration, so only row 0 is used).
     """
 
     def __init__(self, n_antennas: int, n_rf_chains: int, n_users: int, n_inner_steps: int,
+                 step_size: torch.Tensor | None = None,
     ) -> None:
         super().__init__()
 
@@ -242,14 +251,13 @@ class JointUnfoldedLayer(nn.Module):
         self.n_users = n_users
         self.n_inner_steps = n_inner_steps
 
-        # Per-inner-step scalar step sizes for F and S.
-        self.mu = nn.Parameter(torch.full((n_inner_steps,), 1e-2))
-        self.kappa = nn.Parameter(torch.full((n_inner_steps,), 1e-2))
-        # One scalar step size for W, applied once per outer iteration.
-        # Initialised larger (0.1) than the legacy 1e-2 so the W update is
-        # comparable in magnitude to the fixed sub-connected baseline's
-        # per-outer-iteration W step (mean ~0.4), avoiding slow W convergence.
-        self.lambda_ = nn.Parameter(torch.tensor(1e-1))
+        # Per-inner-step step sizes for F, S and W, laid out like PGA_models'
+        # ``step_size`` tensor (columns: 0 = F, 1 = S, 2 = W).  Passed in from
+        # ``system_config.step_size_joint`` (mirroring ``PGA_Unfold_JX``); a
+        # default is created only if none is supplied.
+        if step_size is None:
+            step_size = torch.full((n_inner_steps, 3), 1e-2)
+        self.step_size = nn.Parameter(step_size)
 
     def forward(self, F: torch.Tensor, S: torch.Tensor, W: torch.Tensor, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float, P_BS: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -290,15 +298,18 @@ class JointUnfoldedLayer(nn.Module):
             grad_F = S_hat * grad_F_eff                 # complex * real
             grad_S = torch.real(torch.conj(F_hat) * grad_F_eff)  # real
 
-            F_hat = F_hat + self.mu[j] * grad_F
-            S_hat = S_hat + self.kappa[j] * grad_S
+            F_hat = F_hat + self.step_size[j, 0] * grad_F
 
             # Project F onto unit modulus (full projection; the active mask is
             # carried by S separately in this version).
             F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
 
-            # Project each row of S onto the probability simplex.
-            S_hat = project_to_simplex_rows(S_hat)
+        # ---- S (mask) update: once per outer iteration, after the inner F loop
+        # and before the W update.  Uses the gradient from the last inner step.
+        S_hat = S_hat + self.step_size[0, 1] * grad_S
+
+        # Project each row of S onto the probability simplex.
+        S_hat = project_to_simplex_rows(S_hat)
 
         F_new, S_new = F_hat, S_hat
 
@@ -306,7 +317,7 @@ class JointUnfoldedLayer(nn.Module):
         F_eff_new = F_new * S_new
         grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)
 
-        W_new = W + self.lambda_ * grad_W
+        W_new = W + self.step_size[0, 2] * grad_W
 
         # Power projection: ||F_eff_new W_new||_F^2 == P_BS (per sample).
         prod = F_eff_new @ W_new                            # (B, N_antennas, N_users)
@@ -354,14 +365,8 @@ class JointUPGANet(nn.Module):
     then refines ``(F, S, W)`` jointly over ``n_outer`` outer iterations.
     """
 
-    def __init__(
-        self,
-        n_outer: int,
-        n_inner: int,
-        n_antennas: int,
-        n_rf_chains: int,
-        n_users: int,
-        s_init: str = "selection",
+    def __init__(self, n_outer: int, n_inner: int, n_antennas: int, n_rf_chains: int, n_users: int, s_init: str = "selection",
+                 step_size: torch.Tensor | None = None,
     ) -> None:
         super().__init__()
 
@@ -379,29 +384,23 @@ class JointUPGANet(nn.Module):
 
         if s_init == "fixed":
             self.register_buffer("fixed_s0",build_fixed_subconnected_mask(n_antennas, n_rf_chains))
+
+        # Step sizes mirror ``PGA_Unfold_JX``: a ``[J, I, 3]`` tensor defined in
+        # ``system_config.step_size_joint`` and passed into the constructor.
+        # Each unfolded layer (one outer iteration) owns its ``[J, 3]`` slice
+        # as an independent ``nn.Parameter`` (cloned so layers do not share
+        # storage).  If none is supplied, a default is created.
+        if step_size is None:
+            step_size = torch.full((n_inner, n_outer, 3), 1e-2)
         self.layers = nn.ModuleList(
             [
-                JointUnfoldedLayer(
-                    n_antennas=n_antennas,
-                    n_rf_chains=n_rf_chains,
-                    n_users=n_users,
-                    n_inner_steps=n_inner,
-                )
-                for _ in range(n_outer)
+                JointUnfoldedLayer(n_antennas=n_antennas, n_rf_chains=n_rf_chains, n_users=n_users, n_inner_steps=n_inner,
+                                   step_size=step_size[:, ii, :].clone())
+                for ii in range(n_outer)
             ]
         )
 
-    def forward(
-        self,
-        F0: torch.Tensor,
-        W0: torch.Tensor,
-        H: torch.Tensor,
-        psi0: torch.Tensor,
-        M_matrix: torch.Tensor,
-        omega: float,
-        P_BS: torch.Tensor,
-        tau: float = 1.0,
-        hard: bool = False,
+    def forward(self, F0: torch.Tensor, W0: torch.Tensor, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float, P_BS: torch.Tensor, tau: float = 1.0, hard: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Run the full unfolded network.
 

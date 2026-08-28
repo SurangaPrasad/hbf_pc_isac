@@ -54,7 +54,7 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test):
     model = JointUPGANet(
         n_outer=N_OUTER, n_inner=N_INNER,
         n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
-        s_init=s_init,
+        s_init=s_init, step_size=step_size_joint,
     ).to(device)
     model.load_state_dict(torch.load(joint_model_path(s_init), map_location=device))
     model.eval()

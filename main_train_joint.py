@@ -67,7 +67,7 @@ def main(s_init: str = "selection"):
     # ---- Sensing Fisher-like matrix in antenna space (shared across batch).
     M_matrix = (A_dot.conj().T @ R_N_inv @ A_dot).to(H_train.device)   # (Nt, Nt)
 
-    model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
+    model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init, step_size=step_size_joint).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=JOINT_LR)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)

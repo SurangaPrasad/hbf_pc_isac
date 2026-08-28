@@ -134,6 +134,10 @@ step_size_UPGA_J10_decay = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], s
 step_size_UPGA_J20_decay = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # J_GradReuse uses the same shape as J10; gradient reuse logic is handled inside execute_PGA
 step_size_UPGA_J_GradReuse = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+# JointUPGANet step sizes: [J, I, 3] with columns (F, S, W), mirroring the
+# [J, I, K+1] layout of the UPGA step sizes above (K+1 = 2 columns there for
+# F and W; the joint model adds a third column for the connection matrix S).
+step_size_joint = torch.full([n_iter_inner_J5, n_iter_outer, 3], step_size_fixed, device=device, requires_grad=True)
 
 # # ========================== Initialize step sizes seperately for lambda and mu ============
 # step_size_lambda = torch.diag([Nt, M], step_size_fixed, requires_grad=True)
