@@ -533,6 +533,49 @@ def get_joint_loss(F: torch.Tensor, S: torch.Tensor, W: torch.Tensor, H: torch.T
     return -(omega * rate + crb)
 
 
+def load_joint_state_dict(model: nn.Module, state: dict, n_inner: int) -> None:
+    """Load a JointUPGANet state_dict, remapping the legacy step-size keys.
+
+    Older checkpoints stored the per-layer step sizes as three separate
+    parameters ``layers.<i>.mu`` (J,), ``layers.<i>.kappa`` (scalar) and
+    ``layers.<i>.lambda_`` (scalar).  The current model instead stores a single
+    ``layers.<i>.step_size`` tensor of shape ``(J, 3)`` with columns
+    ``(F, S, W)``.  This helper detects the legacy layout and rebuilds the
+    ``step_size`` tensors from ``mu`` / ``kappa`` / ``lambda_`` so old
+    checkpoints load without retraining.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The ``JointUPGANet`` instance to load into.
+    state : dict
+        The raw ``state_dict`` (e.g. from ``torch.load``).
+    n_inner : int
+        Number of inner steps J (used to size the ``mu`` column).
+    """
+    # Detect the legacy layout: any key ending in ".mu".
+    if any(k.endswith(".mu") for k in state):
+        new_state = {}
+        for k, v in state.items():
+            if k.endswith(".mu"):
+                prefix = k[:-len(".mu")]
+                mu = v
+                kappa = state.get(prefix + ".kappa", torch.tensor(1e-2))
+                lam = state.get(prefix + ".lambda_", torch.tensor(1e-2))
+                # Build (J, 3): col0 = mu (J,), col1 = kappa (scalar), col2 = lambda_ (scalar).
+                step = torch.zeros(n_inner, 3, dtype=mu.dtype, device=mu.device)
+                step[:, 0] = mu
+                step[0, 1] = kappa
+                step[0, 2] = lam
+                new_state[prefix + ".step_size"] = step
+            elif k.endswith(".kappa") or k.endswith(".lambda_"):
+                continue  # folded into step_size above
+            else:
+                new_state[k] = v
+        state = new_state
+    model.load_state_dict(state, strict=False)
+
+
 def initialize_joint(H: torch.Tensor, Pt, n_rf_chains: int):
     """Initial (F0, W0) for the joint network.
 

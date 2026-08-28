@@ -31,6 +31,7 @@ from SelectionNet import SelectionNet
 from main_selection import load_pretrained_upga, REDERIVE_DIGITAL_W
 from joint_upganet import (
     JointUPGANet, get_sum_rate_joint, get_crb_joint, initialize_joint,
+    load_joint_state_dict,
 )
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -56,7 +57,7 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test):
         n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
         s_init=s_init, step_size=step_size_joint,
     ).to(device)
-    model.load_state_dict(torch.load(joint_model_path(s_init), map_location=device))
+    load_joint_state_dict(model, torch.load(joint_model_path(s_init), map_location=device), N_INNER)
     model.eval()
 
     obj = np.zeros(len(snr_dB_list))

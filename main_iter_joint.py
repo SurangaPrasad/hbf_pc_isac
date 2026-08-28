@@ -27,7 +27,7 @@ from utility import get_data_tensor, safe_legend
 from PGA_models import PGA_Unfold_JX, PGA_Unfold_JX_partial
 from joint_upganet import (
     JointUPGANet, build_fixed_subconnected_mask,
-    get_sum_rate_joint, get_crb_joint, initialize_joint,
+    get_sum_rate_joint, get_crb_joint, initialize_joint, load_joint_state_dict,
 )
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -55,7 +55,7 @@ def unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True):
     """JointUPGANet (fixed init); optionally loads the trained state_dict."""
     model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init='fixed', step_size=step_size_joint).to(device)
     if trained:
-        model.load_state_dict(torch.load(joint_model_path('fixed'), map_location=device))
+        load_joint_state_dict(model, torch.load(joint_model_path('fixed'), map_location=device), N_INNER)
     model.eval()
 
     obj_iter = np.zeros(N_OUTER)
