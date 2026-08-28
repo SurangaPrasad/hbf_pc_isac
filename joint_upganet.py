@@ -337,7 +337,7 @@ class JointUPGANet(nn.Module):
                 # / half of the analytic steepest-ascent gradient), so no factor
                 # of 2 on the S gradient.
                 grad_F = S_hat * grad_F_eff                      # complex * real
-                grad_S = torch.real(torch.conj(F_hat) * grad_F_eff)  # real
+                grad_S = 2 * torch.real(torch.conj(F_hat) * grad_F_eff)  # real
 
                 F_hat = F_hat + self.step_size[j, ii, 0] * grad_F
 
