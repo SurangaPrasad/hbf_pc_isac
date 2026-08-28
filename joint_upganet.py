@@ -261,7 +261,7 @@ class JointUPGANet(nn.Module):
     """
 
     def __init__(self, step_size: torch.Tensor, n_antennas: int, n_rf_chains: int, n_users: int,
-                 s_init: str = "selection",
+                 s_init: str = "fixed",
     ) -> None:
         super().__init__()
 
