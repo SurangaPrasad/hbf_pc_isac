@@ -148,7 +148,7 @@ def main():
     plt.plot(iter_x, obj_joint_tr, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), trained')
     # plt.plot(iter_x, obj_joint_un, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), untrained')
     plt.plot(iter_x, obj_sub_tr, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, trained')
-    plt.plot(iter_x, obj_sub_un, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, untrained')
+    # plt.plot(iter_x, obj_sub_un, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, untrained')
     plt.plot(iter_x, obj_full_tr, '--d', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, trained')
     # plt.plot(iter_x, obj_full_un, '--d', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, untrained')
 
