@@ -352,6 +352,20 @@ class JointUPGANet(nn.Module):
                 S_hat = S_hat + self.step_size[j, ii, 1] * grad_S
                 S_hat = project_to_simplex_rows(S_hat)
 
+                # ---- Hard mask with straight-through estimator (every step) --
+                # In hard mode the FORWARD value of S is the discrete one-hot
+                # assignment at every inner step, so the physics (F_eff, the W
+                # update, the metrics) always sees exactly the sub-connected
+                # mask that evaluation will use -- no train/eval mismatch.
+                # The BACKWARD pass flows through the soft simplex-projected S
+                # (argmax is non-differentiable), so the step sizes and
+                # SelectionNet still receive useful gradients.
+                if hard:
+                    winners = S_hat.argmax(dim=-1)               # (B, Nt)
+                    S_hard = torch.zeros_like(S_hat)
+                    S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+                    S_hat = S_hard - S_hat.detach() + S_hat      # STE
+
             F, S = F_hat, S_hat
 
             # ---- W update (once per outer iteration) --------------------------
@@ -380,10 +394,10 @@ class JointUPGANet(nn.Module):
                 rate_over_iters[ii] = get_sum_rate_joint(H, F_eff_m, W, Pt).detach()
                 crb_over_iters[ii] = torch.mean(get_crb_joint(F_eff_m, W, M_matrix, xi_0, Pt)).detach()
 
-        # ---- Hard sub-connected mask at the end (straight-through estimator) --
-        # The forward value is the hard one-hot, but the gradient flows through
-        # the soft S (argmax is non-differentiable, so without this the mask
-        # would get zero gradient during the hard training epochs).
+        # ---- Final hard mask (straight-through estimator) ---------------------
+        # In hard mode S already carries the hard one-hot forward value from the
+        # inner loop; this final STE just re-asserts the discrete value on the
+        # returned tensor (gradient still flows through the soft simplex S).
         if hard:
             winners = S.argmax(dim=-1)                           # (B, Nt)
             S_hard = torch.zeros_like(S)
