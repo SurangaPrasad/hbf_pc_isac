@@ -537,7 +537,7 @@ def load_joint_state_dict(model: nn.Module, state: dict, n_inner: int) -> None:
     """Load a JointUPGANet state_dict, remapping the legacy step-size keys.
 
     Older checkpoints stored the per-layer step sizes as three separate
-    parameters ``layers.<i>.mu`` (J,), ``layers.<i>.kappa`` (scalar) and
+    parameters ``layers.<i>.mu`` (J,), ``layers.<i>.kappa`` (J,) and
     ``layers.<i>.lambda_`` (scalar).  The current model instead stores a single
     ``layers.<i>.step_size`` tensor of shape ``(J, 3)`` with columns
     ``(F, S, W)``.  This helper detects the legacy layout and rebuilds the
@@ -562,11 +562,14 @@ def load_joint_state_dict(model: nn.Module, state: dict, n_inner: int) -> None:
                 mu = v
                 kappa = state.get(prefix + ".kappa", torch.tensor(1e-2))
                 lam = state.get(prefix + ".lambda_", torch.tensor(1e-2))
-                # Build (J, 3): col0 = mu (J,), col1 = kappa (scalar), col2 = lambda_ (scalar).
+                # Build (J, 3): col0 = mu (J,), col1 = kappa, col2 = lambda_.
+                # kappa may be a (J,) vector (per-inner-step) or a scalar; the
+                # current forward uses only step_size[0, 1] for S, so take the
+                # first entry.  lambda_ is a scalar (or vector -> first entry).
                 step = torch.zeros(n_inner, 3, dtype=mu.dtype, device=mu.device)
                 step[:, 0] = mu
-                step[0, 1] = kappa
-                step[0, 2] = lam
+                step[0, 1] = kappa.reshape(-1)[0]
+                step[0, 2] = lam.reshape(-1)[0]
                 new_state[prefix + ".step_size"] = step
             elif k.endswith(".kappa") or k.endswith(".lambda_"):
                 continue  # folded into step_size above
