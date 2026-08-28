@@ -53,9 +53,9 @@ def to_joint_channel(H_kb: torch.Tensor) -> torch.Tensor:
 def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test):
     """Run one JointUPGANet variant over the SNR list; return (obj, rate, crlb)."""
     model = JointUPGANet(
-        n_outer=N_OUTER, n_inner=N_INNER,
+        step_size=step_size_joint,
         n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
-        s_init=s_init, step_size=step_size_joint,
+        s_init=s_init,
     ).to(device)
     load_joint_state_dict(model, torch.load(joint_model_path(s_init), map_location=device), N_INNER)
     model.eval()
@@ -68,8 +68,9 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test):
         snr_ss = 10 ** (snr_dB / 10)
         snr_t = torch.full((B_test,), snr_ss, dtype=torch.float32, device=device)
         with torch.no_grad():
-            F0, W0 = initialize_joint(H_joint, snr_t, Nrf)
-            F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_t, tau=0.05, hard=True)
+            _, _, F, S, W = model.execute_PGA(
+                H_joint, psi0, M_matrix, OMEGA, snr_t,
+                N_OUTER, N_INNER, xi_0, tau=0.05, hard=True, track_metrics=False)
             F_eff = F * S
             r = get_sum_rate_joint(H_joint, F_eff, W, snr_t)
             c = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0, snr_t))

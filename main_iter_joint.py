@@ -53,28 +53,18 @@ def default_upga_step_size() -> torch.Tensor:
 
 def unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True):
     """JointUPGANet (fixed init); optionally loads the trained state_dict."""
-    model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init='fixed', step_size=step_size_joint).to(device)
+    model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init='fixed').to(device)
     if trained:
         load_joint_state_dict(model, torch.load(joint_model_path('fixed'), map_location=device), N_INNER)
     model.eval()
 
-    obj_iter = np.zeros(N_OUTER)
     with torch.no_grad():
-        F0, W0 = initialize_joint(H_joint, snr_t, Nrf)
-        S = model.fixed_s0.expand(H_joint.shape[0], -1, -1).clone()
-        F, W = F0, W0
-        for ii, layer in enumerate(model.layers):
-            F, S, W = layer(F, S, W, H_joint, psi0, M_matrix, OMEGA, snr_t)
-            # Report the objective with a HARD one-hot sub-connected mask
-            # (one RF chain per antenna), matching the eval protocol. The soft
-            # S is kept for the next layer (the network is trained with soft S);
-            # only the tracked objective uses the hardened mask.
-            S_hard = torch.zeros_like(S)
-            S_hard.scatter_(-1, S.argmax(dim=-1).unsqueeze(-1), 1.0)
-            F_eff = F * S_hard
-            r = get_sum_rate_joint(H_joint, F_eff, W, snr_t)
-            c = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0, snr_t))
-            obj_iter[ii] = OMEGA * r.item() + c.item()
+        # track_metrics=True reports the objective after every outer iteration
+        # using a HARD one-hot sub-connected mask (matching the eval protocol).
+        rate_iter, crb_iter, _, _, _ = model.execute_PGA(
+            H_joint, psi0, M_matrix, OMEGA, snr_t,
+            N_OUTER, N_INNER, xi_0, tau=1.0, hard=True, track_metrics=True)
+    obj_iter = OMEGA * rate_iter.cpu().numpy() + crb_iter.cpu().numpy()
     return obj_iter
 
 
@@ -92,7 +82,7 @@ def unroll_upga(H_test, mask=None, trained=True):
         model_path = model_file_name_UPGA_J5
     else:
         model = PGA_Unfold_JX_partial(step_size, mask=mask).to(device)
-        model_path = model_file_name_UPGA_J5
+        model_path = model_file_name_UPGA_partial_J5
 
     if trained:
         state = torch.load(model_path, map_location=device)

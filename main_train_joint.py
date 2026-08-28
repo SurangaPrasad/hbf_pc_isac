@@ -67,7 +67,7 @@ def main(s_init: str = "selection"):
     # ---- Sensing Fisher-like matrix in antenna space (shared across batch).
     M_matrix = (A_dot.conj().T @ R_N_inv @ A_dot).to(H_train.device)   # (Nt, Nt)
 
-    model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init, step_size=step_size_joint).to(device)
+    model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=JOINT_LR)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
@@ -107,11 +107,10 @@ def main(s_init: str = "selection"):
             H_joint = to_joint_channel(H_batch).to(device)          # (B, Nt, M)
             psi0 = torch.full((cur_bs,), desired_angle_rad_torch, device=device)
 
-            # Re-initialise F0 / W0 from the channel (per batch).
-            F0, W0 = initialize_joint(H_joint, snr_train, Nrf)
-
             # tau/hard only affect the 'selection' variant (ignored for 'fixed').
-            F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_train,tau=tau, hard=hard_mode)
+            _, _, F, S, W = model.execute_PGA(
+                H_joint, psi0, M_matrix, OMEGA, snr_train,
+                N_OUTER, N_INNER, xi_0, tau=tau, hard=hard_mode, track_metrics=False)
 
             loss = get_joint_loss(F, S, W, H_joint, M_matrix, OMEGA, xi_0, snr_train)
 

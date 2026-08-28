@@ -215,125 +215,7 @@ def get_grad_W_crb(F: torch.Tensor, W: torch.Tensor, M_matrix: torch.Tensor) -> 
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////
-#                             TASK 2: ONE UNFOLDED OUTER ITERATION
-# /////////////////////////////////////////////////////////////////////////////////////////
-
-class JointUnfoldedLayer(nn.Module):
-    """One outer iteration of the joint unfolded PGA (with J inner steps).
-
-    Each outer iteration runs J inner steps that jointly ascend the objective
-    in ``F`` and ``S`` (the "hat" variables F_hat / S_hat of the inner loop),
-    then performs a single ``W`` update followed by the transmit-power
-    projection ``||F_eff W||_F^2 == P_BS``.
-
-    Learnable parameters
-    ---------------------
-    step_size : (J, 3) per-inner-step step sizes, mirroring the ``step_size``
-        tensor of ``PGA_models.PGA_Unfold_JX`` (which is ``[J, I, K+1]``; here
-        each layer is one outer iteration, so the outer dim is dropped).  The
-        tensor is defined in ``system_config.py`` (``step_size_joint``) and
-        passed into the constructor, exactly like ``PGA_Unfold_JX``.  The three
-        columns are:
-            step_size[j, 0] : step size for the analog precoder F at inner step j.
-            step_size[0, 1] : step size for the connection matrix S (once per
-                              outer iteration, so only row 0 is used).
-            step_size[0, 2] : step size for the digital precoder W (once per
-                              outer iteration, so only row 0 is used).
-    """
-
-    def __init__(self, n_antennas: int, n_rf_chains: int, n_users: int, n_inner_steps: int,
-                 step_size: torch.Tensor | None = None,
-    ) -> None:
-        super().__init__()
-
-        self.n_antennas = n_antennas
-        self.n_rf_chains = n_rf_chains
-        self.n_users = n_users
-        self.n_inner_steps = n_inner_steps
-
-        # Per-inner-step step sizes for F, S and W, laid out like PGA_models'
-        # ``step_size`` tensor (columns: 0 = F, 1 = S, 2 = W).  Passed in from
-        # ``system_config.step_size_joint`` (mirroring ``PGA_Unfold_JX``); a
-        # default is created only if none is supplied.
-        if step_size is None:
-            step_size = torch.full((n_inner_steps, 3), 1e-2)
-        self.step_size = nn.Parameter(step_size)
-
-    def forward(self, F: torch.Tensor, S: torch.Tensor, W: torch.Tensor, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float, P_BS: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Run one unfolded outer iteration.
-
-        Parameters
-        ----------
-        F : (B, N_antennas, N_rf) complex analog precoder (input).
-        S : (B, N_antennas, N_rf) real row-stochastic connection matrix.
-        W : (B, N_rf, N_users) complex digital precoder (input).
-        H : (B, N_antennas, N_users) complex channel.
-        psi0 : (B,) sensing direction (reserved; unused by the current stubs).
-        M_matrix : (B, N_antennas, N_antennas) Hermitian PSD sensing Fisher-like
-            matrix (``A_dot^H R_N_inv A_dot``); a shared ``(N_antennas,
-            N_antennas)`` matrix is also accepted and broadcast over the batch.
-        omega : float weighting of the comm term in the objective.
-        P_BS : scalar or (B,) transmit power budget for the W projection.
-
-        Returns
-        -------
-        F_new, S_new, W_new : the updated (F, S, W) after this outer iteration.
-        """
-        # ---- Inner loop: joint F / S ascent, J steps --------------------------
-        F_hat = F.clone()
-        S_hat = S.clone()
-
-        for j in range(self.n_inner_steps):
-            F_eff = F_hat * S_hat                       # elementwise (Hadamard)
-
-            # Objective gradient w.r.t. the effective precoder, computed once and
-            # reused for both the F and S updates below.
-            grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
-
-            # Chain rule through F_eff = F * S (S real).  Both gradients use the
-            # same convention as grad_F_eff (PyTorch's conjugate-Wirtinger / half
-            # of the analytic steepest-ascent gradient), so no factor of 2 on the
-            # S gradient (which would otherwise be inconsistent with grad_F).
-            grad_F = S_hat * grad_F_eff                 # complex * real
-            grad_S = torch.real(torch.conj(F_hat) * grad_F_eff)  # real
-
-            F_hat = F_hat + self.step_size[j, 0] * grad_F
-
-            # Project F onto unit modulus (full projection; the active mask is
-            # carried by S separately in this version).
-            F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
-
-        # ---- S (mask) update: once per outer iteration, after the inner F loop
-        # and before the W update.  Uses the gradient from the last inner step.
-        S_hat = S_hat + self.step_size[0, 1] * grad_S
-
-        # Project each row of S onto the probability simplex.
-        S_hat = project_to_simplex_rows(S_hat)
-
-        F_new, S_new = F_hat, S_hat
-
-        # ---- W update (once per outer iteration) ------------------------------
-        F_eff_new = F_new * S_new
-        grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)
-
-        W_new = W + self.step_size[0, 2] * grad_W
-
-        # Power projection: ||F_eff_new W_new||_F^2 == P_BS (per sample).
-        prod = F_eff_new @ W_new                            # (B, N_antennas, N_users)
-        fro_norm = torch.linalg.matrix_norm(prod, dim=(-2, -1))  # (B,)
-        fro_norm = fro_norm.clamp_min(1e-8)
-        P_BS_vec = torch.as_tensor(P_BS, device=W_new.device, dtype=W_new.real.dtype)
-        scale = torch.sqrt(P_BS_vec) / fro_norm             # (B,) or scalar
-        while scale.dim() < W_new.dim():
-            scale = scale.unsqueeze(-1)
-        W_new = scale * W_new
-
-        return F_new, S_new, W_new
-
-
-# /////////////////////////////////////////////////////////////////////////////////////////
-#                             TASK 3: FULL UNFOLDED NETWORK
+#                             TASK 2: FULL UNFOLDED NETWORK
 # /////////////////////////////////////////////////////////////////////////////////////////
 
 def build_fixed_subconnected_mask(n_antennas: int, n_rf_chains: int) -> torch.Tensor:
@@ -356,25 +238,37 @@ def build_fixed_subconnected_mask(n_antennas: int, n_rf_chains: int) -> torch.Te
 
 
 class JointUPGANet(nn.Module):
-    """Full joint deep-unfolding network: initial S_0 + I unfolded layers.
+    """Joint deep-unfolding PGA, structured like ``PGA_models.PGA_Unfold_JX``.
+
+    A single module that runs the whole unfolded projected-gradient-ascent in
+    ``execute_PGA`` (mirroring ``PGA_Unfold_JX.execute_PGA``): the connection
+    matrix ``S`` is optimised jointly with the analog precoder ``F`` and the
+    digital precoder ``W`` inside the same unfolded iterations.
 
     The initial connection matrix ``S_0`` is either produced by ``SelectionNet``
     from the channel and sensing direction (``s_init='selection'``) or taken as
     the fixed block sub-connected mask (``s_init='fixed'``, every RF chain serves
-    ``N_antennas / N_rf`` antennas).  A stack of ``JointUnfoldedLayer`` modules
-    then refines ``(F, S, W)`` jointly over ``n_outer`` outer iterations.
+    ``N_antennas / N_rf`` antennas).
+
+    Learnable parameters
+    ---------------------
+    step_size : (J, I, 3) per-inner-step step sizes, exactly like the
+        ``step_size`` tensor of ``PGA_Unfold_JX`` (``[J, I, K+1]``) but with a
+        third column for the connection matrix S.  Columns:
+            step_size[j, ii, 0] : step size for F at inner step j, outer iter ii.
+            step_size[0, ii, 1] : step size for S (once per outer iteration).
+            step_size[0, ii, 2] : step size for W (once per outer iteration).
     """
 
-    def __init__(self, n_outer: int, n_inner: int, n_antennas: int, n_rf_chains: int, n_users: int, s_init: str = "selection",
-                 step_size: torch.Tensor | None = None,
+    def __init__(self, step_size: torch.Tensor, n_antennas: int, n_rf_chains: int, n_users: int,
+                 s_init: str = "selection",
     ) -> None:
         super().__init__()
 
         assert s_init in ("selection", "fixed"), \
             f"s_init must be 'selection' or 'fixed', got {s_init!r}"
 
-        self.n_outer = n_outer
-        self.n_inner = n_inner
+        self.step_size = nn.Parameter(step_size)   # (J, I, 3): (F, S, W) step sizes
         self.n_antennas = n_antennas
         self.n_rf_chains = n_rf_chains
         self.n_users = n_users
@@ -383,76 +277,118 @@ class JointUPGANet(nn.Module):
         self.selection_net = SelectionNet(n_antennas=n_antennas, n_rf_chains=n_rf_chains, n_users=n_users)
 
         if s_init == "fixed":
-            self.register_buffer("fixed_s0",build_fixed_subconnected_mask(n_antennas, n_rf_chains))
+            self.register_buffer("fixed_s0", build_fixed_subconnected_mask(n_antennas, n_rf_chains))
 
-        # Step sizes mirror ``PGA_Unfold_JX``: a ``[J, I, 3]`` tensor defined in
-        # ``system_config.step_size_joint`` and passed into the constructor.
-        # Each unfolded layer (one outer iteration) owns its ``[J, 3]`` slice
-        # as an independent ``nn.Parameter`` (cloned so layers do not share
-        # storage).  If none is supplied, a default is created.
-        if step_size is None:
-            step_size = torch.full((n_inner, n_outer, 3), 1e-2)
-        self.layers = nn.ModuleList(
-            [
-                JointUnfoldedLayer(n_antennas=n_antennas, n_rf_chains=n_rf_chains, n_users=n_users, n_inner_steps=n_inner,
-                                   step_size=step_size[:, ii, :].clone())
-                for ii in range(n_outer)
-            ]
-        )
-
-    def forward(self, F0: torch.Tensor, W0: torch.Tensor, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float, P_BS: torch.Tensor, tau: float = 1.0, hard: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Run the full unfolded network.
+    def execute_PGA(self, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float,
+                    Pt, n_iter_outer: int, n_iter_inner: int, xi_0,
+                    tau: float = 1.0, hard: bool = False, track_metrics: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Run the full unfolded PGA (mirrors ``PGA_Unfold_JX.execute_PGA``).
 
         Parameters
         ----------
-        F0 : (B, N_antennas, N_rf) complex initial analog precoder.
-        W0 : (B, N_rf, N_users) complex initial digital precoder.
         H : (B, N_antennas, N_users) complex channel.
         psi0 : (B,) sensing direction (feeding SelectionNet when ``s_init='selection'``).
         M_matrix : (B, N_antennas, N_antennas) Hermitian PSD sensing Fisher-like
             matrix (``A_dot^H R_N_inv A_dot``).
         omega : float comm/sensing weighting.
-        P_BS : scalar or (B,) transmit power budget.
+        Pt : scalar or (B,) transmit power budget.
+        n_iter_outer : int number of outer iterations I.
+        n_iter_inner : int number of inner steps J per outer iteration.
+        xi_0 : sensing reference amplitude (for the CRLB metric).
         tau : Gumbel-softmax temperature for SelectionNet.
-        hard : straight-through one-hot mode for SelectionNet's S_0.
+        hard : straight-through one-hot mode for the final S.
+        track_metrics : whether to record per-iteration rate / CRLB.
 
         Returns
         -------
+        rate_over_iters, crb_over_iters : (n_iter_outer,) per-iteration metrics
+            (zeros if ``track_metrics`` is False).
         F, S, W : final (F, S, W) after all outer iterations.
         """
+        B = H.shape[0]
+
+        # ---- Initial connection matrix S_0 ------------------------------------
         if self.s_init == "fixed":
-            # Fixed block sub-connected mask, shared across the batch.
-            S = self.fixed_s0.expand(H.shape[0], -1, -1).clone()  # (B, Nt, Nrf)
+            S = self.fixed_s0.expand(B, -1, -1).clone()          # (B, Nt, Nrf)
         else:
             S0, _ = self.selection_net(H, psi0, tau=tau, hard=hard)
-            # Defensive re-projection in case the Gumbel-softmax output drifts.
-            S = project_to_simplex_rows(S0)
+            S = project_to_simplex_rows(S0)                      # defensive re-projection
 
-        F, W = F0, W0
-        for layer in self.layers:
-            F, S, W = layer(F, S, W, H, psi0, M_matrix, omega, P_BS)
+        # ---- Initial (F0, W0) from the channel (like PGA_Unfold_JX.initialize) --
+        F, W = initialize_joint(H, Pt, self.n_rf_chains)
 
-        # Hard sub-connected mask at evaluation: round each row of S to a
-        # one-hot (one RF chain per antenna). Without this, the soft
-        # row-stochastic S makes F_eff = F*S behave like a (partially)
-        # full-connected precoder, so the joint model's objective collapses
-        # onto the full-connected curve instead of showing a genuine
-        # sub-connected result. Hardening restores the sub-connected structure
-        # the network is meant to produce (mirrors the ``selection`` variant's
-        # ``hard=True`` eval protocol).
-        #
-        # Straight-through estimator (STE): the forward value is the hard
-        # one-hot, but the gradient flows through the soft S (argmax is
-        # non-differentiable, so without this the mask would get zero gradient
-        # during the hard training epochs and never learn a good hard mask).
+        rate_over_iters = torch.zeros(n_iter_outer, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, device=H.device)
+
+        for ii in range(n_iter_outer):
+            # ---- Inner loop: J steps of F ascent (S held fixed) --------------
+            F_hat = F.clone()
+            S_hat = S.clone()
+            for j in range(n_iter_inner):
+                F_eff = F_hat * S_hat                            # elementwise (Hadamard)
+
+                # Objective gradient w.r.t. the effective precoder, computed once
+                # and reused for both the F and S updates below.
+                grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
+
+                # Chain rule through F_eff = F * S (S real).  Both gradients use
+                # the same convention as grad_F_eff (PyTorch's conjugate-Wirtinger
+                # / half of the analytic steepest-ascent gradient), so no factor
+                # of 2 on the S gradient.
+                grad_F = S_hat * grad_F_eff                      # complex * real
+                grad_S = torch.real(torch.conj(F_hat) * grad_F_eff)  # real
+
+                F_hat = F_hat + self.step_size[j, ii, 0] * grad_F
+
+                # Project F onto unit modulus (full projection; the active mask
+                # is carried by S separately in this version).
+                F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
+
+            # ---- S (mask) update: once per outer iteration, after the inner F
+            # loop and before the W update.  Uses the gradient from the last
+            # inner step.
+            S_hat = S_hat + self.step_size[0, ii, 1] * grad_S
+            S_hat = project_to_simplex_rows(S_hat)
+            F, S = F_hat, S_hat
+
+            # ---- W update (once per outer iteration) --------------------------
+            F_eff_new = F * S
+            grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)
+            W = W + self.step_size[0, ii, 2] * grad_W
+
+            # Power projection: ||F_eff_new W||_F^2 == Pt (per sample).
+            prod = F_eff_new @ W                                 # (B, N_antennas, N_users)
+            fro_norm = torch.linalg.matrix_norm(prod, dim=(-2, -1)).clamp_min(1e-8)  # (B,)
+            P_BS_vec = torch.as_tensor(Pt, device=W.device, dtype=W.real.dtype)
+            scale = torch.sqrt(P_BS_vec) / fro_norm              # (B,) or scalar
+            while scale.dim() < W.dim():
+                scale = scale.unsqueeze(-1)
+            W = scale * W
+
+            # ---- Per-iteration metrics (hard mask for the reported objective) --
+            if track_metrics:
+                S_metric = S
+                if hard:
+                    winners = S.argmax(dim=-1)                   # (B, Nt)
+                    S_hard = torch.zeros_like(S)
+                    S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+                    S_metric = S_hard
+                F_eff_m = F * S_metric
+                rate_over_iters[ii] = get_sum_rate_joint(H, F_eff_m, W, Pt).detach()
+                crb_over_iters[ii] = torch.mean(get_crb_joint(F_eff_m, W, M_matrix, xi_0, Pt)).detach()
+
+        # ---- Hard sub-connected mask at the end (straight-through estimator) --
+        # The forward value is the hard one-hot, but the gradient flows through
+        # the soft S (argmax is non-differentiable, so without this the mask
+        # would get zero gradient during the hard training epochs).
         if hard:
-            winners = S.argmax(dim=-1)                 # (B, Nt)
+            winners = S.argmax(dim=-1)                           # (B, Nt)
             S_hard = torch.zeros_like(S)
             S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-            S = S_hard - S.detach() + S                # STE: hard value, soft grad
+            S = S_hard - S.detach() + S                          # STE: hard value, soft grad
 
-        return F, S, W
+        return rate_over_iters, crb_over_iters, F, S, W
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////
@@ -539,9 +475,9 @@ def load_joint_state_dict(model: nn.Module, state: dict, n_inner: int) -> None:
     Older checkpoints stored the per-layer step sizes as three separate
     parameters ``layers.<i>.mu`` (J,), ``layers.<i>.kappa`` (J,) and
     ``layers.<i>.lambda_`` (scalar).  The current model instead stores a single
-    ``layers.<i>.step_size`` tensor of shape ``(J, 3)`` with columns
-    ``(F, S, W)``.  This helper detects the legacy layout and rebuilds the
-    ``step_size`` tensors from ``mu`` / ``kappa`` / ``lambda_`` so old
+    ``step_size`` tensor of shape ``(J, I, 3)`` with columns ``(F, S, W)``.
+    This helper detects the legacy layout and rebuilds the full ``step_size``
+    tensor from the per-layer ``mu`` / ``kappa`` / ``lambda_`` so old
     checkpoints load without retraining.
 
     Parameters
@@ -555,26 +491,33 @@ def load_joint_state_dict(model: nn.Module, state: dict, n_inner: int) -> None:
     """
     # Detect the legacy layout: any key ending in ".mu".
     if any(k.endswith(".mu") for k in state):
-        new_state = {}
+        # Collect per-layer legacy step sizes.
+        layers = {}
         for k, v in state.items():
             if k.endswith(".mu"):
                 prefix = k[:-len(".mu")]
-                mu = v
-                kappa = state.get(prefix + ".kappa", torch.tensor(1e-2))
-                lam = state.get(prefix + ".lambda_", torch.tensor(1e-2))
-                # Build (J, 3): col0 = mu (J,), col1 = kappa, col2 = lambda_.
-                # kappa may be a (J,) vector (per-inner-step) or a scalar; the
-                # current forward uses only step_size[0, 1] for S, so take the
-                # first entry.  lambda_ is a scalar (or vector -> first entry).
-                step = torch.zeros(n_inner, 3, dtype=mu.dtype, device=mu.device)
-                step[:, 0] = mu
-                step[0, 1] = kappa.reshape(-1)[0]
-                step[0, 2] = lam.reshape(-1)[0]
-                new_state[prefix + ".step_size"] = step
-            elif k.endswith(".kappa") or k.endswith(".lambda_"):
-                continue  # folded into step_size above
-            else:
-                new_state[k] = v
+                layers[prefix] = {
+                    "mu": v,
+                    "kappa": state.get(prefix + ".kappa", torch.tensor(1e-2)),
+                    "lambda_": state.get(prefix + ".lambda_", torch.tensor(1e-2)),
+                }
+
+        # Rebuild the (J, I, 3) step_size tensor from the per-layer values.
+        n_outer = len(layers)
+        step = torch.zeros(n_inner, n_outer, 3,
+                           dtype=next(iter(layers.values()))["mu"].dtype,
+                           device=next(iter(layers.values()))["mu"].device)
+        for ii, prefix in enumerate(sorted(layers, key=lambda p: int(p.rsplit(".", 1)[-1]))):
+            mu = layers[prefix]["mu"]
+            kappa = layers[prefix]["kappa"]
+            lam = layers[prefix]["lambda_"]
+            step[:, ii, 0] = mu
+            step[0, ii, 1] = kappa.reshape(-1)[0]
+            step[0, ii, 2] = lam.reshape(-1)[0]
+
+        new_state = {k: v for k, v in state.items()
+                     if not (k.endswith(".mu") or k.endswith(".kappa") or k.endswith(".lambda_"))}
+        new_state["step_size"] = step
         state = new_state
     model.load_state_dict(state, strict=False)
 
