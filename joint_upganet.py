@@ -268,7 +268,7 @@ class JointUPGANet(nn.Module):
         assert s_init in ("selection", "fixed"), \
             f"s_init must be 'selection' or 'fixed', got {s_init!r}"
 
-        self.step_size = nn.Parameter(step_size)   # (J, I, 3): (F, S, W) step sizes
+        self.step_size = nn.Parameter(step_size.clone())   # (J, I, 3): (F, S, W) step sizes
         self.n_antennas = n_antennas
         self.n_rf_chains = n_rf_chains
         self.n_users = n_users
