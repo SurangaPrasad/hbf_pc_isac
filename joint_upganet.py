@@ -345,12 +345,9 @@ class JointUPGANet(nn.Module):
                 # is carried by S separately in this version).
                 F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
 
-            # ---- S (mask) update: once per outer iteration, after the inner F
-            # loop and before the W update.  Uses the gradient from the last
-            # inner step.
-            S_hat = S_hat + self.step_size[0, ii, 1] * grad_S
-            S_hat = project_to_simplex_rows(S_hat)
-            F, S = F_hat, S_hat
+                S_hat = S_hat + self.step_size[j, ii, 1] * grad_S
+                S_hat = project_to_simplex_rows(S_hat)
+                F, S = F_hat, S_hat
 
             # ---- W update (once per outer iteration) --------------------------
             F_eff_new = F * S
