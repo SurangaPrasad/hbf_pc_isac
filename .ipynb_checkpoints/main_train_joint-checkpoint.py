@@ -30,11 +30,18 @@ from joint_upganet import JointUPGANet, get_joint_loss, initialize_joint
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # ---- Joint-model specific hyper-parameters -------------------------------
-JOINT_LR = 1e-3              # Adam LR (step sizes + SelectionNet)
+JOINT_LR = 5e-3              # Adam LR (step sizes + SelectionNet)
 JOINT_TAU_START = 2.0        # Gumbel temperature at epoch 0
 JOINT_TAU_END = 0.1          # Gumbel temperature at the last epoch
 JOINT_HARD_FINAL = 5         # last N epochs with hard STE (matches eval)
 JOINT_GRAD_CLIP = 1.0        # global grad-norm clip
+
+# Option B: train with the HARD one-hot mask (straight-through estimator) for
+# the WHOLE run, for BOTH variants, so training and evaluation use the same
+# (hard) objective.  This removes the train/eval mismatch that made the hard
+# eval graph worse than the soft one.  The Gumbel temperature is still annealed
+# (it controls the quality of the STE gradient through the soft probabilities).
+JOINT_HARD_ALL = True
 
 # Reuse the legacy outer/inner-iteration schedule (see system_config.py).
 N_OUTER = n_iter_outer        # I outer iterations
@@ -57,7 +64,7 @@ def to_joint_channel(H_kb: torch.Tensor) -> torch.Tensor:
     return H_kb[0].transpose(1, 2)   # strip K, swap users<->antennas
 
 
-def main(s_init: str = "selection"):
+def main(s_init: str = "fixed"):
     assert s_init in ("selection", "fixed")
     torch.manual_seed(3407)
 
@@ -67,7 +74,7 @@ def main(s_init: str = "selection"):
     # ---- Sensing Fisher-like matrix in antenna space (shared across batch).
     M_matrix = (A_dot.conj().T @ R_N_inv @ A_dot).to(H_train.device)   # (Nt, Nt)
 
-    model = JointUPGANet(n_outer=N_OUTER, n_inner=N_INNER, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
+    model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=JOINT_LR)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
@@ -76,7 +83,14 @@ def main(s_init: str = "selection"):
 
     for i_epoch in range(n_epoch):
         tau = anneal_tau(i_epoch, n_epoch)
-        hard_mode = (i_epoch >= n_epoch - JOINT_HARD_FINAL)
+        # Option B: train with a HARD one-hot S (via the straight-through
+        # estimator) from epoch 0 for BOTH variants, so the training objective
+        # matches the hard evaluation protocol.  This avoids the abrupt
+        # soft->hard loss jump and the train/eval mismatch that made the hard
+        # eval graph worse than the soft one.  The Gumbel temperature is still
+        # annealed because it controls the STE gradient quality through the
+        # soft probabilities.
+        hard_mode = JOINT_HARD_ALL
         if hard_mode:
             tau = JOINT_TAU_END
 
@@ -97,11 +111,10 @@ def main(s_init: str = "selection"):
             H_joint = to_joint_channel(H_batch).to(device)          # (B, Nt, M)
             psi0 = torch.full((cur_bs,), desired_angle_rad_torch, device=device)
 
-            # Re-initialise F0 / W0 from the channel (per batch).
-            F0, W0 = initialize_joint(H_joint, snr_train, Nrf)
-
             # tau/hard only affect the 'selection' variant (ignored for 'fixed').
-            F, S, W = model(F0, W0, H_joint, psi0, M_matrix, OMEGA, snr_train,tau=tau, hard=hard_mode)
+            _, _, F, S, W = model.execute_PGA(
+                H_joint, psi0, M_matrix, OMEGA, snr_train,
+                N_OUTER, N_INNER, xi_0, tau=tau, hard=hard_mode, track_metrics=False)
 
             loss = get_joint_loss(F, S, W, H_joint, M_matrix, OMEGA, xi_0, snr_train)
 
@@ -135,7 +148,7 @@ def main(s_init: str = "selection"):
 
 
 if __name__ == "__main__":
-    s_init = sys.argv[1] if len(sys.argv) > 1 else "selection"
+    s_init = sys.argv[1] if len(sys.argv) > 1 else "fixed"
     if s_init not in ("selection", "fixed"):
         raise SystemExit(f"usage: python main_train_joint.py [selection|fixed], got {s_init!r}")
     main(s_init)

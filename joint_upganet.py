@@ -327,44 +327,18 @@ class JointUPGANet(nn.Module):
             S_hat = S.clone()
             for j in range(n_iter_inner):
                 F_eff = F_hat * S_hat                            # elementwise (Hadamard)
-
-                # Objective gradient w.r.t. the effective precoder, computed once
-                # and reused for both the F and S updates below.
                 grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
 
-                # Chain rule through F_eff = F * S (S real).  Both gradients use
-                # the same convention as grad_F_eff (PyTorch's conjugate-Wirtinger
-                # / half of the analytic steepest-ascent gradient), so no factor
-                # of 2 on the S gradient.
                 grad_F = S_hat * grad_F_eff                      # complex * real
                 grad_S = 2 * torch.real(torch.conj(F_hat) * grad_F_eff)  # real
 
                 F_hat = F_hat + self.step_size[j, ii, 0] * grad_F
 
-                # Project F onto unit modulus (full projection; the active mask
-                # is carried by S separately in this version).
                 F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
 
-
-                # ---- S (mask) update: inside the inner loop, jointly with F --
-                # Refine S at every inner step using the step size for inner
-                # step j, then project each row back onto the simplex.
                 S_hat = S_hat + self.step_size[j, ii, 1] * grad_S
                 S_hat = project_to_simplex_rows(S_hat)
 
-                # ---- Hard mask with straight-through estimator (every step) --
-                # In hard mode the FORWARD value of S is the discrete one-hot
-                # assignment at every inner step, so the physics (F_eff, the W
-                # update, the metrics) always sees exactly the sub-connected
-                # mask that evaluation will use -- no train/eval mismatch.
-                # The BACKWARD pass flows through the soft simplex-projected S
-                # (argmax is non-differentiable), so the step sizes and
-                # SelectionNet still receive useful gradients.
-                # if hard:
-                # winners = S_hat.argmax(dim=-1)               # (B, Nt)
-                # S_hard = torch.zeros_like(S_hat)
-                # S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-                # S_hat = S_hard - S_hat.detach() + S_hat      # STE
 
             F, S = F_hat, S_hat
 
@@ -398,11 +372,11 @@ class JointUPGANet(nn.Module):
         # In hard mode S already carries the hard one-hot forward value from the
         # inner loop; this final STE just re-asserts the discrete value on the
         # returned tensor (gradient still flows through the soft simplex S).
-        if hard:
-            winners = S.argmax(dim=-1)                           # (B, Nt)
-            S_hard = torch.zeros_like(S)
-            S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-            S = S_hard - S.detach() + S                          # STE: hard value, soft grad
+#        if hard:
+#            winners = S.argmax(dim=-1)                           # (B, Nt)
+#            S_hard = torch.zeros_like(S)
+#            S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+#            S = S_hard - S.detach() + S                          # STE: hard value, soft grad
 
         return rate_over_iters, crb_over_iters, F, S, W
 
