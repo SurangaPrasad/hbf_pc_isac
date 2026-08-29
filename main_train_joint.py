@@ -30,7 +30,7 @@ from joint_upganet import JointUPGANet, get_joint_loss, initialize_joint
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # ---- Joint-model specific hyper-parameters -------------------------------
-JOINT_LR = 1e-3              # Adam LR (step sizes + SelectionNet)
+JOINT_LR = 1e-2              # Adam LR (step sizes + SelectionNet)
 JOINT_TAU_START = 2.0        # Gumbel temperature at epoch 0
 JOINT_TAU_END = 0.1          # Gumbel temperature at the last epoch
 JOINT_HARD_FINAL = 5         # last N epochs with hard STE (matches eval)

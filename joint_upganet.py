@@ -360,11 +360,11 @@ class JointUPGANet(nn.Module):
                 # The BACKWARD pass flows through the soft simplex-projected S
                 # (argmax is non-differentiable), so the step sizes and
                 # SelectionNet still receive useful gradients.
-                if hard:
-                    winners = S_hat.argmax(dim=-1)               # (B, Nt)
-                    S_hard = torch.zeros_like(S_hat)
-                    S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-                    S_hat = S_hard - S_hat.detach() + S_hat      # STE
+                # if hard:
+                # winners = S_hat.argmax(dim=-1)               # (B, Nt)
+                # S_hard = torch.zeros_like(S_hat)
+                # S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+                # S_hat = S_hard - S_hat.detach() + S_hat      # STE
 
             F, S = F_hat, S_hat
 
