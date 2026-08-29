@@ -338,11 +338,6 @@ class JointUPGANet(nn.Module):
 
                 S_hat = S_hat + self.step_size[j, ii, 1] * grad_S
                 S_hat = project_to_simplex_rows(S_hat)
-                if track_metrics:
-                    winners = S_hat.argmax(dim=-1)                   # (B, Nt)
-                    S_hard = torch.zeros_like(S_hat)
-                    S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-                    S_hat = S_hard
 
 
             F, S = F_hat, S_hat
