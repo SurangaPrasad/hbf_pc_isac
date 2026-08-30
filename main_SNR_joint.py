@@ -80,7 +80,16 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test, de
             _, _, F, S, W = model.execute_PGA(
                 H_joint, psi0, M_matrix, OMEGA, snr_t,
                 N_OUTER, N_INNER, xi_0, tau=0.05, hard=True, track_metrics=False)
-            F_eff = F * S
+            # Binarize the connection matrix to the physically realizable
+            # one-hot assignment before computing the metrics.  The soft
+            # simplex S (rows like [0.7, 0.2, 0.1, 0.0]) gives F_eff fractional
+            # gains on several RF chains -- more effective DoF/power than any
+            # legal sub-connected hardware allows -- which inflates the
+            # objective unfairly (it looked close to full-connected).
+            winners = S.argmax(dim=-1)                       # (B, Nt)
+            S_hard = torch.zeros_like(S)
+            S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+            F_eff = F * S_hard
             r = get_sum_rate_joint(H_joint, F_eff, W, snr_t)
             c = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0, snr_t))
             rate[ss] = r.item()
