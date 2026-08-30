@@ -52,8 +52,15 @@ def to_joint_channel(H_kb: torch.Tensor) -> torch.Tensor:
     return H_kb[0].transpose(1, 2)
 
 
-def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test, decay: bool = False):
-    """Run one JointUPGANet variant over the SNR list; return (obj, rate, crlb)."""
+def evaluate_joint(s_init: str, H_test, psi0, M_matrix, snr_dB_list, B_test, decay: bool = False):
+    """Run one JointUPGANet variant over the SNR list; return (obj, rate, crlb).
+
+    Evaluation protocol matches ``main_SNR.py`` / ``main_selection.py`` exactly:
+    the model's final (F, S, W) is binarized to the physically realizable
+    one-hot mask, converted to the legacy 4-D layout, and scored with the SAME
+    legacy physics (``get_sum_rate`` / ``get_crb_fe``) used for every baseline,
+    so all curves in the figure are directly comparable.
+    """
     if decay:
         model = JointUPGANet_decay(
             step_size=step_size_joint_decay,
@@ -68,6 +75,8 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test, de
         ).to(device)
     load_joint_state_dict(model, torch.load(joint_model_path(s_init, decay), map_location=device), N_INNER)
     model.eval()
+
+    H_joint = H_test[0].transpose(1, 2).to(device)             # (B, Nt, M)
 
     obj = np.zeros(len(snr_dB_list))
     rate = np.zeros(len(snr_dB_list))
@@ -89,9 +98,17 @@ def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test, de
             winners = S.argmax(dim=-1)                       # (B, Nt)
             S_hard = torch.zeros_like(S)
             S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-            F_eff = F * S_hard
-            r = get_sum_rate_joint(H_joint, F_eff, W, snr_t)
-            c = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0, snr_t))
+
+            # Convert to the legacy 4-D layout: (B, Nt, Nrf) -> (K, B, Nt, Nrf)
+            # and (B, Nrf, M) -> (K, B, Nrf, M), then score with the SAME
+            # legacy physics as every baseline in this figure.
+            F4 = F.unsqueeze(0)                              # (1, B, Nt, Nrf)
+            F_eff4 = F4 * S_hard.unsqueeze(0)                # (1, B, Nt, Nrf)
+            W4 = W.unsqueeze(0)                              # (1, B, Nrf, M)
+
+            r = get_sum_rate(H_test, F_eff4, W4, snr_ss, skip_unit_modulus=True)
+            c = torch.mean(get_crb_fe(H_test, F_eff4, W4, xi_0, A_dot, R_N_inv,
+                                      snr_ss, skip_unit_modulus=True))
             rate[ss] = r.item()
             crlb[ss] = float(np.exp(-c.item()))
             obj[ss] = OMEGA * r.item() + c.item()
@@ -111,9 +128,9 @@ def main():
     psi0 = torch.full((B_test,), desired_angle_rad_torch, device=device)
 
     # -- Joint models (two S_0 initialisation schemes + decay variant) -------
-    obj_sel, rate_sel, crlb_sel = evaluate_joint('selection', H_joint, psi0, M_matrix, snr_dB_list, B_test)
-    obj_fix, rate_fix, crlb_fix = evaluate_joint('fixed', H_joint, psi0, M_matrix, snr_dB_list, B_test)
-    obj_decay, rate_decay, crlb_decay = evaluate_joint('fixed', H_joint, psi0, M_matrix, snr_dB_list, B_test, decay=True)
+    obj_sel, rate_sel, crlb_sel = evaluate_joint('selection', H_test, psi0, M_matrix, snr_dB_list, B_test)
+    obj_fix, rate_fix, crlb_fix = evaluate_joint('fixed', H_test, psi0, M_matrix, snr_dB_list, B_test)
+    obj_decay, rate_decay, crlb_decay = evaluate_joint('fixed', H_test, psi0, M_matrix, snr_dB_list, B_test, decay=True)
 
     # -- Baselines (frozen UPGA beamformer + connectivity masks) -------------
     upga = load_pretrained_upga(model_file_name_UPGA_J5, n_iter_inner_J5, device)
