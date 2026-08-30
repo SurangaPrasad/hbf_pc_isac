@@ -29,6 +29,7 @@ from utility import (
 )
 from SelectionNet import SelectionNet
 from main_selection import load_pretrained_upga, REDERIVE_DIGITAL_W
+from PGA_models import PGA_Unfold_JX_partial
 from joint_upganet import (
     JointUPGANet, JointUPGANet_decay, get_sum_rate_joint, get_crb_joint,
     initialize_joint, load_joint_state_dict,
@@ -134,6 +135,22 @@ def main():
 
     # -- Baselines (frozen UPGA beamformer + connectivity masks) -------------
     upga = load_pretrained_upga(model_file_name_UPGA_J5, n_iter_inner_J5, device)
+
+    # Fixed sub-connected baseline: use the PARTIAL UPGA that was TRAINED for
+    # the sub-connected structure (its own checkpoint), not the full-connected
+    # UPGA with its mask applied afterwards.  Loading UPGA_J5 (full-connected)
+    # and gating it with the block mask leaves the phases mismatched to the
+    # topology, which unfairly depresses the baseline curve.
+    sub_step_size = torch.full([N_INNER, N_OUTER, K + 1], step_size_fixed,
+                               device=device, requires_grad=False)
+    upga_sub = PGA_Unfold_JX_partial(sub_step_size, mask=fixed_mask).to(device)
+    sub_state = torch.load(model_file_name_UPGA_partial_J5, map_location=device)
+    sub_state = {k: v for k, v in sub_state.items() if k != 'mask'}   # keep our mask buffer
+    upga_sub.load_state_dict(sub_state, strict=False)
+    upga_sub.eval()
+    for p in upga_sub.parameters():
+        p.requires_grad_(False)
+
     selnet = SelectionNet(n_antennas=Nt, n_rf_chains=Nrf, n_users=M).to(device)
     selnet.load_state_dict(torch.load(
         directory_model + f'SelectionNet_J{n_iter_inner_J5}.pth', map_location=device))
@@ -181,9 +198,13 @@ def main():
             # Full-connected: use the UPGA's own optimized W.
             o_f, r_f, c_f = baseline_metrics(F_up, W_up, snr_ss)
 
-            # Sub-connected: re-derive a matched W for the masked array.
-            W_sub = compute_digital_precoder(H_test, F_up * fixed_mask) if REDERIVE_DIGITAL_W else W_up
-            o_s, r_s, c_s = baseline_metrics(F_up * fixed_mask, W_sub, snr_ss)
+            # Fixed sub-connected: run the PARTIAL UPGA trained for this
+            # topology (its F already respects the mask; W is its own).
+            _, _, F_sub, W_sub_own, _, _ = upga_sub.execute_PGA(
+                H_test, xi_0, A_dot, R_N_inv,
+                torch.tensor(snr_ss, dtype=torch.float32, device=device),
+                n_iter_outer, n_iter_inner_J5, track_metrics=False)
+            o_s, r_s, c_s = baseline_metrics(F_sub, W_sub_own, snr_ss)
 
             W_adp = compute_digital_precoder(H_test, F_up * S_hard.unsqueeze(0)) if REDERIVE_DIGITAL_W else W_up
             o_a, r_a, c_a = baseline_metrics(F_up * S_hard.unsqueeze(0), W_adp, snr_ss)
