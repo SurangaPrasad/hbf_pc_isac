@@ -328,14 +328,10 @@ class JointUPGANet(nn.Module):
             for j in range(n_iter_inner):
                 F_eff = F_hat * S_hat                            # elementwise (Hadamard)
                 grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
-
                 grad_F = S_hat * grad_F_eff                      # complex * real
                 grad_S = 2 * torch.real(torch.conj(F_hat) * grad_F_eff)  # real
-
                 F_hat = F_hat + self.step_size[j, ii, 0] * grad_F
-
                 F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
-
                 S_hat = S_hat + self.step_size[j, ii, 1] * grad_S
                 S_hat = project_to_simplex_rows(S_hat)
 
@@ -368,15 +364,126 @@ class JointUPGANet(nn.Module):
                 rate_over_iters[ii] = get_sum_rate_joint(H, F_eff_m, W, Pt).detach()
                 crb_over_iters[ii] = torch.mean(get_crb_joint(F_eff_m, W, M_matrix, xi_0, Pt)).detach()
 
-        # ---- Final hard mask (straight-through estimator) ---------------------
-        # In hard mode S already carries the hard one-hot forward value from the
-        # inner loop; this final STE just re-asserts the discrete value on the
-        # returned tensor (gradient still flows through the soft simplex S).
-#        if hard:
-#            winners = S.argmax(dim=-1)                           # (B, Nt)
-#            S_hard = torch.zeros_like(S)
-#            S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-#            S = S_hard - S.detach() + S                          # STE: hard value, soft grad
+        return rate_over_iters, crb_over_iters, F, S, W
+
+
+class JointUPGANet_decay(JointUPGANet):
+    """JointUPGANet with gradient-norm-based decaying inner iterations.
+
+    Mirrors ``PGA_models.PGA_Unfold_JX_decay``: instead of always running the
+    full J_max inner steps per outer iteration, the number of inner steps is
+    chosen dynamically from the norm of the combined F gradient:
+
+        g_i = ||grad_F_J||_F / sqrt(Nt * Nrf)      (per-sample, then batch mean)
+        r_i = g_i / (g_i + alpha)                  (relative gradient activity)
+        n_inner = ceil(J_max * r_i), clipped to [J_min, J_max]
+
+    Early in the unroll the gradient is large -> close to J_max inner steps;
+    as (F, S, W) converge the gradient shrinks -> fewer inner steps are spent,
+    saving computation where it does not help.  The step-size tensor layout is
+    identical to ``JointUPGANet`` ((J, I, 3) columns F/S/W), so checkpoints are
+    interchangeable and the same ``load_joint_state_dict`` applies.
+
+    Additional hyper-parameters (mirroring PGA_Unfold_JX_decay):
+        alpha : relative-activity regulariser (smaller = stays at J_max longer).
+        eps   : numerical floor for the gradient norm.
+        J_min : minimum inner steps per outer iteration.
+    """
+
+    def __init__(self, step_size: torch.Tensor, n_antennas: int, n_rf_chains: int, n_users: int,
+                 s_init: str = "fixed", alpha: float = 0.04, eps: float = 1e-12, J_min: int = 2,
+    ) -> None:
+        super().__init__(step_size=step_size, n_antennas=n_antennas,
+                         n_rf_chains=n_rf_chains, n_users=n_users, s_init=s_init)
+        self.alpha = alpha
+        self.eps = eps
+        self.J_min = J_min
+        self.inner_iter_history = []          # actual n_inner used per outer iter
+
+    def _n_inner_from_grad(self, grad_F_J: torch.Tensor) -> int:
+        """Adaptive inner-step count from the combined F gradient (batch mean)."""
+        J_max = self.step_size.shape[0]
+        J_min = min(self.J_min, J_max)
+
+        Nt_ = grad_F_J.shape[-2]
+        Nrf_ = grad_F_J.shape[-1]
+        g_i = torch.linalg.norm(grad_F_J.reshape(grad_F_J.shape[0], -1), dim=1) / (
+            torch.sqrt(torch.tensor(Nt_ * Nrf_, device=grad_F_J.device,
+                                    dtype=grad_F_J.real.dtype)) + self.eps)
+        g_i = torch.mean(g_i)
+        r_i = g_i / (g_i + self.alpha)
+
+        n_inner = int(torch.ceil(J_max * r_i).item())
+        return max(J_min, min(J_max, n_inner))
+
+    def execute_PGA(self, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float,
+                    Pt, n_iter_outer: int, n_iter_inner: int, xi_0,
+                    tau: float = 1.0, hard: bool = False, track_metrics: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Same protocol as ``JointUPGANet.execute_PGA`` but with a per-outer-
+        iteration adaptive inner-step count (J_max = n_iter_inner cap)."""
+        B = H.shape[0]
+
+        # ---- Initial connection matrix S_0 ------------------------------------
+        if self.s_init == "fixed":
+            S = self.fixed_s0.expand(B, -1, -1).clone()
+        else:
+            S0, _ = self.selection_net(H, psi0, tau=tau, hard=hard)
+            S = project_to_simplex_rows(S0)
+
+        F, W = initialize_joint(H, Pt, self.n_rf_chains)
+
+        rate_over_iters = torch.zeros(n_iter_outer, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, device=H.device)
+        self.inner_iter_history = []
+
+        for ii in range(n_iter_outer):
+            # ---- Adaptive inner-step count from the current F gradient -------
+            F_eff_pre = F * S
+            grad_F_com_pre = omega * get_grad_F_com(H, F_eff_pre, W) + get_grad_F_crb(F_eff_pre, W, M_matrix)
+            n_inner = self._n_inner_from_grad(grad_F_com_pre)
+            self.inner_iter_history.append(n_inner)
+
+            # ---- Inner loop: n_inner steps of joint F/S ascent ----------------
+            F_hat = F.clone()
+            S_hat = S.clone()
+            for j in range(n_inner):
+                F_eff = F_hat * S_hat
+                grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
+                grad_F = S_hat * grad_F_eff
+                grad_S = 2 * torch.real(torch.conj(F_hat) * grad_F_eff)
+                F_hat = F_hat + self.step_size[j, ii, 0] * grad_F
+                F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
+                S_hat = S_hat + self.step_size[j, ii, 1] * grad_S
+                S_hat = project_to_simplex_rows(S_hat)
+
+            F, S = F_hat, S_hat
+
+            # ---- W update (once per outer iteration) --------------------------
+            F_eff_new = F * S
+            grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)
+            W = W + self.step_size[0, ii, 2] * grad_W
+
+            # Power projection: ||F_eff_new W||_F^2 == Pt (per sample).
+            prod = F_eff_new @ W
+            fro_norm = torch.linalg.matrix_norm(prod, dim=(-2, -1)).clamp_min(1e-8)
+            P_BS_vec = torch.as_tensor(Pt, device=W.device, dtype=W.real.dtype)
+            scale = torch.sqrt(P_BS_vec) / fro_norm
+            while scale.dim() < W.dim():
+                scale = scale.unsqueeze(-1)
+            W = scale * W
+
+            # ---- Per-iteration metrics (hard mask for the reported objective) --
+            if track_metrics:
+                S_metric = S
+                if hard:
+                    winners = S.argmax(dim=-1)
+                    S_hard = torch.zeros_like(S)
+                    S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+                    S_metric = S_hard
+                F_eff_m = F * S_metric
+                rate_over_iters[ii] = get_sum_rate_joint(H, F_eff_m, W, Pt).detach()
+                crb_over_iters[ii] = torch.mean(get_crb_joint(F_eff_m, W, M_matrix, xi_0, Pt)).detach()
 
         return rate_over_iters, crb_over_iters, F, S, W
 

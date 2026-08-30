@@ -25,7 +25,7 @@ import torch
 
 from system_config import *
 from utility import get_data_tensor, safe_legend
-from joint_upganet import JointUPGANet, get_joint_loss, initialize_joint
+from joint_upganet import JointUPGANet, JointUPGANet_decay, get_joint_loss, initialize_joint
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -48,9 +48,11 @@ N_OUTER = n_iter_outer        # I outer iterations
 N_INNER = n_iter_inner_J5     # J inner steps per outer iteration
 
 
-def model_filename(s_init: str) -> str:
-    """Checkpoint path for a given S_0 initialisation scheme."""
+def model_filename(s_init: str, decay: bool = False) -> str:
+    """Checkpoint path for a given S_0 initialisation scheme (+ decay variant)."""
     tag = "" if s_init == "selection" else f"_{s_init}"
+    if decay:
+        return directory_model + f'JointUPGANet{tag}_decay_I{N_OUTER}_J{N_INNER}.pth'
     return directory_model + f'JointUPGANet{tag}_I{N_OUTER}_J{N_INNER}.pth'
 
 
@@ -64,17 +66,23 @@ def to_joint_channel(H_kb: torch.Tensor) -> torch.Tensor:
     return H_kb[0].transpose(1, 2)   # strip K, swap users<->antennas
 
 
-def main(s_init: str = "fixed"):
+def main(s_init: str = "fixed", decay: bool = False):
     assert s_init in ("selection", "fixed")
     torch.manual_seed(3407)
 
     H_train, _ = get_data_tensor(data_source)
-    print(f"H_train (K, B, M, Nt): {tuple(H_train.shape)}  (s_init={s_init})")
+    print(f"H_train (K, B, M, Nt): {tuple(H_train.shape)}  "
+          f"(s_init={s_init}, decay={decay})")
 
     # ---- Sensing Fisher-like matrix in antenna space (shared across batch).
     M_matrix = (A_dot.conj().T @ R_N_inv @ A_dot).to(H_train.device)   # (Nt, Nt)
 
-    model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
+    if decay:
+        model = JointUPGANet_decay(step_size=step_size_joint_decay, n_antennas=Nt,
+                                   n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
+    else:
+        model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt,
+                             n_rf_chains=Nrf, n_users=M, s_init=s_init).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=JOINT_LR)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
@@ -134,21 +142,27 @@ def main(s_init: str = "fixed"):
         print(f"Epoch [{i_epoch+1}/{n_epoch}], Average Loss: {avg_loss:.4f}")
 
     # ---- Save model + loss curve
-    torch.save(model.state_dict(), model_filename(s_init))
+    torch.save(model.state_dict(), model_filename(s_init, decay))
 
     plt.figure(figsize=(8, 5))
     plt.plot(range(1, len(epoch_losses) + 1), epoch_losses, marker='o')
     plt.xlabel('Epoch')
     plt.ylabel('Average Loss')
-    plt.title(f'JointUPGANet ({s_init}) Training Loss (I={N_OUTER}, J={N_INNER})')
+    title_tag = ' + decay' if decay else ''
+    plt.title(f'JointUPGANet{title_tag} ({s_init}) Training Loss (I={N_OUTER}, J={N_INNER})')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(directory_result + f'JointUPGANet_{s_init}_loss_I{N_OUTER}_J{N_INNER}.png', dpi=300)
+    loss_tag = f'{s_init}_decay' if decay else s_init
+    plt.savefig(directory_result + f'JointUPGANet_{loss_tag}_loss_I{N_OUTER}_J{N_INNER}.png', dpi=300)
     print(f"Saved loss curve to {directory_result}")
 
 
 if __name__ == "__main__":
+    # Usage:
+    #   python main_train_joint.py [selection|fixed] [decay]
+    # e.g. python main_train_joint.py fixed decay
     s_init = sys.argv[1] if len(sys.argv) > 1 else "fixed"
+    decay = len(sys.argv) > 2 and sys.argv[2].lower() == "decay"
     if s_init not in ("selection", "fixed"):
-        raise SystemExit(f"usage: python main_train_joint.py [selection|fixed], got {s_init!r}")
-    main(s_init)
+        raise SystemExit(f"usage: python main_train_joint.py [selection|fixed] [decay], got {s_init!r}")
+    main(s_init, decay)

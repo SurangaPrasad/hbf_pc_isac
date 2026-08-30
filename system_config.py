@@ -38,6 +38,9 @@ run_UPGA_partial_decay_J10 = 0  # Unfolded PGA with J=10 and partial coupling an
 
 run_SelectionNet = 0            # Learnable antenna-to-RF-chain assignment (SelectionNet)
 
+run_JointUPGANet = 1            # Joint deep-unfolding PGA (F, S, W jointly)
+run_JointUPGANet_decay = 1      # JointUPGANet with gradient-norm-based decaying inner iterations
+
 # ////////////////////////////////////////////// SYSTEM PARAMS //////////////////////////////////////////////
 Nt = 64                 # Num of Tx antennas
 M = 4                   # Num of Users
@@ -138,6 +141,10 @@ step_size_UPGA_J_GradReuse = torch.full([n_iter_inner_J10, n_iter_outer, K + 1],
 # [J, I, K+1] layout of the UPGA step sizes above (K+1 = 2 columns there for
 # F and W; the joint model adds a third column for the connection matrix S).
 step_size_joint = torch.full([n_iter_inner_J5, n_iter_outer, 3], step_size_fixed, device=device, requires_grad=True)
+# JointUPGANet + decay uses the same (J_max, I, 3) layout; the class decides
+# dynamically how many of the J_max inner steps to run per outer iteration
+# based on the gradient norm (mirroring PGA_Unfold_JX_decay).
+step_size_joint_decay = torch.full([n_iter_inner_J5, n_iter_outer, 3], step_size_fixed, device=device, requires_grad=True)
 
 # # ========================== Initialize step sizes seperately for lambda and mu ============
 # step_size_lambda = torch.diag([Nt, M], step_size_fixed, requires_grad=True)
@@ -182,6 +189,7 @@ model_file_name_UPGA_J10_PC_omega03 = directory_model03 + 'UPGA_J10_PC.pth'
 
 model_file_name_UPGA_partial_decay_J5 = directory_model + 'UPGA_partial_decay_J5.pth'
 model_file_name_UPGA_partial_decay_J10 = directory_model + 'UPGA_partial_decay_J10.pth'
+model_file_name_JointUPGANet_decay = directory_model + 'JointUPGANet_fixed_decay_I120_J5.pth'
 # To save result figures
 directory_result = "./sim_results/" + system_config + "/"
 if not os.path.exists(directory_result):

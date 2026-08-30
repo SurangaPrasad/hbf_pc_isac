@@ -30,8 +30,8 @@ from utility import (
 from SelectionNet import SelectionNet
 from main_selection import load_pretrained_upga, REDERIVE_DIGITAL_W
 from joint_upganet import (
-    JointUPGANet, get_sum_rate_joint, get_crb_joint, initialize_joint,
-    load_joint_state_dict,
+    JointUPGANet, JointUPGANet_decay, get_sum_rate_joint, get_crb_joint,
+    initialize_joint, load_joint_state_dict,
 )
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -40,8 +40,10 @@ N_OUTER = n_iter_outer
 N_INNER = n_iter_inner_J5
 
 
-def joint_model_path(s_init: str) -> str:
+def joint_model_path(s_init: str, decay: bool = False) -> str:
     tag = "" if s_init == "selection" else f"_{s_init}"
+    if decay:
+        return directory_model + f'JointUPGANet{tag}_decay_I{N_OUTER}_J{N_INNER}.pth'
     return directory_model + f'JointUPGANet{tag}_I{N_OUTER}_J{N_INNER}.pth'
 
 
@@ -50,14 +52,21 @@ def to_joint_channel(H_kb: torch.Tensor) -> torch.Tensor:
     return H_kb[0].transpose(1, 2)
 
 
-def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test):
+def evaluate_joint(s_init: str, H_joint, psi0, M_matrix, snr_dB_list, B_test, decay: bool = False):
     """Run one JointUPGANet variant over the SNR list; return (obj, rate, crlb)."""
-    model = JointUPGANet(
-        step_size=step_size_joint,
-        n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
-        s_init=s_init,
-    ).to(device)
-    load_joint_state_dict(model, torch.load(joint_model_path(s_init), map_location=device), N_INNER)
+    if decay:
+        model = JointUPGANet_decay(
+            step_size=step_size_joint_decay,
+            n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
+            s_init=s_init,
+        ).to(device)
+    else:
+        model = JointUPGANet(
+            step_size=step_size_joint,
+            n_antennas=Nt, n_rf_chains=Nrf, n_users=M,
+            s_init=s_init,
+        ).to(device)
+    load_joint_state_dict(model, torch.load(joint_model_path(s_init, decay), map_location=device), N_INNER)
     model.eval()
 
     obj = np.zeros(len(snr_dB_list))
@@ -92,9 +101,10 @@ def main():
     H_joint = to_joint_channel(H_test).to(device)             # (B, Nt, M)
     psi0 = torch.full((B_test,), desired_angle_rad_torch, device=device)
 
-    # -- Joint models (two S_0 initialisation schemes) ----------------------
+    # -- Joint models (two S_0 initialisation schemes + decay variant) -------
     obj_sel, rate_sel, crlb_sel = evaluate_joint('selection', H_joint, psi0, M_matrix, snr_dB_list, B_test)
     obj_fix, rate_fix, crlb_fix = evaluate_joint('fixed', H_joint, psi0, M_matrix, snr_dB_list, B_test)
+    obj_decay, rate_decay, crlb_decay = evaluate_joint('fixed', H_joint, psi0, M_matrix, snr_dB_list, B_test, decay=True)
 
     # -- Baselines (frozen UPGA beamformer + connectivity masks) -------------
     upga = load_pretrained_upga(model_file_name_UPGA_J5, n_iter_inner_J5, device)
@@ -160,6 +170,7 @@ def main():
     cmap = {
         'JointUPGANet (selection init)':  ('-o', 'red'),
         'JointUPGANet (fixed init)':      ('-^', 'purple'),
+        'JointUPGANet + decay':           ('-v', 'orange'),
         'Full-connected':                 ('-d', 'black'),
         'Fixed sub-connected':            ('--s', 'blue'),
         'Adaptive (SelectionNet)':        ('-.v', 'green'),
@@ -182,6 +193,7 @@ def main():
     plot_curves(snr_dB_list, {
         'JointUPGANet (selection init)': obj_sel,
         'JointUPGANet (fixed init)': obj_fix,
+        'JointUPGANet + decay': obj_decay,
         'Full-connected': obj_full,
         'Fixed sub-connected': obj_sub,
         'Adaptive (SelectionNet)': obj_adp,
@@ -192,6 +204,7 @@ def main():
     plot_curves(snr_dB_list, {
         'JointUPGANet (selection init)': rate_sel,
         'JointUPGANet (fixed init)': rate_fix,
+        'JointUPGANet + decay': rate_decay,
         'Full-connected': rate_full,
         'Fixed sub-connected': rate_sub,
         'Adaptive (SelectionNet)': rate_adp,
@@ -201,6 +214,7 @@ def main():
     plot_curves(snr_dB_list, {
         'JointUPGANet (selection init)': crlb_sel,
         'JointUPGANet (fixed init)': crlb_fix,
+        'JointUPGANet + decay': crlb_decay,
         'Full-connected': crlb_full,
         'Fixed sub-connected': crlb_sub,
         'Adaptive (SelectionNet)': crlb_adp,

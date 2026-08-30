@@ -26,7 +26,7 @@ from system_config import *
 from utility import get_data_tensor, safe_legend
 from PGA_models import PGA_Unfold_JX, PGA_Unfold_JX_partial
 from joint_upganet import (
-    JointUPGANet, build_fixed_subconnected_mask,
+    JointUPGANet, JointUPGANet_decay, build_fixed_subconnected_mask,
     get_sum_rate_joint, get_crb_joint, initialize_joint, load_joint_state_dict,
 )
 
@@ -36,8 +36,10 @@ N_OUTER = n_iter_outer
 N_INNER = n_iter_inner_J5
 
 
-def joint_model_path(s_init: str) -> str:
+def joint_model_path(s_init: str, decay: bool = False) -> str:
     tag = "" if s_init == "selection" else f"_{s_init}"
+    if decay:
+        return directory_model + f'JointUPGANet{tag}_decay_I{N_OUTER}_J{N_INNER}.pth'
     return directory_model + f'JointUPGANet{tag}_I{N_OUTER}_J{N_INNER}.pth'
 
 
@@ -51,11 +53,19 @@ def default_upga_step_size() -> torch.Tensor:
     return torch.full([N_INNER, N_OUTER, K + 1], step_size_fixed, device=device)
 
 
-def unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True):
-    """JointUPGANet (fixed init); optionally loads the trained state_dict."""
-    model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init='fixed').to(device)
+def unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True, decay=False):
+    """JointUPGANet (fixed init); optionally loads the trained state_dict.
+
+    With ``decay=True`` the gradient-norm-based decaying inner-iteration
+    variant (JointUPGANet_decay) is used instead.
+    """
+    if decay:
+        model = JointUPGANet_decay(step_size=step_size_joint_decay, n_antennas=Nt,
+                                   n_rf_chains=Nrf, n_users=M, s_init='fixed').to(device)
+    else:
+        model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init='fixed').to(device)
     if trained:
-        load_joint_state_dict(model, torch.load(joint_model_path('fixed'), map_location=device), N_INNER)
+        load_joint_state_dict(model, torch.load(joint_model_path('fixed', decay), map_location=device), N_INNER)
     model.eval()
 
     with torch.no_grad():
@@ -121,6 +131,11 @@ def main():
     print('JointUPGANet (fixed init), untrained ...')
     obj_joint_un = unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=False)
 
+    print('JointUPGANet + decay (fixed init), trained ...')
+    obj_joint_decay_tr = unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True, decay=True)
+    print('JointUPGANet + decay (fixed init), untrained ...')
+    obj_joint_decay_un = unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=False, decay=True)
+
     print('Fixed sub-connected, trained ...')
     obj_sub_tr = unroll_upga(H_test, mask=block_mask, trained=True)
     print('Fixed sub-connected, untrained ...')
@@ -137,6 +152,8 @@ def main():
     plt.figure(figsize=(8, 5))
     plt.plot(iter_x, obj_joint_tr, '--', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), trained')
     plt.plot(iter_x, obj_joint_un, '--^', color='red', linewidth=3, markersize=6, markevery=5, label='JointUPGANet (fixed init), untrained')
+    plt.plot(iter_x, obj_joint_decay_tr, '--', color='orange', linewidth=3, markersize=6, markevery=5, label='JointUPGANet + decay, trained')
+    plt.plot(iter_x, obj_joint_decay_un, '--v', color='orange', linewidth=3, markersize=6, markevery=5, label='JointUPGANet + decay, untrained')
     plt.plot(iter_x, obj_sub_tr, '--', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, trained')
     plt.plot(iter_x, obj_sub_un, '--s', color='blue', linewidth=3, markersize=6, markevery=5, label='Fixed sub-connected, untrained')
     plt.plot(iter_x, obj_full_tr, '--', color='green', linewidth=3, markersize=6, markevery=5, label='Full-connected, trained')
@@ -153,6 +170,8 @@ def main():
 
     for label, obj in [('JointUPGANet (fixed init), trained', obj_joint_tr),
                        ('JointUPGANet (fixed init), untrained', obj_joint_un),
+                       ('JointUPGANet + decay, trained', obj_joint_decay_tr),
+                       ('JointUPGANet + decay, untrained', obj_joint_decay_un),
                        ('Fixed sub-connected, trained', obj_sub_tr),
                        ('Fixed sub-connected, untrained', obj_sub_un),
                        ('Full-connected, trained', obj_full_tr),
