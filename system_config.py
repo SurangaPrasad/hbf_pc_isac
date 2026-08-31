@@ -13,7 +13,7 @@ print(f"Using device: {device}")
 #/////////////////////////// CONSIONDER SCHEMES /////////////////////////////////////////////////////////
 run_conv_PGA = 0           # Conventional PGA without unfolding
 run_conv_PGA_J5 = 1        # Conventional PGA with setting J = 5
-run_conv_PGA_J10 = 1       # Conventional PGA with setting J = 10
+run_conv_PGA_J10 = 0       # Conventional PGA with setting J = 10
 run_conv_PGA_J20 = 0
 run_conv_PGA_J10_PC = 0    # Conventional PGA with J = 10 and partial coupling (PC) 
 run_UPGA_J1 = 0            # Unfolded PGA without any modification (J = 1)
@@ -30,7 +30,7 @@ run_UPGA_J10_RMSProp = 0   # Unfolded PGA with J = 10 and RMSProp-like adaptive 
 run_UPGA_J5_decay = 0        # Unfolded PGA with decaying inner iterations (J_max=5 → 1)
 run_UPGA_J10_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=10 → 1)
 run_UPGA_J20_decay = 0       # Unfolded PGA with decaying inner iterations (J_max=20 → 1)
-run_UPGA_J_GradReuse = 0   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
+run_UPGA_J_GradReuse = 1   # Unfolded PGA with J=10 and gradient reuse / lazy gradient strategy
 
 
 run_UPGA_partial_decay_J5 = 0   # Unfolded PGA with J=5 and partial coupling and decaying inner iterations (J_max=5 → 1)
@@ -72,7 +72,7 @@ train_size = 112 * 4 * 10   # size of training set
 if str(device) == 'cuda':
     test_size = 50     
 else:
-    test_size = 30     
+    test_size = 10     
 batch_size = len(snr_dB_list) * 8
 n_epoch = 30         # number of training epochs
 learning_rate = 0.005 # learning 
@@ -137,7 +137,7 @@ step_size_UPGA_J5_decay = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], ste
 step_size_UPGA_J10_decay = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 step_size_UPGA_J20_decay = torch.full([n_iter_inner_J20, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # J_GradReuse uses the same shape as J10; gradient reuse logic is handled inside execute_PGA
-step_size_UPGA_J_GradReuse = torch.full([n_iter_inner_J10, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
+step_size_UPGA_J_GradReuse = torch.full([n_iter_inner_J5, n_iter_outer, K + 1], step_size_fixed, device=device, requires_grad=True)
 # JointUPGANet step sizes: [J, I, 3] with columns (F, S, W), mirroring the
 # [J, I, K+1] layout of the UPGA step sizes above (K+1 = 2 columns there for
 # F and W; the joint model adds a third column for the connection matrix S).

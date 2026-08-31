@@ -396,15 +396,14 @@ if run_program == 1:
     if run_UPGA_J_GradReuse == 1:
         print('Running unfolded PGA with gradient reuse (J = 10)...')
         model_UPGA_J_GradReuse = PGA_Unfold_J_GradReuse(step_size_UPGA_J_GradReuse)
-        # model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J10, map_location=device))
+        model_UPGA_J_GradReuse.load_state_dict(torch.load(model_file_name_UPGA_J5, map_location=device))
         register_step_size('UPGA (J=10, GradReuse)', model_UPGA_J_GradReuse.step_size)
 
-        sum_rate_UPGA_J_GradReuse, crb_UPGA_J_GradReuse, power_UPGA_J_GradReuse, F_UPGA_J_GradReuse, W_UPGA_J_GradReuse = model_UPGA_J_GradReuse.execute_PGA(
+        sum_rate_UPGA_J_GradReuse, crb_UPGA_J_GradReuse, F_UPGA_J_GradReuse, W_UPGA_J_GradReuse, gradient_norm_history_UPGA_J_GradReuse, gradient_norm_history_UPGA_J_GradReuse_W = model_UPGA_J_GradReuse.execute_PGA(
             H_test, xi_0, A_dot, R_N_inv, snr, n_iter_outer, n_iter_inner_J10)
         print(f'  GradReuse fallback recomputations: {model_UPGA_J_GradReuse.grad_recalc_count}')
-        rate_iter_UPGA_J_GradReuse  = sum_rate_UPGA_J_GradReuse.mean(0).cpu().numpy()
-        crb_iter_UPGA_J_GradReuse   = crb_UPGA_J_GradReuse.mean(0).cpu().numpy()
-        power_iter_UPGA_J_GradReuse = power_UPGA_J_GradReuse.mean(0).cpu().numpy()
+        rate_iter_UPGA_J_GradReuse  = get_outer_iter_curve(sum_rate_UPGA_J_GradReuse)
+        crb_iter_UPGA_J_GradReuse   = get_outer_iter_curve(crb_UPGA_J_GradReuse)
     # ====================================================== Propsed Unofolded PGA with RMSProp-like adaptive step sizes ====================================
     if run_UPGA_J10_RMSProp == 1:
         print('Running unfolded PGA with J = 10 and RMSProp-like adaptive step sizes...')
@@ -593,21 +592,12 @@ if plot_figure == 1:
     # ===================== OBJECTIVE (outer iters only) =============================================
     # plt.figure()
     plt.figure(figsize=(8, 5.2))
-    # if run_conv_PGA == 1:
-    #     obj_iter_conv_PGA_J1 = OMEGA * rate_iter_conv_PGA_J1 + crb_iter_conv_PGA_J1
-    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J1[outer_idx_J1], '..', markevery=5, color='black', linewidth=3, markersize=7, label=Conv_PGA_J1)
-    # if run_UPGA_J1 == 1:
-    #     obj_iter_UPGA_J1 = OMEGA * rate_iter_UPGA_J1[outer_idx_J1] + crb_iter_UPGA_J1
-    #     plt.plot(iter_outer_x, obj_iter_UPGA_J1, '-o', markevery=5, color='cyan', linewidth=3, markersize=7, label=label_UPGA_J1)
     if run_conv_PGA_J5 == 1:
         obj_iter_conv_PGA_J5 = OMEGA * rate_iter_conv_PGA_J5 + crb_iter_conv_PGA_J5
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J5, ':d', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J5)
     if run_conv_PGA_J10 == 1:
         obj_iter_conv_PGA_J10 = OMEGA * rate_iter_conv_PGA_J10 + crb_iter_conv_PGA_J10
         plt.plot(iter_outer_x, obj_iter_conv_PGA_J10, ':o', markevery=5, color='blue', linewidth=3, markersize=7, label=Conv_PGA_J10)
-    # if run_conv_PGA_J20 == 1:
-    #     obj_iter_conv_PGA_J20 = OMEGA * rate_iter_conv_PGA_J20 + crb_iter_conv_PGA_J20[outer_idx_J20]
-    #     plt.plot(iter_outer_x, obj_iter_conv_PGA_J20[outer_idx_J20], '.-', markevery=5, color='blue', linewidth=3, markersize=7, label=label_conv_PGA_J20)
     if run_UPGA_J4 == 1:
         obj_iter_UPGA_J4 = OMEGA * rate_iter_UPGA_J4[outer_idx_J4] + crb_iter_UPGA_J4[outer_idx_J4]
         plt.plot(iter_outer_x, obj_iter_UPGA_J4, '--', markevery=5, color='orange', linewidth=3, markersize=7, label=label_UPGA_J4)
@@ -630,9 +620,6 @@ if plot_figure == 1:
     if run_UPGA_partial_J10 == 1:
         obj_iter_UPGA_partial_J10 = OMEGA * rate_iter_UPGA_partial_J10[outer_idx_J10] + crb_iter_UPGA_partial_J10[outer_idx_J10]
         plt.plot(iter_outer_x, obj_iter_UPGA_partial_J10, '--v', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_partial_J10)
-    # if run_UPGA_J20 == 1:
-    #     obj_iter_UPGA_J20 = OMEGA * rate_iter_UPGA_J20[outer_idx_J20] + crb_iter_UPGA_J20[outer_idx_J20]
-    #     plt.plot(iter_outer_x, obj_iter_UPGA_J20, '-->', markevery=5, color='red', linewidth=3, markersize=7, label=label_UPGA_J20)
     if run_UPGA_J5_decay == 1:
         obj_iter_UPGA_J5_decay = OMEGA * rate_iter_UPGA_J5_decay[outer_idx_J5_decay] + crb_iter_UPGA_J5_decay[outer_idx_J5_decay]
         plt.plot(iter_outer_x_J5_decay, obj_iter_UPGA_J5_decay, '-d', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J5_decay)
@@ -647,10 +634,12 @@ if plot_figure == 1:
     if run_UPGA_partial_decay_J10 == 1:
         obj_iter_UPGA_partial_decay_J10 = OMEGA * rate_iter_UPGA_partial_decay_J10[outer_idx_J10_decay] + crb_iter_UPGA_partial_decay_J10[outer_idx_J10_decay]
         plt.plot(iter_outer_x_J10_decay, obj_iter_UPGA_partial_decay_J10, '-v', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_partial_decay_J10)
-    
-    # if run_UPGA_J20_decay == 1:
-    #     obj_iter_UPGA_J20_decay = OMEGA * rate_iter_UPGA_J20_decay[outer_idx_J20_decay] + crb_iter_UPGA_J20_decay[outer_idx_J20_decay]
-    #     plt.plot(iter_outer_x_J20_decay, obj_iter_UPGA_J20_decay, '-', markevery=5, color='green', linewidth=3, markersize=7, label=label_UPGA_J20_decay)
+
+    if run_UPGA_J_GradReuse == 1:
+        # GradReuse returns one metric per outer iteration (same as J5), so plot directly.
+        obj_iter_UPGA_J_GradReuse = OMEGA * rate_iter_UPGA_J_GradReuse + crb_iter_UPGA_J_GradReuse
+        plt.plot(iter_outer_x, obj_iter_UPGA_J_GradReuse, '-x', markevery=5, color='magenta', linewidth=3, markersize=7, label=label_UPGA_J_GradReuse)
+
     plt.title("When $1$ RF chain to $16$ antennas", fontsize=14)
     plt.xlabel(r'Number of iterations/layers $(I)$', fontsize=14)
     plt.ylabel(r'$\omega R + \log(\text{CRLB}^{-1})$', fontsize=14)

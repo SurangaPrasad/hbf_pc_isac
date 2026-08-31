@@ -529,8 +529,7 @@ class JointUPGANet_GradReuse(JointUPGANet):
         with torch.no_grad():
             F_eff = F * S
             rate = get_sum_rate_joint(H, F_eff, W, Pt)
-            crb = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0=None, Pt=Pt)) if False else \
-                torch.mean(get_crb_joint(F_eff, W, M_matrix, 1.0, Pt))
+            crb = torch.mean(get_crb_joint(F_eff, W, M_matrix, 1.0, Pt))
             return (omega * rate + crb).item()
 
     def execute_PGA(self, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float,
@@ -556,6 +555,11 @@ class JointUPGANet_GradReuse(JointUPGANet):
         W_grad_recalc = 0
         prev_grad_W = None   # stored W gradient across outer iterations
 
+        # Number of inner iterations is bounded by the unrolled step-size depth,
+        # exactly like PGA_Unfold_J_GradReuse (n_inner = self.step_size.shape[0]).
+        # For a J=5 checkpoint this runs 5 inner steps per outer iteration.
+        n_inner = min(n_iter_inner, self.step_size.shape[0])
+
         for ii in range(n_iter_outer):
             prev_grad_F_eff = None   # stored F_eff gradient, refreshed at j=0 or fallback
             prev_obj = None
@@ -563,7 +567,7 @@ class JointUPGANet_GradReuse(JointUPGANet):
             # ---- Inner loop: joint F/S ascent with gradient reuse -------------
             F_hat = F.clone()
             S_hat = S.clone()
-            for j in range(n_iter_inner):
+            for j in range(n_inner):
                 if j == 0:
                     # ---- Always compute fresh gradients at the first step ----
                     F_eff = F_hat * S_hat
@@ -581,9 +585,7 @@ class JointUPGANet_GradReuse(JointUPGANet):
                         # ---- Reuse accepted --------------------------------
                         F_hat, S_hat = F_trial, S_trial
                         prev_obj = obj_trial
-                        if track_metrics:
-                            self._record_metrics(ii, j, F_hat, S_hat, W, H, M_matrix,
-                                                 Pt, xi_0, rate_over_iters, crb_over_iters, hard)
+                        # prev_grad_F_eff left unchanged so next j reuses it.
                         continue
 
                     # ---- Reuse rejected: recompute fresh gradients ------------
@@ -601,10 +603,6 @@ class JointUPGANet_GradReuse(JointUPGANet):
                 # Store gradient and objective baseline for the next inner step.
                 prev_grad_F_eff = grad_F_eff.detach()
                 prev_obj = self._objective(F_hat, S_hat, W, H, M_matrix, omega, Pt)
-
-                if track_metrics:
-                    self._record_metrics(ii, j, F_hat, S_hat, W, H, M_matrix,
-                                         Pt, xi_0, rate_over_iters, crb_over_iters, hard)
 
             F, S = F_hat, S_hat
 
@@ -652,7 +650,7 @@ class JointUPGANet_GradReuse(JointUPGANet):
 
         self.grad_recalc_count = grad_recalc
         self.W_grad_recalc_count = W_grad_recalc
-        max_possible_F = n_iter_outer * (n_iter_inner - 1)
+        max_possible_F = n_iter_outer * (n_inner - 1)
         max_possible_W = n_iter_outer - 1
         print(f'[JointGradReuse] F/S fallback recomputations = {grad_recalc} / {max_possible_F} '
               f'({100.0 * grad_recalc / max(max_possible_F, 1):.1f}%)')
@@ -660,19 +658,6 @@ class JointUPGANet_GradReuse(JointUPGANet):
               f'({100.0 * W_grad_recalc / max(max_possible_W, 1):.1f}%)')
 
         return rate_over_iters, crb_over_iters, F, S, W
-
-    def _record_metrics(self, ii, j, F_hat, S_hat, W, H, M_matrix, Pt, xi_0,
-                        rate_over_iters, crb_over_iters, hard):
-        """Record per-inner-step metrics with the hard one-hot mask."""
-        S_metric = S_hat
-        if hard:
-            winners = S_hat.argmax(dim=-1)
-            S_hard = torch.zeros_like(S_hat)
-            S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
-            S_metric = S_hard
-        F_eff_m = F_hat * S_metric
-        rate_over_iters[ii] = get_sum_rate_joint(H, F_eff_m, W, Pt).detach()
-        crb_over_iters[ii] = torch.mean(get_crb_joint(F_eff_m, W, M_matrix, xi_0, Pt)).detach()
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////

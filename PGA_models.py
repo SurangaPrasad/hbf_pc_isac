@@ -624,29 +624,33 @@ class PGA_Unfold_J_GradReuse(nn.Module):
 
     # =========== Projection Gradient Ascent execution ===================
     def execute_PGA(self, H, xi_0, A_dot, R_N_inv, Pt, n_iter_outer, n_iter_inner, track_metrics=True):
-        rate_init, F, W = initialize(H, Pt, initial_normalization)
+        _ , F, W = initialize(H, Pt, initial_normalization)
         B = len(H[0])
 
-        # Metric arrays: shape (n_outer, J+1, B).
-        #   [ii, 0..J-1, :] – after each inner F-update.
-        #   [ii,    J  , :] – after W-update (end of outer iter ii).
-        rate_over_iters  = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        crb_over_iters   = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
-        power_over_iters = torch.zeros(n_iter_outer, n_iter_inner + 1, B, device=H.device)
+        # Metric arrays: same structure as PGA_Unfold_JX — one entry per outer iteration.
+        rate_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
+        crb_over_iters  = torch.zeros(n_iter_outer, B, device=H.device)
 
         grad_recalc = 0    # F fallback recomputations (excludes mandatory jj=0 gradients)
         W_grad_recalc = 0  # W fallback recomputations (excludes mandatory ii=0 gradients)
 
+        # Number of inner iterations is bounded by the unrolled step-size depth,
+        # exactly like PGA_Unfold_JX (n_inner = self.step_size.shape[0]).
+        n_inner = self.step_size.shape[0]
+
         # W gradient state persists across outer iterations (unlike F which resets each outer iter).
         prev_grad_W_k_com = None
         prev_grad_W_k_crb = None
+
+        gradient_norm_history = []
+        gradient_norm_history_W = []
 
         for ii in range(n_iter_outer):
             prev_grad_F_com = None  # last stored gradient, refreshed at jj=0 or on fallback
             prev_grad_F_crb = None
             prev_obj = None         # Python float: combined objective at current F
 
-            for jj in range(n_iter_inner):
+            for jj in range(n_inner):
                 if jj == 0:
                     # ---- Always compute a fresh gradient at the first inner step ----
                     grad_F_com = get_grad_F_com(H, F, W)
@@ -654,8 +658,8 @@ class PGA_Unfold_J_GradReuse(nn.Module):
                     if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
                         print('Error NaN gradients!!!!!!!!!!!!!!!')
                 else:
-                    # # ---- jj >= 1: attempt gradient reuse ----
-                    # # Propose a step using the last stored gradient.
+                    # ---- jj >= 1: attempt gradient reuse ----
+                    # Propose a step using the last stored gradient.
                     F_trial = (F
                                + self.step_size[jj][ii][0] * prev_grad_F_com * WEIGHT_F_COM
                                + self.step_size[jj][ii][0] * prev_grad_F_crb * WEIGHT_F_CRB)
@@ -672,10 +676,6 @@ class PGA_Unfold_J_GradReuse(nn.Module):
                         F = F_trial
                         prev_obj = obj_trial
                         # prev_grad_F_com/crb left unchanged so next jj reuses the same gradient.
-                        if track_metrics:
-                            rate_over_iters[ii, jj]  = r_trial.detach()
-                            crb_over_iters[ii, jj]   = c_trial.detach()
-                            power_over_iters[ii, jj] = get_power(F, W).detach()
                         continue
 
                     else:
@@ -700,11 +700,7 @@ class PGA_Unfold_J_GradReuse(nn.Module):
                     c_cur = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt)
                     prev_obj = (r_cur * WEIGHT_F_COM + c_cur.mean() * WEIGHT_F_CRB).item()
 
-                if track_metrics:
-                    rate_over_iters[ii, jj]  = r_cur.detach()
-                    crb_over_iters[ii, jj]   = c_cur.detach()
-                    power_over_iters[ii, jj] = get_power(F, W).detach()
-
+            # Projection of analog precoder
             F = project_unit_modulus(F)
 
             # ---- W update with gradient reuse across outer iterations ----
@@ -733,10 +729,6 @@ class PGA_Unfold_J_GradReuse(nn.Module):
                     F, W = F_wt, W_trial
                     w_reuse_accepted = True
                     # prev_grad_W_k_com/crb left unchanged: next outer iter reuses same gradient.
-                    if track_metrics:
-                        rate_over_iters[ii, -1]  = r_wt.detach()
-                        crb_over_iters[ii, -1]   = c_wt.detach()
-                        power_over_iters[ii, -1] = get_power(F, W).detach()
                 else:
                     # ---- W reuse rejected: recompute W gradients from current (F, W) ----
                     grad_W_k_com = get_grad_W_com(H, F, W)
@@ -763,26 +755,25 @@ class PGA_Unfold_J_GradReuse(nn.Module):
                 prev_grad_W_k_com = grad_W_k_com[0].detach()
                 prev_grad_W_k_crb = grad_W_k_crb[0].detach()
 
-                if track_metrics:
-                    rate_over_iters[ii, -1]  = get_sum_rate(H, F, W, Pt).detach()
-                    crb_over_iters[ii, -1]   = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
-                    power_over_iters[ii, -1] = get_power(F, W).detach()
+            # Record metrics after W-update (same as PGA_Unfold_JX)
+            if track_metrics:
+                rate_over_iters[ii, :] = get_sum_rate(H, F, W, Pt).detach()
+                crb_over_iters[ii, :]  = get_crb_fe(H, F, W, xi_0, A_dot, R_N_inv, Pt).detach()
 
         # Log and store gradient recomputation counts.
         self.grad_recalc_count = grad_recalc
         self.W_grad_recalc_count = W_grad_recalc
-        max_possible_F = n_iter_outer * (n_iter_inner - 1)
+        max_possible_F = n_iter_outer * (n_inner - 1)
         max_possible_W = n_iter_outer - 1
         print(f'[GradReuse] F fallback recomputations = {grad_recalc} / {max_possible_F} '
               f'({100.0 * grad_recalc / max(max_possible_F, 1):.1f}%)')
         print(f'[GradReuse] W fallback recomputations = {W_grad_recalc} / {max_possible_W} '
               f'({100.0 * W_grad_recalc / max(max_possible_W, 1):.1f}%)')
 
-        # Flatten to (n_outer*(J+1), B) then transpose to (B, n_outer*(J+1)).
-        rates     = rate_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        crb_fes   = crb_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        power_fes = power_over_iters.reshape(n_iter_outer * (n_iter_inner + 1), B).detach()
-        return rates.transpose(0, 1), crb_fes.transpose(0, 1), power_fes.transpose(0, 1), F, W
+        # Same return signature as PGA_Unfold_JX: (rates, crb_fes, F, W, grad_hist_F, grad_hist_W)
+        rates   = rate_over_iters.reshape(n_iter_outer, B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
+        return (rates, crb_fes, F, W, gradient_norm_history, gradient_norm_history_W)
 
 
 

@@ -71,7 +71,15 @@ def unroll_joint(H_joint, psi0, M_matrix, snr_t, trained=True, decay=False, grad
     else:
         model = JointUPGANet(step_size=step_size_joint, n_antennas=Nt, n_rf_chains=Nrf, n_users=M, s_init='fixed').to(device)
     if trained:
-        load_joint_state_dict(model, torch.load(joint_model_path('fixed', decay, gradreuse), map_location=device), N_INNER)
+        # GradReuse/decay share the same step-size layout as the base model, so
+        # fall back to the base checkpoint when no variant-specific one exists
+        # (mirrors the legacy GradReuse loading the trained UPGA_J5 weights).
+        ckpt_path = joint_model_path('fixed', decay, gradreuse)
+        if not os.path.exists(ckpt_path):
+            ckpt_path = joint_model_path('fixed')
+            print(f'  [unroll_joint] {joint_model_path("fixed", decay, gradreuse)} not found; '
+                  f'loading base checkpoint {ckpt_path} instead.')
+        load_joint_state_dict(model, torch.load(ckpt_path, map_location=device), N_INNER)
     model.eval()
 
     with torch.no_grad():
