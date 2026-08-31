@@ -488,6 +488,193 @@ class JointUPGANet_decay(JointUPGANet):
         return rate_over_iters, crb_over_iters, F, S, W
 
 
+class JointUPGANet_GradReuse(JointUPGANet):
+    """JointUPGANet with lazy gradient reuse (mirrors PGA_Unfold_J_GradReuse).
+
+    Reduces the per-inner-iteration cost of the joint unroll by reusing the
+    last stored physics gradient when it still points in a useful direction:
+
+    F/S inner steps (per outer iteration ii):
+      j = 0  : always compute fresh gradients.
+      j >= 1 : propose (F_trial, S_trial) by stepping with the STORED gradient
+               at the current step size; accept the trial if the combined
+               objective improved, otherwise recompute fresh gradients.
+
+    W outer steps:
+      ii = 0 : always compute fresh gradients.
+      ii >= 1: propose W_trial with the stored W gradient; accept if the
+               objective improved, otherwise recompute.
+
+    The step-size layout and checkpoint format are identical to
+    ``JointUPGANet`` ((J, I, 3) columns F/S/W), so ``load_joint_state_dict``
+    applies unchanged.
+
+    Attributes
+    ----------
+    grad_recalc_count   : F/S fallback recomputations (excludes mandatory j=0).
+    W_grad_recalc_count : W fallback recomputations (excludes mandatory ii=0).
+    """
+
+    def __init__(self, step_size: torch.Tensor, n_antennas: int, n_rf_chains: int, n_users: int,
+                 s_init: str = "fixed",
+    ) -> None:
+        super().__init__(step_size=step_size, n_antennas=n_antennas,
+                         n_rf_chains=n_rf_chains, n_users=n_users, s_init=s_init)
+        self.grad_recalc_count = 0
+        self.W_grad_recalc_count = 0
+
+    def _objective(self, F: torch.Tensor, S: torch.Tensor, W: torch.Tensor,
+                   H: torch.Tensor, M_matrix: torch.Tensor, omega: float, Pt) -> float:
+        """Combined objective (higher = better); evaluated without grad."""
+        with torch.no_grad():
+            F_eff = F * S
+            rate = get_sum_rate_joint(H, F_eff, W, Pt)
+            crb = torch.mean(get_crb_joint(F_eff, W, M_matrix, xi_0=None, Pt=Pt)) if False else \
+                torch.mean(get_crb_joint(F_eff, W, M_matrix, 1.0, Pt))
+            return (omega * rate + crb).item()
+
+    def execute_PGA(self, H: torch.Tensor, psi0: torch.Tensor, M_matrix: torch.Tensor, omega: float,
+                    Pt, n_iter_outer: int, n_iter_inner: int, xi_0,
+                    tau: float = 1.0, hard: bool = False, track_metrics: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Joint unroll with objective-checked gradient reuse."""
+        B = H.shape[0]
+
+        # ---- Initial connection matrix S_0 ------------------------------------
+        if self.s_init == "fixed":
+            S = self.fixed_s0.expand(B, -1, -1).clone()
+        else:
+            S0, _ = self.selection_net(H, psi0, tau=tau, hard=hard)
+            S = project_to_simplex_rows(S0)
+
+        F, W = initialize_joint(H, Pt, self.n_rf_chains)
+
+        rate_over_iters = torch.zeros(n_iter_outer, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, device=H.device)
+
+        grad_recalc = 0
+        W_grad_recalc = 0
+        prev_grad_W = None   # stored W gradient across outer iterations
+
+        for ii in range(n_iter_outer):
+            prev_grad_F_eff = None   # stored F_eff gradient, refreshed at j=0 or fallback
+            prev_obj = None
+
+            # ---- Inner loop: joint F/S ascent with gradient reuse -------------
+            F_hat = F.clone()
+            S_hat = S.clone()
+            for j in range(n_iter_inner):
+                if j == 0:
+                    # ---- Always compute fresh gradients at the first step ----
+                    F_eff = F_hat * S_hat
+                    grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
+                else:
+                    # ---- j >= 1: attempt gradient reuse ----------------------
+                    grad_F = S_hat * prev_grad_F_eff
+                    grad_S = 2 * torch.real(torch.conj(F_hat) * prev_grad_F_eff)
+                    F_trial = F_hat + self.step_size[j, ii, 0] * grad_F
+                    F_trial = F_trial / F_trial.abs().clamp_min(1e-8)
+                    S_trial = project_to_simplex_rows(S_hat + self.step_size[j, ii, 1] * grad_S)
+
+                    obj_trial = self._objective(F_trial, S_trial, W, H, M_matrix, omega, Pt)
+                    if obj_trial > prev_obj:
+                        # ---- Reuse accepted --------------------------------
+                        F_hat, S_hat = F_trial, S_trial
+                        prev_obj = obj_trial
+                        if track_metrics:
+                            self._record_metrics(ii, j, F_hat, S_hat, W, H, M_matrix,
+                                                 Pt, xi_0, rate_over_iters, crb_over_iters, hard)
+                        continue
+
+                    # ---- Reuse rejected: recompute fresh gradients ------------
+                    F_eff = F_hat * S_hat
+                    grad_F_eff = omega * get_grad_F_com(H, F_eff, W) + get_grad_F_crb(F_eff, W, M_matrix)
+                    grad_recalc += 1
+
+                # ---- Apply gradient step (j=0 or reuse-rejected) --------------
+                grad_F = S_hat * grad_F_eff
+                grad_S = 2 * torch.real(torch.conj(F_hat) * grad_F_eff)
+                F_hat = F_hat + self.step_size[j, ii, 0] * grad_F
+                F_hat = F_hat / F_hat.abs().clamp_min(1e-8)
+                S_hat = project_to_simplex_rows(S_hat + self.step_size[j, ii, 1] * grad_S)
+
+                # Store gradient and objective baseline for the next inner step.
+                prev_grad_F_eff = grad_F_eff.detach()
+                prev_obj = self._objective(F_hat, S_hat, W, H, M_matrix, omega, Pt)
+
+                if track_metrics:
+                    self._record_metrics(ii, j, F_hat, S_hat, W, H, M_matrix,
+                                         Pt, xi_0, rate_over_iters, crb_over_iters, hard)
+
+            F, S = F_hat, S_hat
+
+            # ---- W update with gradient reuse across outer iterations ---------
+            F_eff_new = F * S
+            obj_preW = self._objective(F, S, W, H, M_matrix, omega, Pt)
+
+            w_reuse_accepted = False
+            if ii > 0 and prev_grad_W is not None:
+                W_trial = W + self.step_size[0, ii, 2] * prev_grad_W
+                obj_wt = self._objective(F, S, W_trial, H, M_matrix, omega, Pt)
+                if obj_wt > obj_preW:
+                    W = W_trial
+                    w_reuse_accepted = True
+                else:
+                    grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)
+                    W_grad_recalc += 1
+            else:
+                grad_W = omega * get_grad_W_com(H, F_eff_new, W) + get_grad_W_crb(F_eff_new, W, M_matrix)
+
+            if not w_reuse_accepted:
+                W = W + self.step_size[0, ii, 2] * grad_W
+                prev_grad_W = grad_W.detach()
+
+            # Power projection: ||F_eff_new W||_F^2 == Pt (per sample).
+            prod = F_eff_new @ W
+            fro_norm = torch.linalg.matrix_norm(prod, dim=(-2, -1)).clamp_min(1e-8)
+            P_BS_vec = torch.as_tensor(Pt, device=W.device, dtype=W.real.dtype)
+            scale = torch.sqrt(P_BS_vec) / fro_norm
+            while scale.dim() < W.dim():
+                scale = scale.unsqueeze(-1)
+            W = scale * W
+
+            # ---- Per-iteration metrics (hard mask for the reported objective) --
+            if track_metrics:
+                S_metric = S
+                if hard:
+                    winners = S.argmax(dim=-1)
+                    S_hard = torch.zeros_like(S)
+                    S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+                    S_metric = S_hard
+                F_eff_m = F * S_metric
+                rate_over_iters[ii] = get_sum_rate_joint(H, F_eff_m, W, Pt).detach()
+                crb_over_iters[ii] = torch.mean(get_crb_joint(F_eff_m, W, M_matrix, xi_0, Pt)).detach()
+
+        self.grad_recalc_count = grad_recalc
+        self.W_grad_recalc_count = W_grad_recalc
+        max_possible_F = n_iter_outer * (n_iter_inner - 1)
+        max_possible_W = n_iter_outer - 1
+        print(f'[JointGradReuse] F/S fallback recomputations = {grad_recalc} / {max_possible_F} '
+              f'({100.0 * grad_recalc / max(max_possible_F, 1):.1f}%)')
+        print(f'[JointGradReuse] W fallback recomputations = {W_grad_recalc} / {max_possible_W} '
+              f'({100.0 * W_grad_recalc / max(max_possible_W, 1):.1f}%)')
+
+        return rate_over_iters, crb_over_iters, F, S, W
+
+    def _record_metrics(self, ii, j, F_hat, S_hat, W, H, M_matrix, Pt, xi_0,
+                        rate_over_iters, crb_over_iters, hard):
+        """Record per-inner-step metrics with the hard one-hot mask."""
+        S_metric = S_hat
+        if hard:
+            winners = S_hat.argmax(dim=-1)
+            S_hard = torch.zeros_like(S_hat)
+            S_hard.scatter_(-1, winners.unsqueeze(-1), 1.0)
+            S_metric = S_hard
+        F_eff_m = F_hat * S_metric
+        rate_over_iters[ii] = get_sum_rate_joint(H, F_eff_m, W, Pt).detach()
+        crb_over_iters[ii] = torch.mean(get_crb_joint(F_eff_m, W, M_matrix, xi_0, Pt)).detach()
+
+
 # /////////////////////////////////////////////////////////////////////////////////////////
 #                             EVALUATION / LOSS HELPERS
 # /////////////////////////////////////////////////////////////////////////////////////////
