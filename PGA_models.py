@@ -224,6 +224,82 @@ class PGA_Unfold_JX(nn.Module):
         self.inner_iter_history = list(inner_iter_history)
         return (rates, crb_fes, F, W, gradient_norm_history, gradient_norm_history_W)
 
+    # =========== Wideband (multi-subcarrier) Projection Gradient Ascent ==========
+    def execute_PGA_wideband(self, H, M_k, R_N_inv_t, Pt,
+                             n_iter_outer, n_iter_inner, track_metrics=True):
+        """Wideband extension of ``execute_PGA`` (overlapping subcarrier allocation).
+
+        H   : (K, B, M, Nt) frequency-selective channels.
+        M_k : (K, Nt, Nt)   per-subcarrier sensing Fisher matrices.
+        Pt  : scalar or (B,) transmit power budget.
+
+        The analog precoder F is frequency-flat (shared across subcarriers) and
+        is updated with the pooled wideband gradient (1/K) sum_k (...).  The
+        digital precoders W[k] are frequency-dependent and updated per k.
+
+        Returns (rates, crb_fes, F, W, grad_hist_F, grad_hist_W) with
+        rates/crb_fes of shape (n_iter_outer, B) — one entry per outer
+        iteration, matching the narrowband protocol.
+        """
+        K_wb = H.shape[0]
+        F, W = initialize_wideband(H, Pt)
+
+        B = len(H[0])
+        rate_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
+
+        gradient_norm_history = []
+        gradient_norm_history_W = []
+
+        n_inner = self.step_size.shape[0]
+
+        for ii in range(n_iter_outer):
+            # ---- Inner loop: pooled wideband F updates -----------------------
+            for jj in range(n_inner):
+                # Pooled communication gradient (1/K) sum_k grad R_k
+                grad_F_com = get_grad_F_com(H, F, W)               # (K, B, Nt, Nrf)
+                grad_F_com_pooled = grad_F_com.mean(dim=0, keepdim=True).expand(K_wb, -1, -1, -1)
+
+                # Pooled sensing gradient (1/K) sum_k grad log CRLB_k^-1
+                grad_F_crb = get_grad_F_crb_wideband(F, W, M_k)    # (K, B, Nt, Nrf)
+                grad_F_crb_pooled = grad_F_crb.mean(dim=0, keepdim=True).expand(K_wb, -1, -1, -1)
+
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                    print('Error NaN gradients (wideband F)!!!!!!!!!!!!!!!')
+
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com_pooled
+                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb_pooled
+
+                F = (F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB)
+                F = normalize_power(F, W, H, Pt)
+
+            # Projection of analog precoder
+            F = project_unit_modulus(F)
+
+            # ---- Outer update: per-subcarrier W[k] updates --------------------
+            grad_W_k_com = get_grad_W_com(H, F, W)                 # (K, B, Nrf, M)
+            grad_W_k_crb = get_grad_W_crb_wideband(F, W, M_k)      # (K, B, Nrf, M)
+
+            grad_J_w = grad_W_k_com * WEIGHT_W_COM + grad_W_k_crb * WEIGHT_W_CRB
+            g_W = torch.abs(grad_J_w).reshape(grad_J_w.shape[0], -1).mean(dim=1)
+            gradient_norm_history_W.append(g_W.mean().item())
+
+            # step_size[0][ii][1] is the W step size (same for every k).
+            W_new = (W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM
+                        + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB)
+
+            # Projection / normalization (per-subcarrier power budget)
+            F, W = normalize(F, W_new, H, Pt)
+
+            # Record metrics after W-update
+            if track_metrics:
+                rate_over_iters[ii, :] = get_sum_rate_wideband(H, F, W, Pt).detach()
+                crb_over_iters[ii, :] = get_crb_wideband(H, F, W, xi_0, M_k, R_N_inv_t, Pt).detach()
+
+        rates = rate_over_iters.reshape(n_iter_outer, B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
+        return (rates, crb_fes, F, W, gradient_norm_history, gradient_norm_history_W)
+
 # ============================================== Unfolded PGA with decaying inner iterations ==============================
 class PGA_Unfold_JX_decay(nn.Module):
 
@@ -324,6 +400,100 @@ class PGA_Unfold_JX_decay(nn.Module):
         self.inner_iter_history = list(inner_iter_history)
 
         return (rates, crb_fes, F, W, gradient_norm_history) 
+
+    # =========== Wideband (multi-subcarrier) Projection Gradient Ascent with decaying J ==========
+    def execute_PGA_wideband(self, H, M_k, R_N_inv_t, Pt,
+                             n_iter_outer, n_iter_inner, track_metrics=True):
+        """Wideband extension of ``execute_PGA`` with gradient-norm-based
+        adaptive inner iterations (mirrors ``execute_PGA`` of this class).
+
+        The pooled wideband F gradient drives the adaptive inner-step count:
+            g_i = ||pooled grad||_F / sqrt(Nt*Nrf),  r_i = g_i/(g_i+alpha),
+            n_inner = ceil(J_max * r_i), clipped to [J_min, J_max].
+
+        Returns (rates, crb_fes, F, W, grad_hist_F) with rates/crb_fes of
+        shape (n_iter_outer, B), plus ``self.inner_iter_history``.
+        """
+        K_wb = H.shape[0]
+        F, W = initialize_wideband(H, Pt)
+        B = len(H[0])
+
+        rate_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
+        crb_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
+
+        def _n_inner_from_grad(grad_F_J):
+            J_max = self.step_size.shape[0]
+            J_min = min(self.J_min, J_max)
+
+            Nt_ = F.shape[-2]
+            Nrf_ = F.shape[-1]
+
+            g_i = torch.linalg.norm(grad_F_J.reshape(grad_F_J.shape[0], -1), dim=1) / (
+                torch.sqrt(torch.tensor(Nt_ * Nrf_, device=grad_F_J.device,
+                                        dtype=grad_F_J.real.dtype)) + self.eps)
+            g_i = torch.mean(g_i)
+            r_i = g_i / (g_i + self.alpha)
+
+            n_inner = int(torch.ceil(J_max * r_i).item())
+            return max(J_min, min(J_max, n_inner))
+
+        def inner_f_update(F, W, H, xi_0_val, M_k, n_inner, Pt):
+            for jj in range(n_inner):
+                grad_F_com = get_grad_F_com(H, F, W)
+                grad_F_crb = get_grad_F_crb_wideband(F, W, M_k)
+
+                if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                    print('Error NaN gradients (wideband decay F)!!!!!!!!!!!!!!!')
+
+                # Pool across subcarriers (1/K average), same as fixed-J wideband.
+                grad_F_com_pooled = grad_F_com.mean(dim=0, keepdim=True).expand(K_wb, -1, -1, -1)
+                grad_F_crb_pooled = grad_F_crb.mean(dim=0, keepdim=True).expand(K_wb, -1, -1, -1)
+
+                delta_F_com = self.step_size[jj][ii][0] * grad_F_com_pooled
+                delta_F_crb = self.step_size[jj][ii][0] * grad_F_crb_pooled
+
+                F = (F + delta_F_com * WEIGHT_F_COM + delta_F_crb * WEIGHT_F_CRB)
+                F = normalize_power(F, W, H, Pt)
+            return F
+
+        inner_iter_history = []
+        gradient_norm_history = []
+
+        for ii in range(n_iter_outer):
+            # ---- Adaptive inner-step count from the pooled wideband gradient --
+            grad_F_com = get_grad_F_com(H, F, W)
+            grad_F_crb = get_grad_F_crb_wideband(F, W, M_k)
+
+            grad_F_J = (WEIGHT_F_COM * grad_F_com.mean(dim=0, keepdim=True)
+                        + WEIGHT_F_CRB * grad_F_crb.mean(dim=0, keepdim=True))
+            n_inner = _n_inner_from_grad(grad_F_J)
+            inner_iter_history.append(n_inner)
+
+            if track_metrics:
+                F = inner_f_update(F, W, H, xi_0, M_k, n_inner, Pt)
+            else:
+                F = checkpoint(inner_f_update, F, W, H, xi_0, M_k, n_inner, Pt, use_reentrant=False)
+
+            F = project_unit_modulus(F)
+
+            # ---- Per-subcarrier W[k] updates ----------------------------------
+            grad_W_k_com = get_grad_W_com(H, F, W)
+            grad_W_k_crb = get_grad_W_crb_wideband(F, W, M_k)
+
+            W_new = (W + self.step_size[0][ii][1] * grad_W_k_com * WEIGHT_W_COM
+                        + self.step_size[0][ii][1] * grad_W_k_crb * WEIGHT_W_CRB)
+
+            F, W = normalize(F, W_new, H, Pt)
+
+            if track_metrics:
+                rate_over_iters[ii, :] = get_sum_rate_wideband(H, F, W, Pt).detach()
+                crb_over_iters[ii, :] = get_crb_wideband(H, F, W, xi_0, M_k, R_N_inv_t, Pt).detach()
+
+        rates = rate_over_iters.reshape(n_iter_outer, B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
+
+        self.inner_iter_history = list(inner_iter_history)
+        return (rates, crb_fes, F, W, gradient_norm_history)
 
 
 class PGA_Unfold_JX_partial(nn.Module):
@@ -775,6 +945,150 @@ class PGA_Unfold_J_GradReuse(nn.Module):
         crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
         return (rates, crb_fes, F, W, gradient_norm_history, gradient_norm_history_W)
 
+    # =========== Wideband (multi-subcarrier) Projection Gradient Ascent with gradient reuse ==========
+    def execute_PGA_wideband(self, H, M_k, R_N_inv_t, Pt,
+                             n_iter_outer, n_iter_inner, track_metrics=True):
+        """Wideband extension of ``execute_PGA`` with lazy gradient reuse.
+
+        Mirrors the narrowband ``execute_PGA`` of this class: the pooled
+        wideband F gradient is reused across inner steps when the combined
+        objective improves, and the W gradient is reused across outer
+        iterations.  The inner loop is bounded by the unrolled step-size depth
+        (``self.step_size.shape[0]``), exactly like the narrowband version.
+
+        Returns (rates, crb_fes, F, W, grad_hist_F, grad_hist_W) with
+        rates/crb_fes of shape (n_iter_outer, B).
+        """
+        K_wb = H.shape[0]
+        F, W = initialize_wideband(H, Pt)
+        B = len(H[0])
+
+        rate_over_iters = torch.zeros(n_iter_outer, B, device=H.device)
+        crb_over_iters  = torch.zeros(n_iter_outer, B, device=H.device)
+
+        grad_recalc = 0
+        W_grad_recalc = 0
+
+        n_inner = self.step_size.shape[0]
+
+        prev_grad_W_k_com = None
+        prev_grad_W_k_crb = None
+
+        gradient_norm_history = []
+        gradient_norm_history_W = []
+
+        for ii in range(n_iter_outer):
+            prev_grad_F_com = None
+            prev_grad_F_crb = None
+            prev_obj = None
+
+            for jj in range(n_inner):
+                if jj == 0:
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb_wideband(F, W, M_k)
+                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                        print('Error NaN gradients (wideband GradReuse)!!!!!!!!!!!!!!!')
+                else:
+                    # ---- Attempt gradient reuse with the pooled gradient ----
+                    F_trial = (F
+                               + self.step_size[jj][ii][0] * prev_grad_F_com * WEIGHT_F_COM
+                               + self.step_size[jj][ii][0] * prev_grad_F_crb * WEIGHT_F_CRB)
+                    F_trial = normalize_power(F_trial, W, H, Pt)
+
+                    with torch.no_grad():
+                        r_trial = get_sum_rate_wideband(H, F_trial, W, Pt)
+                        c_trial = get_crb_wideband(H, F_trial, W, xi_0, M_k, R_N_inv_t, Pt)
+                        obj_trial = (r_trial.mean() * WEIGHT_F_COM + c_trial.mean() * WEIGHT_F_CRB).item()
+
+                    if obj_trial > prev_obj:
+                        F = F_trial
+                        prev_obj = obj_trial
+                        continue
+
+                    # ---- Reuse rejected: recompute fresh gradients ----
+                    grad_F_com = get_grad_F_com(H, F, W)
+                    grad_F_crb = get_grad_F_crb_wideband(F, W, M_k)
+                    if grad_F_com.isnan().any() or grad_F_crb.isnan().any():
+                        print('Error NaN gradients (wideband GradReuse)!!!!!!!!!!!!!!!')
+                    grad_recalc += 1
+
+                # ---- Apply gradient step (jj=0 or reuse-rejected) ----
+                F = (F
+                     + self.step_size[jj][ii][0] * grad_F_com * WEIGHT_F_COM
+                     + self.step_size[jj][ii][0] * grad_F_crb * WEIGHT_F_CRB)
+                F = normalize_power(F, W, H, Pt)
+
+                prev_grad_F_com = grad_F_com.detach()
+                prev_grad_F_crb = grad_F_crb.detach()
+                with torch.no_grad():
+                    r_cur = get_sum_rate_wideband(H, F, W, Pt)
+                    c_cur = get_crb_wideband(H, F, W, xi_0, M_k, R_N_inv_t, Pt)
+                    prev_obj = (r_cur.mean() * WEIGHT_F_COM + c_cur.mean() * WEIGHT_F_CRB).item()
+
+            # Projection of analog precoder
+            F = project_unit_modulus(F)
+
+            # ---- W update with gradient reuse across outer iterations ----
+            with torch.no_grad():
+                r_preW = get_sum_rate_wideband(H, F, W, Pt)
+                c_preW = get_crb_wideband(H, F, W, xi_0, M_k, R_N_inv_t, Pt)
+                obj_preW = (r_preW.mean() * WEIGHT_W_COM + c_preW.mean() * WEIGHT_W_CRB).item()
+
+            w_reuse_accepted = False
+            if ii > 0 and prev_grad_W_k_com is not None:
+                W_trial_new = W.clone().detach()
+                W_trial_new[0] = (W[0].detach()
+                                  + (self.step_size[0][ii][1] * prev_grad_W_k_com) * WEIGHT_W_COM
+                                  + (self.step_size[0][ii][1] * prev_grad_W_k_crb) * WEIGHT_W_CRB)
+                F_wt, W_trial = normalize(F, W_trial_new, H, Pt)
+
+                with torch.no_grad():
+                    r_wt = get_sum_rate_wideband(H, F_wt, W_trial, Pt)
+                    c_wt = get_crb_wideband(H, F_wt, W_trial, xi_0, M_k, R_N_inv_t, Pt)
+                    obj_wt = (r_wt.mean() * WEIGHT_W_COM + c_wt.mean() * WEIGHT_W_CRB).item()
+
+                if obj_wt > obj_preW:
+                    F, W = F_wt, W_trial
+                    w_reuse_accepted = True
+                else:
+                    grad_W_k_com = get_grad_W_com(H, F, W)
+                    grad_W_k_crb = get_grad_W_crb_wideband(F, W, M_k)
+                    if grad_W_k_com[0].isnan().any() or grad_W_k_crb[0].isnan().any():
+                        print('Error NaN gradients (wideband GradReuse W)!!!!!!!!!!!!!!!')
+                    W_grad_recalc += 1
+            else:
+                grad_W_k_com = get_grad_W_com(H, F, W)
+                grad_W_k_crb = get_grad_W_crb_wideband(F, W, M_k)
+                if grad_W_k_com[0].isnan().any() or grad_W_k_crb[0].isnan().any():
+                    print('Error NaN gradients (wideband GradReuse W)!!!!!!!!!!!!!!!')
+
+            if not w_reuse_accepted:
+                W_new = W.clone().detach()
+                W_new[0] = (W[0].detach()
+                            + (self.step_size[0][ii][1] * grad_W_k_com[0]) * WEIGHT_W_COM
+                            + (self.step_size[0][ii][1] * grad_W_k_crb[0]) * WEIGHT_W_CRB)
+                F, W = normalize(F, W_new, H, Pt)
+
+                prev_grad_W_k_com = grad_W_k_com[0].detach()
+                prev_grad_W_k_crb = grad_W_k_crb[0].detach()
+
+            if track_metrics:
+                rate_over_iters[ii, :] = get_sum_rate_wideband(H, F, W, Pt).detach()
+                crb_over_iters[ii, :]  = get_crb_wideband(H, F, W, xi_0, M_k, R_N_inv_t, Pt).detach()
+
+        self.grad_recalc_count = grad_recalc
+        self.W_grad_recalc_count = W_grad_recalc
+        max_possible_F = n_iter_outer * (n_inner - 1)
+        max_possible_W = n_iter_outer - 1
+        print(f'[Wideband GradReuse] F fallback recomputations = {grad_recalc} / {max_possible_F} '
+              f'({100.0 * grad_recalc / max(max_possible_F, 1):.1f}%)')
+        print(f'[Wideband GradReuse] W fallback recomputations = {W_grad_recalc} / {max_possible_W} '
+              f'({100.0 * W_grad_recalc / max(max_possible_W, 1):.1f}%)')
+
+        rates = rate_over_iters.reshape(n_iter_outer, B).detach()
+        crb_fes = crb_over_iters.reshape(n_iter_outer, B).detach()
+        return (rates, crb_fes, F, W, gradient_norm_history, gradient_norm_history_W)
+
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////
@@ -816,8 +1130,11 @@ def get_grad_F_com(H, F, W):
     grad1 = HtF @ V.unsqueeze(2)  / (denom1.unsqueeze(-1).unsqueeze(-1) + 1e-4)  # (K,B,M,Nt,Nrf)
     grad2 = HtF @ V_mk            / (denom2.unsqueeze(-1).unsqueeze(-1) + 1e-4)  # (K,B,M,Nt,Nrf)
 
-    # Sum over M users, average over K frequencies
-    grad_F = (grad1 - grad2).sum(dim=2) / K_d             # (K, B, Nt, Nrf)
+    # Sum over M users.  NOTE: no 1/K averaging here — the wideband callers
+    # pool across subcarriers with .mean(dim=0), which already provides the
+    # 1/K objective weighting; dividing here as well would scale the gradient
+    # by 1/K^2 and break step-size transfer from the K=1 trained model.
+    grad_F = (grad1 - grad2).sum(dim=2)                   # (K, B, Nt, Nrf)
     return grad_F
 
 def get_grad_W_com(H, F, W):
@@ -847,7 +1164,11 @@ def get_grad_W_com(H, F, W):
         grad_W_2_masked = grad_W_2 * mask_m  # need element-wise multiplication for masking
         grad_W = grad_W + (grad_W_1 - grad_W_2_masked)
 
-    grad_W = grad_W / K
+    # NOTE: no 1/K averaging here.  The 1/K objective weighting is already
+    # handled by the pooled F gradient; the per-subcarrier W[k] gradient must
+    # keep its natural magnitude so step sizes trained at K=1 transfer directly
+    # to the wideband setting (the trained lambda would otherwise under-drive
+    # the W update by a factor of K).
     return grad_W
 
 def get_grad_S_com(H, F, W):
@@ -870,6 +1191,21 @@ def get_sum_loss(F, W, H, xi_0, A_dot, R_N_inv, Pt, beta=0.97, skip_unit_modulus
     # loss = -( sum_rate + OMEGA * mean_crb)
 
     return loss
+
+
+# ================== wideband (multi-subcarrier) deep-supervision loss ==========
+def get_sum_loss_wideband(F, W, H, xi_0, M_k, Pt):
+    """Wideband training loss: -(OMEGA * R + (1/K) sum_k log(CRLB_k^-1)).
+
+    Mirrors ``get_sum_loss`` for the wideband overlapping allocation: the rate
+    is averaged over subcarriers by ``get_sum_rate`` and the sensing term is
+    the per-subcarrier log-inverse-CRLB averaged over K (paper Eq. 1).
+    Returns a scalar tensor.
+    """
+    sum_rate = get_sum_rate(H, F, W, Pt)                       # (B,) mean over K
+    crb = get_crb_wideband(H, F, W, xi_0, M_k, None, Pt)       # (B,)
+    mean_crb = torch.mean(crb)
+    return -(OMEGA * sum_rate.mean() + mean_crb)
 
 
 # ================== compute CRLB gradients =========================

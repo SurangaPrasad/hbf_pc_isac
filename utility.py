@@ -308,7 +308,7 @@ def get_sum_rate(H, F, W, Pt, skip_unit_modulus=False):
         - torch.log2(trace_2 + sigma2)
     ).real.sum(dim=-1)  # (K, B)
 
-    sum_rate = torch.mean(rate)
+    sum_rate = torch.mean(rate, dim=0)   # mean over K -> (B,)
 
     return sum_rate
 
@@ -380,6 +380,9 @@ def get_trace(A):
 # ======== normalization to meet constant modulus and power constraint ===========================
 def normalize(F, W, H, Pt, skip_unit_modulus=False):
     B = len(H[0])
+    # Number of subcarriers actually present in H (wideband sweeps pass K > 1
+    # while the global config K stays 1, so derive it from the tensor).
+    K_eff = H.shape[0]
 
     # ================= Constant modulus =================
     # NOTE: when F already carries a real-valued selection mask S (sub-connected
@@ -404,7 +407,7 @@ def normalize(F, W, H, Pt, skip_unit_modulus=False):
         Pt_vec = torch.full((B,), float(Pt), device=F.device, dtype=sum_norm_BB.dtype)
 
     # ================= Normalize W =================
-    normalize_factor = torch.sqrt(K * Pt_vec / sum_norm_BB).view(B, 1, 1)
+    normalize_factor = torch.sqrt(K_eff * Pt_vec / sum_norm_BB).view(B, 1, 1)
     W = normalize_factor * W
 
     return F, W
@@ -417,6 +420,9 @@ def normalize_power(F, W, H, Pt):
     Pt can be a scalar or a 1-D tensor of shape (B,).
     """
     B = len(H[0])
+    # Number of subcarriers actually present in H (wideband sweeps pass K > 1
+    # while the global config K stays 1, so derive it from the tensor).
+    K_eff = H.shape[0]
     sum_norm_power = sum(torch.linalg.matrix_norm(F @ W, ord='fro') ** 2)  # (B,)
     sum_norm_power = torch.clamp(sum_norm_power, min=1e-6)
     if torch.is_tensor(Pt) and Pt.dim() >= 1:
@@ -425,7 +431,7 @@ def normalize_power(F, W, H, Pt):
     else:
         Pt_vec = torch.full((B,), float(Pt), dtype=sum_norm_power.real.dtype if sum_norm_power.is_complex() else sum_norm_power.dtype,
                             device=F.device)
-    normalize_factor = torch.sqrt(Pt_vec / sum_norm_power).view(B, 1, 1)
+    normalize_factor = torch.sqrt(K_eff * Pt_vec / sum_norm_power).view(B, 1, 1)
     F = normalize_factor * F
     return F
 
@@ -619,6 +625,275 @@ def get_data_tensor(data_source):
     H_train_tensor = torch.from_numpy(train_slice).to(COMPLEX_DTYPE).contiguous().to(device)
     H_test_tensor = torch.from_numpy(test_slice).to(COMPLEX_DTYPE).contiguous().to(device)
     return H_train_tensor, H_test_tensor
+
+
+# /////////////////////////////////////////////////////////////////////////////////////////
+#                     WIDEBAND (MULTI-SUBCARRIER) HELPERS
+# /////////////////////////////////////////////////////////////////////////////////////////
+#
+# The wideband OFDM extension treats the existing narrowband channel as the
+# reference (center) subcarrier and synthesizes the remaining subcarriers with
+# a frequency-selective tapped-delay-line model:
+#
+#   h_m[k] = sqrt(gamma) * sum_{l=0}^{L-1} sqrt(beta_l) * alpha_{m,l}
+#            * a(Nt, theta_{m,l}) * exp(-j 2 pi k tau_l / K)
+#
+# where beta_l is an exponential power-delay profile and tau_l the normalized
+# delay of tap l.  The center subcarrier (k = K//2) is *replaced* by the loaded
+# narrowband channel so that K=1 reduces exactly to the legacy behaviour and
+# the wideband sweeps stay anchored to the same channel statistics.
+
+def synthesize_wideband_channels(H_ref, n_subcarriers, n_taps=4, delay_spread=3.0, seed=None):
+    """Synthesize frequency-selective wideband channels from a narrowband batch.
+
+    Parameters
+    ----------
+    H_ref : torch.Tensor (1, B, M, Nt) complex
+        Narrowband (reference) channel batch, e.g. from ``get_data_tensor``.
+    n_subcarriers : int
+        Number of OFDM subcarriers K to synthesize.
+    n_taps : int
+        Number of delay taps in the exponential power-delay profile.
+    delay_spread : float
+        Controls the normalized tap delays tau_l = l * delay_spread / n_taps.
+    seed : int, optional
+        RNG seed for reproducibility.
+
+    Returns
+    -------
+    H_wb : torch.Tensor (K, B, M, Nt) complex
+        Wideband channel tensor; subcarrier ``K//2`` equals ``H_ref``.
+    """
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    K_wb = int(n_subcarriers)
+    B = H_ref.shape[1]
+    dev = H_ref.device
+
+    # ---- Exponential power-delay profile (normalized to unit total power) ----
+    tap_powers = torch.exp(-torch.arange(n_taps, dtype=REAL_DTYPE, device=dev) / (n_taps / 2.0))
+    tap_powers = tap_powers / tap_powers.sum()
+    tap_delays = torch.arange(n_taps, dtype=REAL_DTYPE, device=dev) * delay_spread / n_taps
+
+    # ---- Per-tap structure: preserve the mmWave sparse spatial geometry ----
+    # Each tap shares the reference channel's angle-of-departure structure but
+    # gets an independent complex gain (small-scale variation across delay),
+    # so the spatial sparsity of the reference channel is retained on every
+    # subcarrier.  The dominant tap (l = 0) is exactly the reference channel.
+    H_wb = torch.zeros(K_wb, B, H_ref.shape[2], H_ref.shape[3],
+                       dtype=COMPLEX_DTYPE, device=dev)
+
+    # Reference channel as the dominant tap response at the center subcarrier.
+    H_center = H_ref[0]                                   # (B, M, Nt)
+
+    # Independent complex gains per tap (unit variance), shared across (B, M, Nt).
+    tap_gains = [torch.ones((), dtype=COMPLEX_DTYPE, device=dev)]
+    for _ in range(n_taps - 1):
+        g = randn_complex((1,), device=dev) / np.sqrt(2)
+        tap_gains.append(g)
+
+    # Phase rotation across subcarriers: exp(-j 2 pi k tau_l / K)
+    k_idx = torch.arange(K_wb, dtype=REAL_DTYPE, device=dev)
+    center_k = K_wb // 2
+
+    for k in range(K_wb):
+        acc = torch.zeros_like(H_center)
+        for l in range(n_taps):
+            phase_val = -2.0 * np.pi * float(k - center_k) * float(tap_delays[l]) / max(K_wb, 1)
+            phase = torch.complex(torch.cos(torch.tensor(phase_val)),
+                                  torch.sin(torch.tensor(phase_val))).to(dev)
+            acc = acc + torch.sqrt(tap_powers[l]) * phase * tap_gains[l] * H_center
+        H_wb[k] = acc
+
+    # Overwrite the center subcarrier with the exact reference channel so the
+    # K=1 case is bit-identical to the legacy narrowband pipeline.
+    H_wb[center_k] = H_center
+
+    return H_wb
+
+
+def build_sensing_matrices_per_subcarrier(n_subcarriers, xi_0_val=1.0):
+    """Build per-subcarrier sensing matrices M[k] = A_dot^H(f_k) R_z^-1 A_dot(f_k).
+
+    The steering vector and its angle-derivative are evaluated at each
+    subcarrier frequency f_k (normalized around the center carrier):
+
+        a(f_k)   = exp(j 2 pi d n sin(theta) f_k)
+        a_dot(f_k) = j 2 pi d n cos(theta) sin(theta) f_k * a(f_k)  (chain rule)
+
+    For a ULA with half-wavelength spacing the frequency scaling enters through
+    d = lambda_k / 2 = c / (2 f_k), so the *electrical* angle
+    pi * n * sin(theta) * f_k / f_c scales linearly with f_k.
+
+    Parameters
+    ----------
+    n_subcarriers : int
+        Number of subcarriers K.
+    xi_0_val : float
+        Reference path-loss amplitude (kept for API symmetry; the CRLB metric
+        adds log(2 xi_0^2) separately).
+
+    Returns
+    -------
+    M_k : torch.Tensor (K, Nt, Nt) complex
+        Stack of per-subcarrier sensing Fisher matrices.
+    A_dot_k : torch.Tensor (K, Nt, Nt) complex
+        Stack of per-subcarrier A_dot = a_dot a^H + a a_dot^H matrices.
+    """
+    K_wb = int(n_subcarriers)
+    dev = A_dot.device
+
+    # Normalized subcarrier frequencies around the center carrier: f_k / f_c.
+    center_k = K_wb // 2
+    freq_scale = torch.ones(K_wb, dtype=REAL_DTYPE, device=dev)
+    if K_wb > 1:
+        # Fixed total fractional bandwidth (10%) regardless of K, so the
+        # per-subcarrier spacing shrinks as K grows — matching a real OFDM
+        # system where the occupied bandwidth is fixed and more subcarriers
+        # means finer frequency resolution.
+        total_bw = 0.10
+        freq_scale = 1.0 + total_bw * (torch.arange(K_wb, dtype=REAL_DTYPE, device=dev) - center_k) / K_wb
+
+    n_idx = torch.arange(Nt, dtype=REAL_DTYPE, device=dev)
+    sin_t = float(np.sin(desired_angle_rad))
+    cos_t = float(np.cos(desired_angle_rad))
+
+    M_list = []
+    Adot_list = []
+    for k in range(K_wb):
+        fs = float(freq_scale[k])
+        # Match the system_config convention exactly: a(f) = exp(j 2 pi d n sin(theta))
+        # with d = lambda/2, and a_dot(f) = j 2 pi d n cos(theta) * a(f)
+        # (derivative w.r.t. theta, NOT including an extra sin factor).
+        phase = 1j * 2 * torch.pi * 0.5 * sin_t * fs * n_idx          # d = lambda/2
+        a_k = torch.exp(phase).to(COMPLEX_DTYPE)                      # (Nt,)
+        adot_k = (1j * 2 * torch.pi * 0.5 * cos_t * fs * n_idx).to(COMPLEX_DTYPE) * a_k
+
+        a_k = a_k.unsqueeze(1)                                        # (Nt, 1)
+        adot_k = adot_k.unsqueeze(1)                                  # (Nt, 1)
+        A_dot_k = (adot_k @ a_k.transpose(0, 1) + a_k @ adot_k.transpose(0, 1)).to(COMPLEX_DTYPE)
+        M_k = (A_dot_k.conj().T @ R_N_inv @ A_dot_k).to(COMPLEX_DTYPE)
+
+        M_list.append(M_k.to(dev))
+        Adot_list.append(A_dot_k.to(dev))
+
+    return torch.stack(M_list, dim=0), torch.stack(Adot_list, dim=0)
+
+
+def get_sum_rate_wideband(H, F, W, Pt):
+    """Wideband sum rate: mean over subcarriers of the per-subcarrier rate.
+
+    Implements R = (1/K) sum_k R_k(F, W[k]) with the same per-subcarrier
+    interference structure as ``get_sum_rate``.  H, F, W all carry a leading
+    subcarrier dimension of size K.
+
+    Returns a scalar tensor (mean over batch and subcarriers).
+    """
+    return get_sum_rate(H, F, W, Pt)          # get_sum_rate already averages over K
+
+
+def initialize_wideband(H, Pt):
+    """Wideband-aware (F0, W0) initialization for K > 1 subcarriers.
+
+    F0 is frequency-flat: the unit-modulus right-singular vectors of the
+    *center* subcarrier channel (matching the legacy 'svd' init).  W0 is a
+    per-subcarrier ridge-ZF digital precoder matched to H[k] F0, power
+    normalized so that sum_k ||F0 W0[k]||_F^2 = K * Pt (same convention as
+    ``normalize``).
+
+    H : (K, B, M, Nt) complex wideband channels.
+    Returns (F0, W0) with F0 (K, B, Nt, Nrf) (replicated over K) and
+    W0 (K, B, Nrf, M).
+    """
+    K_wb = H.shape[0]
+    B = H.shape[1]
+    center_k = K_wb // 2
+
+    # ---- Frequency-flat F0 from the center subcarrier ----
+    H_c = H[center_k]                                     # (B, M, Nt)
+    # SVD of H^T (B, Nt, M): U columns are the antenna-space right-singular
+    # vectors of H, i.e. the dominant beam directions (matching the legacy
+    # 'svd' init which takes V[:, :, :, :Nrf] of H directly).
+    U_c, _, _ = torch.linalg.svd(H_c.transpose(-2, -1))   # (B, Nt, Nt)
+    F0 = U_c[:, :, :Nrf]                                  # (B, Nt, Nrf)
+    F0 = F0 / (torch.abs(F0) + 1e-12)
+    F0 = F0.unsqueeze(0).expand(K_wb, -1, -1, -1).contiguous()   # (K, B, Nt, Nrf)
+
+    # ---- Per-subcarrier ridge-ZF W0 ----
+    H_eff = torch.matmul(H, F0)                           # (K, B, M, Nrf)
+    G = H_eff @ H_eff.conj().transpose(-1, -2)            # (K, B, M, M)
+    lam = 1e-2 * torch.diagonal(G, dim1=-2, dim2=-1).real.mean().detach()
+    I_m = torch.eye(G.shape[-1], dtype=G.dtype, device=G.device)
+    W0 = H_eff.conj().transpose(-1, -2) @ torch.linalg.inv(G + lam * I_m)   # (K, B, Nrf, M)
+
+    # ---- Power normalization: per-subcarrier budget ||F0 W0[k]||_F^2 = Pt ----
+    # (paper Eq. 10c: |F W[k]|_F^2 = P_BS for every k, so the total across K
+    # subcarriers is K * Pt — matching the convention used by ``normalize``.)
+    power = torch.linalg.matrix_norm(F0 @ W0, dim=(-2, -1)) ** 2   # (K, B)
+    mean_power = power.mean(dim=0).clamp_min(1e-6)                 # (B,)
+    if torch.is_tensor(Pt) and Pt.dim() >= 1:
+        Pt_vec = Pt.to(device=F0.device, dtype=mean_power.dtype)
+    else:
+        Pt_vec = torch.full((B,), float(Pt), device=F0.device, dtype=mean_power.dtype)
+    scale = torch.sqrt(Pt_vec / mean_power).view(1, B, 1, 1)
+    W0 = scale * W0
+
+    return F0, W0
+
+
+def get_crb_wideband(H, F, W, xi_0_val, M_k, R_N_inv_t, Pt):
+    """Wideband log-inverse-CRLB: (1/K) sum_k log(CRLB_k^-1).
+
+    M_k : (K, Nt, Nt) per-subcarrier sensing matrices.
+    Returns a (B,) tensor — one entry per sample.
+    """
+    F, W = normalize(F, W, H, Pt)
+
+    F_H = F.conj().transpose(-2, -1)                       # (K, B, Nrf, Nt)
+    W_H = W.conj().transpose(-2, -1)                       # (K, B, M, Nrf)
+
+    inner_mat = W_H @ F_H @ M_k.unsqueeze(1) @ F @ W       # (K, B, M, M)
+    batch_trace = torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1)   # (K, B)
+
+    # Per-subcarrier log(CRLB_k^-1), then average over K (Eq. 1 of the paper):
+    #   (1/K) sum_k log(2 xi_0^2 * FIM_k)
+    fim = batch_trace.real                                  # (K, B)
+    crb = torch.log(fim + 1e-12) + torch.log(2 * torch.tensor(xi_0_val, device=fim.device) ** 2)
+    return crb.mean(dim=0)                                  # (B,) — average over K
+
+
+def get_grad_F_crb_wideband(F, W, M_k):
+    """Pooled wideband gradient of log(CRLB^-1) w.r.t. F (averaged over K).
+
+    M_k : (K, Nt, Nt).  Returns (K, B, Nt, Nrf) — the per-subcarrier gradient
+    stacked over K; the caller weights it with WEIGHT_F_CRB / K when pooling.
+    """
+    W_H = W.conj().transpose(-2, -1)
+    F_H = F.conj().transpose(-2, -1)
+
+    inner_mat = W_H @ F_H @ M_k.unsqueeze(1) @ F @ W       # (K, B, M, M)
+    batch_trace = torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1)   # (K, B)
+    denom = batch_trace.view(F.shape[0], -1, 1, 1)
+
+    numerator = M_k.unsqueeze(1) @ F @ W @ W_H             # (K, B, Nt, Nrf)
+    return numerator / (denom + 1e-12)
+
+
+def get_grad_W_crb_wideband(F, W, M_k):
+    """Per-subcarrier gradient of log(CRLB^-1) w.r.t. W[k].
+
+    M_k : (K, Nt, Nt).  Returns (K, B, Nrf, M).
+    """
+    W_H = W.conj().transpose(-2, -1)
+    F_H = F.conj().transpose(-2, -1)
+
+    inner_mat = W_H @ F_H @ M_k.unsqueeze(1) @ F @ W       # (K, B, M, M)
+    batch_trace = torch.diagonal(inner_mat, dim1=-2, dim2=-1).sum(-1)   # (K, B)
+    denom = batch_trace.view(F.shape[0], -1, 1, 1)
+
+    numerator = F_H @ M_k.unsqueeze(1) @ F @ W             # (K, B, Nrf, M)
+    return numerator / (denom + 1e-12)
 
 
 # =================================== load radar data generated in Matlab ==================================================
